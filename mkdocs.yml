@@ -1,8 +1,8 @@
-site_name: mypkg
-site_url: https://devincornell.github.io/mypkg
+site_name: mediatools
+site_url: https://devincornell.github.io/mediatools
 theme:
   name: material
   icon:
     repo: fontawesome/brands/git-alt 
-repo_url: https://github.com/devincornell/mypkg
-repo_name: devincornell/mypkg
+repo_url: https://github.com/devincornell/mediatools
+repo_name: devincornell/mediatools

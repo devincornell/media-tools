@@ -1,4 +1,4 @@
-PACKAGE_NAME = mypkg
+PACKAGE_NAME = mediatools
 PACKAGE_SRC = src/$(PACKAGE_NAME)
 
 
