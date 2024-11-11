@@ -33,3 +33,22 @@ class VideoTime(str):
         return float(self)
 
 
+def multi_extension_glob(
+    glob_func: typing.Callable[[str],Path], 
+    extensions: typing.Iterable[str],
+    base_name_pattern: str = '*',
+) -> list[Path]:
+    '''Get a list of file paths that match patterns for different file extensions.
+    Args:
+        glob_func: A function that takes a pattern and returns a list of paths.
+            Could be glob.glob, Path.glob, or Path.rglob.
+        extensions: A list of file extensions to search for.
+        base_name_pattern: The base name pattern to use for the file name.
+            Example: "*" or "video_*" or "vid_*_name". Concatenated with extensions.
+    '''
+    all_paths = list()
+    for ext in extensions:
+        pattern = f'{base_name_pattern}{ext}' if ext.startswith('.') else f'{base_name_pattern}.{ext}'
+        all_paths += list(glob_func(pattern))
+    return list(sorted(all_paths))
+    
