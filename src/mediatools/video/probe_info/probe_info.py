@@ -9,7 +9,7 @@ from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError
 
 from .stream_info import VideoStreamInfo, AudioStreamInfo
 
-from .util import get_or_None_factory, VideoTime
+from mediatools.util import get_or_None_factory, VideoTime
 
 
 @dataclasses.dataclass

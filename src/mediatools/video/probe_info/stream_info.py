@@ -4,7 +4,7 @@ import dataclasses
 import typing
 
 
-from .util import get_or_None_factory, VideoTime
+from mediatools.util import get_or_None_factory, VideoTime
 
 
 @dataclasses.dataclass
