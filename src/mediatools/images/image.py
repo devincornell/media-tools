@@ -6,39 +6,41 @@ import numpy as np
 import pathlib
 
 #from .imagegrid import ImageGrid
-from .distances import Distances
+#from .distances import Distances
 
-class Height(int):
-    pass
-
-class Width(int):
-    pass
+Height = int
+Width = int
 
 @dataclasses.dataclass(frozen=True)
 class Image:
+    '''Represents an image loaded into memory.'''
     im: np.ndarray
 
-    #def copy(self, **new_values) -> Image:
-    #    '''Copy all but provided attributes.'''
-    #    return self.__class__(**{**dataclasses.asdict(self), **new_values})
-    
-    def copy(self, new_type: typing.Optional[typing.Type[Image]] = None, **additional_data) -> Image:
-        use_type = new_type if new_type is not None else self.__class__
-        return use_type(**{**dataclasses.asdict(self), **additional_data})
+    @classmethod
+    def from_file(cls, path: pathlib.Path) -> typing.Self:
+        return cls(
+            im=skimage.io.imread(str(path))
+        )
+    def clone(self, **new_attrs) -> Image:
+        return self.__class__(**{**dataclasses.asdict(self), **new_attrs})
 
     ################ Dunder ################
-    def __getitem__(self, ind: typing.Union[slice, typing.Tuple[slice, ...]]) -> Image:
+    def __getitem__(self, ind: slice | tuple[slice, ...]) -> typing.Self:
         '''Get image at index or (y,x) index.'''
-        return self.copy(im=self.im[ind])
+        return self.clone(im=self.im[ind])
     
-    #def slice(self, y: int, x: int, h: int, w: int) -> Image:
-    #    '''Get image at index or (y,x) index.'''
-    #    return self[x:x+w, y:y+h]
-
     ################ Properties ################
     @property
-    def dist(self) -> Distances:
-        return Distances(self)
+    def dist(self) -> DistanceCalculator:
+        return DistanceCalculator(self)
+    
+    @property
+    def filter(self) -> FilterCalculator:
+        return FilterCalculator(self)
+    
+    @property
+    def transform(self) -> TransformCalculator:
+        return TransformCalculator(self)
 
     @property
     def size(self) -> typing.Tuple[Height, Width]:
@@ -51,9 +53,6 @@ class Image:
         return self.im.shape # type: ignore
 
     ################ Read/Writing ################
-    @classmethod
-    def read(cls, path: pathlib.Path) -> Image:
-        return cls(im = skimage.io.imread(str(path)))
 
     #def write_ubyte(self, path: pathlib.Path) -> None:
     #    '''Writes image as uint8.'''
@@ -65,32 +64,75 @@ class Image:
 
     ################ Transforms ################
 
-    def filter_sobel(self) -> Image:
-        return self.copy(im=skimage.filters.sobel(self.im))
+    #def filter_sobel(self) -> Image:
+    #    return self.clone(im=skimage.filters.sobel(self.im))
     
-    def filter_sobel_image(self) -> Image:
-        return skimage.filters.sobel(self.im)
+    #def filter_sobel_image(self) -> Image:
+    #    return skimage.filters.sobel(self.im)
     
-    def resize(self, resize_shape: typing.Tuple[Height, Width], **kwargs) -> Image:
-        return self.copy(im=skimage.transform.resize(self.im, resize_shape, **kwargs))
+    #def resize(self, resize_shape: typing.Tuple[Height, Width], **kwargs) -> Image:
+    #    return self.clone(im=skimage.transform.resize(self.im, resize_shape, **kwargs))
 
-    def transform_color_rgb(self) -> Image:
-        '''Transform image to be rgb.'''
-        if len(self.im.shape) < 3:
-            im = skimage.color.gray2rgb(self.im)
-        elif self.im.shape[2] > 3:
-            im = skimage.color.rgba2rgb(self.im)
-        else:
-            im = self.im
-        return self.copy(im=im)
+    #def transform_color_rgb(self) -> Image:
+    #    '''Transform image to be rgb.'''
+    #    if len(self.im.shape) < 3:
+    #        im = skimage.color.gray2rgb(self.im)
+    #    elif self.im.shape[2] > 3:
+    #        im = skimage.color.rgba2rgb(self.im)
+    #    else:
+    #        im = self.im
+    #    return self.clone(im=im)
 
     
     ################ Conversions ################
     def as_ubyte(self) -> Image:
-        return self.copy(im=skimage.img_as_ubyte(self.im))
+        return self.clone(im=skimage.img_as_ubyte(self.im))
     
     def as_float(self) -> Image:
-        return self.copy(im=skimage.img_as_float(self.im))
+        return self.clone(im=skimage.img_as_float(self.im))
 
 
+@dataclasses.dataclass
+class TransformCalculator:
+    '''Calculates distances between images.'''
+    image: Image
+    
+    def to_rgb(self) -> Image:
+        '''Transform image to be rgb.'''
+        if len(self.image.im.shape) < 3:
+            im = skimage.color.gray2rgb(self.im)
+        elif self.image.im.shape[2] > 3:
+            im = skimage.color.rgba2rgb(self.im)
+        else:
+            im = self.image.im
+        return self.image.clone(im=im)
+    
+    def resize(self, resize_shape: typing.Tuple[Height, Width], **kwargs) -> Image:
+        '''Resize image.'''
+        return self.image.clone(im=skimage.transform.resize(self.image.im, resize_shape, **kwargs))
 
+@dataclasses.dataclass
+class FilterCalculator:
+    '''Calculates distances between images.'''
+    image: Image
+    
+    def sobel(self) -> Image:
+        '''Sobel filtered image.'''
+        return self.image.clone(im=skimage.filters.sobel(self.image.im))
+
+@dataclasses.dataclass
+class DistanceCalculator:
+    '''Calculates distances between images.'''
+    image: Image
+
+    def composit(self, other: Image) -> float:
+        '''Composite distance between images.'''
+        return self.euclid(other) + self.sobel(other)
+
+    def euclid(self, other: Image) -> float:
+        '''Euclidean distance between images.'''
+        return np.linalg.norm(self.image.im - other.im)
+            
+    def sobel(self, other: Image) -> float:
+        '''Distances between sobel filtered images.'''
+        return np.linalg.norm(self.image.filter.sobel().im - other.filter.sobel().im)
