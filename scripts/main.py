@@ -2,8 +2,7 @@
 import sys
 sys.path.append('../src')
 
-import mypkg
-from mypkg import separate_funcs
+import mediatools
 
 if __name__ == '__main__':
     
