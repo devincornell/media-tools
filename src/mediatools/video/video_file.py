@@ -34,6 +34,7 @@ class VideoFileDoesNotExistError(Exception):
 
 @dataclasses.dataclass(repr=False)
 class VideoFile:
+    '''Represents a video file.'''
     fpath: Path
     
     #def __post_init__(self):
