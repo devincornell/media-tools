@@ -131,6 +131,11 @@ class VideoFile:
     
 
 
+XCoord = int
+YCoord = int
+Height = int
+Width = int
+
 
 @dataclasses.dataclass
 class NewVideoResult:
@@ -146,6 +151,24 @@ class NewVideoResult:
                 f'even though ffmpeg did not raise an exception.')
         return cls(vf=VideoFile.from_path(fpath), stdout=stdout)
 
+@dataclasses.dataclass
+class NewVideoResult:
+    vf: VideoFile
+    stdout: str
+
+    @classmethod
+    def check_file_exists(cls, fpath: Path, stdout: str) -> NewVideoResult:
+        '''Check that the file exists and return a NewVideoResult.'''
+        fpath = Path(fpath)
+        if not fpath.exists():
+            raise FileNotFoundError(f'The video file "{fpath}" was not found '
+                f'even though ffmpeg did not raise an exception.')
+        return cls(vf=VideoFile.from_path(fpath), stdout=stdout)
+
+@dataclasses.dataclass
+class NewThumbResult:
+    fp: Path
+    stdout: str
 
 
 @dataclasses.dataclass
@@ -202,8 +225,8 @@ class FFMPEGTools:
 
     def crop(self, 
         output_fname: Path, 
-        topleft_point: typing.Tuple[int,int],
-        size: typing.Tuple[int,int],
+        topleft_point: typing.Tuple[XCoord, YCoord],
+        size: typing.Tuple[Width,Height],
         overwrite: bool = False, 
         **output_kwargs
     ) -> NewVideoResult:
@@ -234,7 +257,7 @@ class FFMPEGTools:
         width: int = -1, 
         overwrite: bool = False, 
         **output_kwargs
-    ) -> tuple[Path, str]:
+    ) -> NewThumbResult:
         '''Make a thumbnail from this video.
         Args:
             time_point is the proportion of the video at which to take the thumb (e.g. 0.5 means at half way through.)
@@ -242,7 +265,8 @@ class FFMPEGTools:
             copied from here:
                 https://api.video/blog/tutorials/automatically-add-a-thumbnail-to-your-video-with-python-and-ffmpeg
         '''
-        if Path(output_fname).exists() and not overwrite:
+        output_fname = Path(output_fname)
+        if output_fname.exists() and not overwrite:
             raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
         
         probe = self.vf.probe()
@@ -251,11 +275,11 @@ class FFMPEGTools:
                 ffmpeg
                 .input(self.vf.fpath, ss=int(probe.duration * time_point))
                 .filter('scale', width, height)
-                .output(output_fname, vframes=1, **output_kwargs)
+                .output(str(output_fname), vframes=1, **output_kwargs)
             ),
             overwrite_output=overwrite,
         )
-        return Path(output_fname), stdout
+        return NewThumbResult(output_fname, stdout)
 
     @staticmethod
     def run(ffmpeg_command, overwrite_output: bool) -> str:
