@@ -1,0 +1,8 @@
+site_name: mypkg
+site_url: https://devincornell.github.io/mypkg
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/git-alt 
+repo_url: https://github.com/devincornell/mypkg
+repo_name: devincornell/mypkg
