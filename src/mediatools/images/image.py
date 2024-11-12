@@ -47,8 +47,8 @@ class Image:
 
     @property
     def size(self) -> typing.Tuple[Height, Width]:
-        '''Height, width.'''
-        return self.im.shape[:2] # type: ignore    
+        '''Height, width. Doing it manually so errors raise KeyError or IndexErrors.'''
+        return (self.im.shape[0], self.im.shape[1]) # type: ignore
     
     @property
     def shape(self) -> typing.Tuple[Height, Width, int]:
