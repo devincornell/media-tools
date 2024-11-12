@@ -22,6 +22,9 @@ def test_ffmpeg_tools():
 
         vf = mediatools.VideoFile.from_path(td(test_video_fname))
 
+        print('testing globbing multiple files')
+        imfs = mediatools.VideoFiles.from_rglob(tempdir)
+        assert(len(imfs) > 0)
 
         print('compressing')
         result = vf.ffmpeg.compress(td('totk_compressed.mp4'), crf=30, overwrite=True)
