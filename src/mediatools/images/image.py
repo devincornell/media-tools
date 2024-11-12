@@ -11,7 +11,7 @@ import pathlib
 Height = int
 Width = int
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, repr=False)
 class Image:
     '''Represents an image loaded into memory.'''
     im: np.ndarray
@@ -28,6 +28,9 @@ class Image:
     def __getitem__(self, ind: slice | tuple[slice, ...]) -> typing.Self:
         '''Get image at index or (y,x) index.'''
         return self.clone(im=self.im[ind])
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(shape={self.shape})'
     
     ################ Properties ################
     @property
