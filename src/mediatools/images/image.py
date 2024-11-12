@@ -88,6 +88,16 @@ class Image:
 
     
     ################ Conversions ################
+    def to_rgb(self) -> Image:
+        '''Transform image to be rgb.'''
+        if len(self.im.shape) < 3:
+            im = skimage.color.gray2rgb(self.im)
+        elif self.im.shape[2] > 3:
+            im = skimage.color.rgba2rgb(self.im)
+        else:
+            im = self.im
+        return self.clone(im=im)
+
     def as_ubyte(self) -> Image:
         return self.clone(im=skimage.img_as_ubyte(self.im))
     
@@ -99,16 +109,6 @@ class Image:
 class TransformCalculator:
     '''Calculates distances between images.'''
     image: Image
-    
-    def to_rgb(self) -> Image:
-        '''Transform image to be rgb.'''
-        if len(self.image.im.shape) < 3:
-            im = skimage.color.gray2rgb(self.im)
-        elif self.image.im.shape[2] > 3:
-            im = skimage.color.rgba2rgb(self.im)
-        else:
-            im = self.image.im
-        return self.image.clone(im=im)
     
     def resize(self, resize_shape: typing.Tuple[Height, Width], **kwargs) -> Image:
         '''Resize image.'''
