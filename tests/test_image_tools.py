@@ -5,7 +5,6 @@ import requests
 
 import sys
 sys.path.append('../src')
-
 import mediatools
 
 
@@ -20,6 +19,8 @@ def test_image_tools():
         with open(Path(tempdir) / test_video_fname, 'wb') as f:
             f.write(r.content)
 
+
+        
         imf = mediatools.ImageFile.from_path(td(test_video_fname))
         im = imf.read()
         im.transform.to_rgb()
@@ -29,7 +30,8 @@ def test_image_tools():
         im.dist.euclid(im)
         im.dist.sobel(im)
 
-
+        imfs = mediatools.ImageFiles.from_rglob(tempdir)
+        assert(len(imfs) > 0)
 
 
 if __name__ == '__main__':
