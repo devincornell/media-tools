@@ -1,122 +1,118 @@
-# devin-package-template
-This repo should be used as a template for Python packages and templates.
+# MediaTools
+This package contains tools for working with video and image files.
 
-Most of commands I use here can be found in the `Makefile`, so you can use that as a reference.
-
-+ Environment setup
-    + Python Virtual Environments
-+ Building
-    + Install and uninstall
-+ Validation
-    + Linting
-    + Testing
-+ Generate documentation
-    + Generate Requirements List
-    + Compile Example Notebooks
-    + MKDocs-Material Documentation
-
-
-## Environment Setup
-
-### Python Virtual Environments
-
-Create a new python virtual environment like this.
+### Install
 
 ```bash
-python -m venv $(VIRTUAL_ENV_NAME)
+pip install git+ssh://git@github.com:devincornell/media-tools.git@main
 ```
 
-Activate it like this:
-
-```bash
-source $(VIRTUAL_ENV_NAME)/bin/activate
-```
-
-It should appear in paranetheses at the beginning of your shell prompt.
-
-Deactivate it using this command:
-
-```bash
-deactivate
-```
-## Builiding the Package
-
-Install the package using this command in the root directory of the package.
-
-```bash
-pip install .
-```
-
-Uninstall like this.
-
-```bash
-pip uninstall $(PACKAGE_NAME)
-```
-
-## Validation and Testing
-
-### Testing
-
-I use `pytest` for testing. Run all tests in the `tests/` folder like this.
-
-```bash
-cd tests; pytest *.py
-```
-
-### Linting
-
-I use `mypy` for linting. Set the Python version in the command.
-
-```bash
-python -m mypy $(PACKAGE_SRC) --python-version=3.11
+```python
+import mediatools
 ```
 
 
-## Generate Documentation
+## API Overview
 
-### Generate Requirements List
+Currently, the package provides tools for working with video and image files.
 
-I put requirements lists in the `requrements/`folder. The `freeze` and `list` commands will create a full list of installed packages, where the `pipreqs` command will create a list of only the packages that are used in the project. The `--force` flag will overwrite the file if it already exists.
++ **Video files**: process videos using [ffmpeg-python](https://github.com/kkroening/ffmpeg-python).
+    + Compress
+    + Splice
+    + Crop
+    + Create thumbnails
 
-```bash
-mkdir $(REQUIREMENTS_FOLDER)
-pip freeze > $(REQUIREMENTS_FOLDER)/requirements.txt	
-pip list > $(REQUIREMENTS_FOLDER)/packages.txt
-pip install pipreqs
-pipreqs --force $(PACKAGE_NAME)/ --savepath $(REQUIREMENTS_FOLDER)/used_packages.txt
++ **Image files**: interface for manipulating images using [skimage](https://scikit-image.org/).
+    + Convert between GS/RGB/RGBA
+    + Compute filter functions
+    + Execute distance metrics
+    + Crop
+    + Resize
+
+### Working with Videos
+
+First create a `VideoFile` object from a file path.
+
+```python
+vf = mediatools.VideoFile.from_path('my_video.mp4)
 ```
 
-### Compile Example Notebooks
+Compress the video using the `compress` method.
 
-In the `examples/` folder I usually put notebooks that can be compiled to markdown and included in the documentation shown on the mkdocs website (or even just github). This is done with the following commands.
-
-```bash
-jupyter nbconvert --to markdown $(EXAMPLE_NOTEBOOK_FOLDER)/*.ipynb
-mv $(EXAMPLE_NOTEBOOK_FOLDER)/*.md $(MKDOCS_FOLDER)
-```
-
-
-### MKDocs-Material Documentation
-
-This template uses the [mkdocs-material](https://squidfunk.github.io/mkdocs-material/) theme to create a website with documentation. All of the Makefile commands startings with "mkdocs" are related to this. See the makefile for available commands.
-
-
-Use this command to start a new mkdocs project. You'll see that it creates a "mkdocs.yml" file where project info goes. I already created one for this template with the fields I usually put out.
-
-```bash
-mkdocs new .
-```
-
-Use this command to see a local version of what it will look like
-
-```bash
-mkdocs serve
+```python
+vf.ffmpeg.compress(td('totk_compressed.mp4'), crf=30, overwrite=True)
 ```
 
 
-This command will publish it to the web.
+Splice the video using the `splice` method.
 
-```bash
-mkdocs gh-deploy --force
+```python
+result = vf.ffmpeg.splice(
+    output_fname=td('totk_spliced.mp4'), 
+    start_time=datetime.timedelta(seconds=0), 
+    end_time=datetime.timedelta(seconds=5),
+    overwrite=True
+)
 ```
+
+Crop the video using the `crop` method.
+```python
+result = vf.ffmpeg.crop(
+    output_fname=td('totk_cropped.mp4'), 
+    topleft_point=(0,0),
+    size=(vf.probe().video.width//2, vf.probe().video.height//2),
+    overwrite=True
+)
+```
+
+Make a thumbnail using the `make_thumb` method.
+```python
+result = vf.ffmpeg.make_thumb(
+    output_fname=td('totk_thumb.jpg'), 
+    time_point=0.5,
+    height=100,
+    overwrite=True
+)
+```
+
+### Working with Images
+
+First create an `ImageFile` object from a file path.
+
+```python
+imf = mediatools.ImageFile.from_path('my_image.jpg')
+```
+
+You can read the image file using the `read` method. This will allow you to manipulate the data itself.
+
+```python
+imf.read()
+```
+
+You can also use the `transform` attribute to manipulate the image file. For example, you can convert the image to RGB using the `to_rgb` method.
+
+```python
+im.transform.to_rgb()
+```
+
+Resize the image.
+
+```python
+im.transform.resize((100,100))
+```
+
+Apply a filter to the image.
+
+```python
+im.filter.sobel()
+```
+
+Compute the distance between two images.
+
+```python
+im.dist.composit(im)
+im.dist.euclid(im)
+im.dist.sobel(im)
+```
+
 
