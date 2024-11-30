@@ -2,34 +2,22 @@ from __future__ import annotations
 import jinja2
 import typing
 import pathlib
-import dataclasses
-import pprint
-import subprocess
-import os
-import tqdm
-import ffmpeg
-import sys
-#import videotools
-import html
-import urllib.parse
 
 import sys
-sys.path.append('..')
-import pydevin
-#import pydevin.videotools
-#import pydevin.mediasite
+sys.path.append('../src')
+import mediatools
 
 def make_pages(
         fpath: pathlib.Path, 
-        config: pydevin.mediasite.SiteConfig, 
+        config: mediatools.site.SiteConfig, 
         make_thumbs: bool = True
-    ) -> pydevin.mediasite.PageInfo:
-    page_tree = pydevin.mediasite.PageInfo.from_fpath(fpath, config, verbose=True)
+    ) -> mediatools.site.PageInfo:
+    page_tree = mediatools.site.PageInfo.from_fpath(fpath, config, verbose=True)
     return make_files_recursive(page_tree, config=config, make_thumbs=make_thumbs)
 
 def make_files_recursive(
-        pinfo: pydevin.mediasite.PageInfo, 
-        config: pydevin.mediasite.SiteConfig, 
+        pinfo: mediatools.site.PageInfo, 
+        config: mediatools.site.SiteConfig, 
         make_thumbs: bool
     ):
     print(f'starting in {str(pinfo.folder_fpath)}')
@@ -100,14 +88,14 @@ if __name__ == '__main__':
 
     print('reading template')
     #template_path = pathlib.Path('templates/band1_template.html')
-    template_path = pydevin.TEMPLATES['gpt_multi_v2.2']
+    template_path = mediatools.site.TEMPLATES['gpt_multi_v2.2']
     with template_path.open('r') as f:
         template_html = f.read()
     environment = jinja2.Environment()
     template = environment.from_string(template_html)
 
 
-    config = pydevin.mediasite.SiteConfig(
+    config = mediatools.site.SiteConfig(
         base_path = base_path,
         thumb_base_path = thumb_path,
         template = template,
@@ -124,7 +112,7 @@ if __name__ == '__main__':
     
     print(f'making pages')
     make_pages(
-        fpath=base_path,#.joinpath('z_photos/'),
+        fpath=base_path,
         config=config,
         make_thumbs=True,
     )

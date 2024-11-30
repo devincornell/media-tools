@@ -15,11 +15,11 @@ import urllib.parse
 
 
 from .infobase import InfoBase
-from ..util import format_memory, format_time
+from .util import format_memory, format_time
 from .siteconfig import SiteConfig
 from .util import parse_url, fname_to_title, fname_to_id
 
-from ..vtools import VideoFile, ProbeInfo, ProbeError
+from ..video import VideoFile, ProbeInfo, ProbeError
 
 @dataclasses.dataclass
 class VidInfo(InfoBase):

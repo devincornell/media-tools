@@ -2,6 +2,7 @@ import typing
 from pathlib import Path
 import functools
 
+
 Constant = str | int | bool | float
 
 

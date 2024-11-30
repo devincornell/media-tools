@@ -1,5 +1,5 @@
-
 import urllib
+
 
 def fname_to_title(fname: str, max_char: int = 150) -> str:
     replaced = fname.replace('_', ' ').replace('-', ' ')
