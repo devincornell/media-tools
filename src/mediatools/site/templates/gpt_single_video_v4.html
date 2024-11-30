@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .navbar {
+            background: #333;
+            color: #fff;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .navbar a {
+            color: #fff;
+            text-decoration: none;
+            padding: 14px 20px;
+            display: inline-block;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            width: 80%;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+        .main-content {
+            flex: 3;
+            padding: 20px;
+        }
+        .video-player {
+            width: 100%;
+            background: #000;
+            position: relative;
+        }
+        .video-player video {
+            width: 100%;
+            height: auto;
+        }
+        .download-button {
+            display: block;
+            width: 150px;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .video-details {
+            margin: 20px 0;
+        }
+        .video-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .video-description {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .comments-section {
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .comments-section h3 {
+            margin-top: 0;
+        }
+        .comment {
+            margin-bottom: 20px;
+        }
+        .comment .username {
+            font-weight: bold;
+        }
+        .comment .comment-text {
+            margin: 5px 0;
+        }
+        .info-column {
+            flex: 1;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-left: 20px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        .info-column h2 {
+            margin-top: 0;
+        }
+        .info-column p {
+            margin: 10px 0;
+        }
+        .info-column a {
+            text-decoration: none;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="#">Home</a>
+        <a href="#">Trending</a>
+        <a href="#">Subscriptions</a>
+        <a href="#">Library</a>
+    </div>
+    <div class="container">
+        <div class="main-content">
+            <div class="video-player">
+                <video controls poster="thumbnail.jpg">
+                    <source src="video.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <a href="video.mp4" download class="download-button">Download</a>
+            </div>
+            <div class="video-details">
+                <div class="video-title">Video Title</div>
+                <div class="video-description">
+                    This is a brief description of the video. It provides an overview of the video's content and any relevant information for viewers.
+                </div>
+            </div>
+            <div class="comments-section">
+                <h3>Comments</h3>
+                <div class="comment">
+                    <div class="username">User1</div>
+                    <div class="comment-text">This is a great video!</div>
+                </div>
+                <div class="comment">
+                    <div class="username">User2</div>
+                    <div class="comment-text">I learned a lot from this, thanks for sharing.</div>
+                </div>
+                <!-- Add more comments as needed -->
+            </div>
+        </div>
+        <div class="info-column">
+            <h2>Related Videos</h2>
+            <p><a href="#">Related Video 1</a></p>
+            <p><a href="#">Related Video 2</a></p>
+            <p><a href="#">Related Video 3</a></p>
+            <p><a href="#">Related Video 4</a></p>
+            <p><a href="#">Related Video 5</a></p>
+            <p><a href="#">Related Video 6</a></p>
+            <p><a href="#">Related Video 7</a></p>
+            <p><a href="#">Related Video 8</a></p>
+            <p><a href="#">Related Video 9</a></p>
+            <p><a href="#">Related Video 10</a></p>
+            <!-- Add more related videos or information as needed -->
+        </div>
+    </div>
+</body>
+</html>

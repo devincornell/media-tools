@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Gallery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+        }
+        .header {
+            background: #333;
+            color: #fff;
+            padding: 10px 0;
+            text-align: center;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .video {
+            background: #fff;
+            margin: 10px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        .video video {
+            width: 100%;
+            height: auto;
+        }
+        .video-title {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Video Gallery</h1>
+    </div>
+    <div class="container">
+        <div class="gallery">
+            <!-- Video Item 1 -->
+            <div class="video">
+                <video controls poster="thumbnail1.jpg">
+                    <source src="video1.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 1</div>
+            </div>
+            <!-- Video Item 2 -->
+            <div class="video">
+                <video controls poster="thumbnail2.jpg">
+                    <source src="video2.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 2</div>
+            </div>
+            <!-- Video Item 3 -->
+            <div class="video">
+                <video controls poster="thumbnail3.jpg">
+                    <source src="video3.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 3</div>
+            </div>
+            <div class="video">
+                <video controls poster="thumbnail3.jpg">
+                    <source src="video3.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 3</div>
+            </div>
+            <div class="video">
+                <video controls poster="thumbnail3.jpg">
+                    <source src="video3.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 3</div>
+            </div>
+            <div class="video">
+                <video controls poster="thumbnail3.jpg">
+                    <source src="video3.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-title">Video Title 3</div>
+            </div>
+
+            <!-- Add more videos as needed -->
+        </div>
+    </div>
+</body>
+</html>

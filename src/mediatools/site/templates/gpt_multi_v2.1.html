@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Gallery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            width: 90%;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 300px;
+            margin: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: white;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .thumbnail img, .thumbnail video {
+            width: 100%;
+            height: auto;
+        }
+        .thumbnail .title {
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            background-color: #fafafa;
+        }
+        .video-player {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background-color: black;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        .video-player video {
+            width: 80vw;
+            height: auto;
+        }
+        .video-player .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: red;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Media Gallery</h1>
+    </div>
+    <div class="container">
+        <div class="gallery">
+            <div class="thumbnail" onclick="openPlayer('video1.mp4')">
+                <video src="video1.mp4" poster="thumbnail1.jpg"></video>
+                <div class="title">Video 1</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+            <div class="thumbnail" onclick="openPlayer('video2.mp4')">
+                <video src="video2.mp4" poster="thumbnail2.jpg"></video>
+                <div class="title">Video 2</div>
+            </div>
+
+            <div class="thumbnail">
+                <img src="image1.jpg" alt="Image 1">
+                <div class="title">Image 1</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image1.jpg" alt="Image 1">
+                <div class="title">Image 1</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image1.jpg" alt="Image 1">
+                <div class="title">Image 1</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+            <div class="thumbnail">
+                <img src="image2.jpg" alt="Image 2">
+                <div class="title">Image 2</div>
+            </div>
+
+        </div>
+    </div>
+    <div class="video-player" id="videoPlayer">
+        <button class="close-btn" onclick="closePlayer()">Close</button>
+        <video controls id="videoElement">
+            <source id="videoSource" src="" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <script>
+        function openPlayer(videoSrc) {
+            document.getElementById('videoSource').src = videoSrc;
+            document.getElementById('videoElement').load();
+            document.getElementById('videoPlayer').style.display = 'block';
+        }
+        function closePlayer() {
+            document.getElementById('videoPlayer').style.display = 'none';
+            document.getElementById('videoElement').pause();
+        }
+    </script>
+</body>
+</html>

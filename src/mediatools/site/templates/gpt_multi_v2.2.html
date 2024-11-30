@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Gallery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #333;
+            color: white;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .sidebar h2 {
+            font-size: 20px;
+            margin-top: 0;
+        }
+        .file-browser ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .file-browser li {
+            margin: 10px 0;
+        }
+        .file-browser li a {
+            color: white;
+            text-decoration: none;
+        }
+        .container {
+            width: 95%;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 300px;
+            margin: 0px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: white;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .thumbnail img {
+            width: 300px;
+            height: auto;
+        }
+        .thumbnail video {
+            width: auto;
+            height: 200px;
+        }
+        .thumbnail .title {
+            padding: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: left;
+            text-decoration: none;
+        }
+        .thumbnail p {
+            padding: 0px;
+            text-align: center;
+            margin: 0px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .video-player {
+            display: none;
+            position: fixed;
+            left: 50%;
+            transform: translate(-50%);
+            z-index: 1000;
+            background-color: black;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            height: 90%;
+            color: white;
+        }
+        .video-player video, .video-player img {
+            width: auto;
+            height: 90%;
+        }
+        .video-player .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: red;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .close-player {
+            color: white;
+            background-color: red;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .section-title {
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .download-button {
+            /*display: block;
+            width: 100px;
+            text-align: center;
+            margin: 5px 0;
+            */
+            padding: 5px 5px;
+            margin: 5px;
+            background: #a9bbce;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Navigation</h2>
+        <div class="file-browser">
+            <ul>      
+                <li><a href="../web.html">↑ Up</a></li>
+                <li><a href="#folders">Folders</a></li>
+                <li><a href="#videos">Videos</a></li>
+                <li><a href="#images">Images</a></li>
+            </ul>
+            <a class="close-player" onclick="closePlayer()">Close Player</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>Media Gallery</h1>
+        </div>
+
+        {% if child_paths|length > 0 %}
+            <div id="folders" class="gallery">
+                <div class="section-title">Folders</div>
+                {% for cp in child_paths %}
+                    <div class="thumbnail">
+                        <a href='{{ cp.path }}'>
+                            <img src="{{ cp.subfolder_thumb }}" alt="{{cp.name}} subfolder thumb">
+                            <div class="title">{{cp.name}}</div>
+                        </a>
+                        <p>{{cp.num_vids}} videos | {{cp.num_subfolders}} folders | {{cp.files_size_str}} total<br/></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        {% if vids|length > 0 %}
+            <div id="videos" class="gallery">
+                <div class="section-title">Videos</div>
+                {% for vid in vids %}
+                    <div class="thumbnail" id="{{vid.idx}}">
+                        <div onclick="openPlayer('{{vid.vid_web}}', '{{vid.vid_title}}', '{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}')">
+                            <!--<video src="{{ vid.vid_web }}" poster="{{ vid.thumb_web }}"></video>-->
+                            <img src="{{vid.thumb_web}}"/>
+                        </div>
+                        <div class="title">{{ vid.vid_title }}</div>
+                        <p>{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}</p>
+                        <p><a href="{{vid.vid_web}}" download class="download-button">Download</a> | 
+                            <a href="{{vid.vid_web}}" class="download-button">Open</a></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if clips|length > 0 %}
+            <div id="clips" class="gallery">
+                <div class="section-title">Clips</div>
+                {% for vid in clips %}
+                    <div class="thumbnail" id="{{vid.idx}}">
+                        <div onclick="openPlayer('{{vid.vid_web}}', '{{vid.vid_title}}', '{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}')">
+                            <!--<video src="{{ vid.vid_web }}" poster="{{ vid.thumb_web }}"></video>-->
+                            <img src="{{vid.thumb_web}}"/>
+                        </div>
+                        <div class="title">{{ vid.vid_title }}</div>
+                        <p>{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}</p>
+                        <p><a href="{{vid.vid_web}}" download class="download-button">Download</a> | 
+                            <a href="{{vid.vid_web}}" class="download-button">Open</a></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+
+        {% if imgs|length > 0 %}
+            <div id="images" class="gallery">
+                <div class="section-title">Images</div>
+                {% for img in imgs %}
+                    <div class="thumbnail">
+                        <a href="{{img.path}}"><img src="{{img.path}}" alt="could not show image"></a>
+                        <!--<div class="title">{{img.title}}</div>-->
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <div class="video-player" id="videoPlayer">
+        <button class="close-btn" onclick="closePlayer()">Close</button>
+        <video controls id="videoElement">
+            <source id="videoSource" src="" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <h2 id="videoTitle"></h2>
+        <p id="videoInfo"></p>
+        <p><a id="downloadLink" href="" download class="download-button">Download</a> | <a id="openLink" href="" class="download-button">Open</a></p>
+    </div>
+    <script>
+        function openPlayer(videoSrc, videoTitle, videoInfo) {
+            document.getElementById('videoSource').src = videoSrc;
+            document.getElementById('videoTitle').innerText = videoTitle;
+            document.getElementById('videoInfo').innerText = videoInfo;
+            document.getElementById('downloadLink').href = videoSrc;
+            document.getElementById('openLink').href = videoSrc;
+            document.getElementById('videoElement').load();
+            document.getElementById('videoPlayer').style.display = 'block';
+        }
+        function closePlayer() {
+            document.getElementById('videoPlayer').style.display = 'none';
+            document.getElementById('videoElement').pause();
+        }
+        document.body.addEventListener('keydown', function(e) {
+            if (e.key == "Escape") {
+                closePlayer()
+            }
+        });
+    </script>
+</body>
+</html>
