@@ -92,26 +92,21 @@ class VideoFile:
         return FFMPEGTools(vf=self)
     
 
+    ############################# file operations #############################
+    def copy(self, new_fpath: Path, overwrite: bool = False) -> VideoFile:
+        '''Copy the file to a new location.'''
+        new_fpath = Path(new_fpath)
+        if new_fpath.exists() and not overwrite:
+            raise FileExistsError(f'The file {new_fpath} already exists. User overwrite=True to overwrite it.')
+        new_fpath.write_bytes(self.fpath.read_bytes())
+        return VideoFile.from_path(new_fpath)
+
 
 XCoord = int
 YCoord = int
 Height = int
 Width = int
 
-
-@dataclasses.dataclass
-class NewVideoResult:
-    vf: VideoFile
-    stdout: str
-
-    @classmethod
-    def check_file_exists(cls, fpath: Path, stdout: str) -> NewVideoResult:
-        '''Check that the file exists and return a NewVideoResult.'''
-        fpath = Path(fpath)
-        if not fpath.exists():
-            raise FileNotFoundError(f'The video file "{fpath}" was not found '
-                f'even though ffmpeg did not raise an exception.')
-        return cls(vf=VideoFile.from_path(fpath), stdout=stdout)
 
 @dataclasses.dataclass
 class NewVideoResult:

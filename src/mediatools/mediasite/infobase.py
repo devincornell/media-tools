@@ -15,8 +15,6 @@ import urllib.parse
 from .util import *
 
 class InfoBase:
-    #fpath = None
-
     @classmethod
     def from_fpath(self, *args, **kwargs):
         raise NotImplementedError(f'This method should have been implemented by subclass.')

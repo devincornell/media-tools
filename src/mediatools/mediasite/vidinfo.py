@@ -45,6 +45,7 @@ class VidInfo(InfoBase):
         return self.vf.fpath
     
     def aspect(self) -> float:
+        #self.probe.video.aspect_ratio
         return self.probe.video.width / self.probe.video.height
         
     def has_thumb(self) -> bool:
