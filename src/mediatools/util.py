@@ -47,9 +47,42 @@ def multi_extension_glob(
         base_name_pattern: The base name pattern to use for the file name.
             Example: "*" or "video_*" or "vid_*_name". Concatenated with extensions.
     '''
+    # insert capitalized and lower case versions of extensions
+    extensions = [e.lower() for e in extensions] + [e.upper() for e in extensions]
+
     all_paths = list()
     for ext in extensions:
         pattern = f'{base_name_pattern}{ext}' if ext.startswith('.') else f'{base_name_pattern}.{ext}'
         all_paths += list(glob_func(pattern))
     return list(sorted(all_paths))
     
+
+
+def format_time(num_seconds: int, decimals: int = 2):
+    ''' Get string representing time quantity with correct units.
+    '''
+    
+    if num_seconds >= 3600:
+        return f'{num_seconds/3600:0.{decimals}f} hrs'
+    elif num_seconds >= 60:
+        return f'{num_seconds/60:0.{decimals}f} min'
+    elif num_seconds < 1.0:
+        return f'{num_seconds*1000:0.{decimals}f} ms'
+    else:
+        return f'{num_seconds:0.{decimals}f} sec'
+
+def format_memory(num_bytes: int, decimals: int = 2):
+    ''' Get string representing memory quantity with correct units.
+    '''
+    if num_bytes >= 1e9:
+        return f'{num_bytes/1e9:0.{decimals}f} GB'
+    elif num_bytes >= 1e6:
+        return f'{num_bytes/1e6:0.{decimals}f} MB'
+    elif num_bytes >= 1e3:
+        return f'{num_bytes*1e3:0.{decimals}f} kB'
+    else:
+        return f'{num_bytes:0.{decimals}f} Bytes'
+
+
+
+

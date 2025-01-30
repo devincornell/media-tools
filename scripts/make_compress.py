@@ -8,13 +8,13 @@ import random
 import pathlib
 
 import sys
-sys.path.append('..')
-import pydevin
+sys.path.append('../src')
+import mediatools
 
 def get_new_filename(fp: pathlib.Path) -> pathlib.Path:
     return fp.with_name(fp.stem[:249] + "-c" + fp.suffix)
 
-def bitrate_calculator(info: pydevin.vtools.ProbeInfo) -> int:
+def bitrate_calculator(info: mediatools.ProbeInfo) -> int:
     # 1920x1080: 2073600
     # 1280x720: 921600
     if info.video.pixels > 3000000: # ~80% of 2160p
@@ -28,7 +28,7 @@ def bitrate_calculator(info: pydevin.vtools.ProbeInfo) -> int:
 
 
 def compress_video(
-    vf: pydevin.vtools.VideoFile,
+    vf: mediatools.VideoFile,
     new_fpath: pathlib.Path,
     bitrate_cutoff: int,
     crf_increment: int = 5,
@@ -38,14 +38,15 @@ def compress_video(
     try:
         try_crf = 25
         while True:
-            nvid = vf.compress(
+            result = vf.ffmpeg.compress(
                 output_fname = new_fpath,
                 crf = try_crf,
                 overwrite = True,
             )
+            nvid = result.vf
             if verbose:
-                print(f'\ttried crf: {try_crf}; {vf.probe().file_bitrate/1000:6.1f} kbps ({pydevin.util.format_memory(vf.probe().size)}) --> '
-                    f'{nvid.probe().file_bitrate/1000:6.1f} kbps ({pydevin.util.format_memory(nvid.probe().size)})')
+                print(f'\ttried crf: {try_crf}; {vf.probe().file_bitrate/1000:6.1f} kbps ({mediatools.format_memory(vf.probe().size)}) --> '
+                    f'{nvid.probe().file_bitrate/1000:6.1f} kbps ({mediatools.format_memory(nvid.probe().size)})')
             if nvid.probe().file_bitrate < bitrate_cutoff:
                 return True
             else:
@@ -53,7 +54,7 @@ def compress_video(
                 if verbose:
                     print(f'\t{nvid.probe().file_bitrate/1000:5.1f} kbps > target '
                         f'({bitrate_cutoff/1000:5.1f} kbps). increasing crf to {try_crf}')
-    except pydevin.vtools.FFMPEGCommandError as e:
+    except mediatools.FFMPEGCommandError as e:
         new_fpath.unlink(missing_ok=True)
         if verbose:
             print(f'\n\terror encountered. {str(new_fpath)}')
@@ -69,23 +70,23 @@ def compress_all_files(
     do_compress: bool = True,
     delete_old: bool = True,
     samp_size: typing.Optional[int] = None,
-    delete_errored_files: bool = True,
+    delete_errored_files: bool = False,
 ):
     #sfp = pathlib.Path(fpath_glob)
     #vfs = [pydevin.VideoFile(fn) for fn in glob.glob(fpath_glob)]
-    cand_vfs = pydevin.vtools.VideoFile.from_rglob(root_fpath)
+    cand_vfs = mediatools.VideoFiles.from_rglob(root_fpath)
     print(f'found {len(cand_vfs)} video files.')
     
     if samp_size is not None:
         random.seed(0)
         cand_vfs = random.sample(cand_vfs, samp_size)
 
-    ivfs: list[tuple[pydevin.vtools.ProbeInfo, pydevin.vtools.VideoFile]] = list()
+    ivfs: list[tuple[mediatools.ProbeInfo, mediatools.VideoFile]] = list()
     for vf in tqdm.tqdm(cand_vfs):
-        #print(vf)
+        vf: mediatools.VideoFile
         try:
             info = vf.probe()
-        except pydevin.vtools.ProbeError as e:
+        except mediatools.ProbeError as e:
             print(f'\n\tcould not probe {str(vf.fpath)}')
             if delete_errored_files:
                 vf.fpath.unlink(vf.fpath)
