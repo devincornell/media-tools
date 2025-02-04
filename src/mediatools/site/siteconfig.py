@@ -2,22 +2,47 @@ from __future__ import annotations
 import pathlib
 import dataclasses
 import typing
+import jinja2
 
-DEFAULT_VIDEO_EXTENSIONS = ('mp4', 'mov', 'm4v', 'flv', 'ts', 'webm', 'mkv', 'avi', 'wmv', 'm4v', 'vob', '3gp', '3g2', 'm2ts', 'mts', 'mxf', 'ogv', 'ogg', 'rm', 'rmvb', 'flv', 'f4v', 'asf', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mpg', 'mpeg', 'mpe', 'mpv', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'mpg', 'mpeg', 'm2v', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'avi', 'wmv', 'asf', 'qt', 'mov', 'rm', 'rmvb', 'flv', 'f4v', 'swf', 'avchd', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mts', 'mxf', 'ogg', 'ogv', 'ogm', 'rm', 'rmvb', 'flv', 'f4v', 'asf', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mpg', 'mpeg', 'mpe', 'mpv', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'mpg', 'mpeg', 'm2v', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'avi', 'wmv', 'asf', 'qt', 'mov', 'rm', 'rmvb', 'flv', 'f4v', 'swf', 'avchd', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2'),
-DEFAULT_IMAGE_EXTENSIONS = ('png', 'gif', 'jpg', 'jpeg', 'svg', 'bmp', 'tiff', 'webp', 'ico', 'jpe', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k',),
+if typing.TYPE_CHECKING:
+    from .vidinfo import VidInfo
+    from .imginfo import ImgInfo
+
+DEFAULT_VIDEO_EXTENSIONS = ('mp4', 'mov', 'm4v', 'flv', 'ts', 'webm', 'mkv', 'avi', 'wmv', 'm4v', 'vob', '3gp', '3g2', 'm2ts', 'mts', 'mxf', 'ogv', 'ogg', 'rm', 'rmvb', 'flv', 'f4v', 'asf', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mpg', 'mpeg', 'mpe', 'mpv', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'mpg', 'mpeg', 'm2v', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'avi', 'wmv', 'asf', 'qt', 'mov', 'rm', 'rmvb', 'flv', 'f4v', 'swf', 'avchd', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mts', 'mxf', 'ogg', 'ogv', 'ogm', 'rm', 'rmvb', 'flv', 'f4v', 'asf', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2v', 'm2t', 'm2ts', 'mpg', 'mpeg', 'mpe', 'mpv', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'mpg', 'mpeg', 'm2v', 'mp2v', 'mp2', 'm2p', 'mp4v', 'mp4', 'm4p', 'm4v', 'avi', 'wmv', 'asf', 'qt', 'mov', 'rm', 'rmvb', 'flv', 'f4v', 'swf', 'avchd', 'webm', 'wtv', 'dvr-ms', 'm1v', 'm2')
+DEFAULT_IMAGE_EXTENSIONS = ('png', 'gif', 'jpg', 'jpeg', 'svg', 'bmp', 'tiff', 'webp', 'ico', 'jpe', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k', 'jpf', 'jpx', 'jpm', 'mj2', 'svgz', 'tif', 'tiff', 'jfif', 'jp2', 'j2k')
 
 
 @dataclasses.dataclass
 class SiteConfig:
     '''Stores configuration for entire site.'''
     root_path: pathlib.Path | str
-    template_path: pathlib.Path | str
-    page_fname: str
-    vid_extensions: tuple[str, ...]
-    img_extensions: tuple[str, ...]
-    thumb_extension: str
+    
+    template: jinja2.Template
+    template_args: dict[str, typing.Any] = dataclasses.field(default_factory=dict)
+    
+    page_fname: str = 'index.html'
+    
+    thumb_extension: str = '.gif'
     thumb_path: pathlib.Path | str | None = None
-    template_args: dict[str, typing.Any]
+
+    vid_extensions: tuple[str, ...] = DEFAULT_VIDEO_EXTENSIONS
+    img_extensions: tuple[str, ...] = DEFAULT_IMAGE_EXTENSIONS
+
+    video_sort_key: typing.Callable[[VidInfo], typing.Any] | None = None
+    clip_sort_key: typing.Callable[[VidInfo], typing.Any] | None = None
+    image_sort_key: typing.Callable[[ImgInfo], typing.Any] | None = None
+    subpage_sort_key: typing.Callable[[typing.Self], typing.Any] | None = None
+
+    max_clip_duration: int | None = 60
+
+    max_depth: int | None = None
+
+    def __post_init__(self) -> None:
+        '''Post init checks and conversions.'''
+        self.root_path = pathlib.Path(self.root_path)
+        self.thumb_path = pathlib.Path(self.thumb_path) if self.thumb_path else self.root_path.joinpath('_thumbs/')
+
+        self.thumb_path.relative_to(self.root_path) # raise error if not relative. Must be relative.
 
     @classmethod
     def new(
@@ -32,7 +57,7 @@ class SiteConfig:
         template_args: dict[str, typing.Any]|None = None,
     ) -> typing.Self:
         '''Create a new SiteConfig object with defaults.'''
-        thumb_path.relative_to(root_path) # raise error if not relative. Must be relative.
+        
 
         return cls(
             root_path = root_path,

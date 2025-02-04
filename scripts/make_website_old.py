@@ -81,29 +81,40 @@ def make_files_recursive(
 
 if __name__ == '__main__':
 
-    root_path = pathlib.Path('/AddStorage/personal/dwhelper/')
-    thumb_path = root_path.joinpath('_thumbs/')
+    base_path = pathlib.Path('/AddStorage/personal/dwhelper/')
+    #base_path = pathlib.Path('/StorageDrive/raw_videos/gopro_videos')
+
+    thumb_path = base_path.joinpath('_thumbs/')
+
+    print('reading template')
+    #template_path = pathlib.Path('templates/band1_template.html')
+    template_path = mediatools.site.TEMPLATES['gpt_multi_v2.2']
+    with template_path.open('r') as f:
+        template_html = f.read()
+    environment = jinja2.Environment()
+    template = environment.from_string(template_html)
+
 
     config = mediatools.SiteConfig(
-        root_path = root_path,
-        thumb_path = thumb_path,
-        template = mediatools.site.read_template('templates/gpt_multi_v2.2.html'),
-        #page_fname = 'web.html',
-        #vid_extensions = ('mp4', 'MOV', 'mov', 'MP4', 'flv', 'ts', 'webm'),
-        #img_extensions = ('png', 'gif', 'jpg', 'jpeg'),
-        #thumb_extension = '.gif',
-        max_clip_duration = 60,
-        max_depth=1,
-        template_args={
-            'video_width': '85%',
-            'clip_width': '100%',
-            'ideal_aspect': 1.8,
-            'do_clip_autoplay': False,
-        },
+        base_path = base_path,
+        thumb_base_path = thumb_path,
+        template = template,
+        page_fname = 'web.html',
+        vid_extensions = ('mp4', 'MOV', 'mov', 'MP4', 'flv', 'ts', 'webm'),
+        img_extensions = ('png', 'gif', 'jpg', 'jpeg'),
+        thumb_extension = '.gif',
+        video_width = '85%',
+        clip_width = '100%',
+        ideal_aspect = 1.8,
+        clip_duration = 60,
+        do_clip_autoplay = False,
     )
     
-    num_pages = mediatools.site.MediaPage.scan_directory(root_path, config, read_media=False).page_count()
-    print(f'found {num_pages} pages')
+    print(f'making pages')
+    make_pages(
+        fpath=base_path,
+        config=config,
+        make_thumbs=True,
+    )
 
-    root_page = mediatools.site.MediaPage.scan_directory(root_path, config, verbose=True, read_media=True)
-    print(root_page)
+

@@ -23,7 +23,7 @@ class VidInfo(BaseInfo):
         config: SiteConfig, 
     ) -> list[typing.Self]:
         '''Scan directory for video files and return list of info objects.'''
-        return [cls.from_path(fp, config) for fp in multi_extension_glob(path, config.vid_extensions)]
+        return [cls.from_path(fp, config) for fp in multi_extension_glob(path.glob, config.vid_extensions)]
 
     @classmethod
     def from_path(cls, vpath: pathlib.Path, config: SiteConfig) -> typing.Self:
@@ -33,6 +33,11 @@ class VidInfo(BaseInfo):
         vf = VideoFile.from_path(vpath)
         return cls(
             vf = vf,
-            config = SiteConfig,
+            config = config,
             probe = vf.probe(),
         )
+
+    def is_clip(self) -> bool:
+        '''Check if video is a clip.'''
+        return self.probe.duration <= self.config.max_clip_duration
+

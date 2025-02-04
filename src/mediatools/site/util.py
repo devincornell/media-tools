@@ -15,3 +15,15 @@ def parse_url(urlstr: str) -> str:
     except TypeError as e:
         return ''
 
+
+import jinja2
+import pathlib
+
+def read_template(template_path: str | pathlib.Path) -> jinja2.Template:
+    '''Read template file and return jinja2 template object.'''
+    with pathlib.Path(template_path).open('r') as f:
+        template_html = f.read()
+    environment = jinja2.Environment()
+    return environment.from_string(template_html)
+
+

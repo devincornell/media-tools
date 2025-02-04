@@ -35,7 +35,7 @@ class VideoTime(str):
 
 
 def multi_extension_glob(
-    glob_func: typing.Callable[[str],Path], 
+    glob_func: typing.Callable[[str],list[Path]], 
     extensions: typing.Iterable[str],
     base_name_pattern: str = '*',
 ) -> list[Path]:
@@ -48,7 +48,8 @@ def multi_extension_glob(
             Example: "*" or "video_*" or "vid_*_name". Concatenated with extensions.
     '''
     # insert capitalized and lower case versions of extensions
-    extensions = [e.lower() for e in extensions] + [e.upper() for e in extensions]
+    exts = list(extensions)
+    extensions = [e.lower() for e in exts] + [e.upper() for e in exts]
 
     all_paths = list()
     for ext in extensions:

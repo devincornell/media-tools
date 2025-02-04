@@ -43,7 +43,7 @@ class ImgInfo(BaseInfo):
         '''Create ImgInfo object from file path.'''
         path = pathlib.Path(path)
         imf = ImageFile.from_path(path)
-        h,w = imf.read().shape
+        h,w,z = imf.read().shape
         return cls(
             imf = imf, 
             config = config,
@@ -51,7 +51,7 @@ class ImgInfo(BaseInfo):
             size = path.stat().st_size,
         )
     
-    def info_dict(self) -> typing.Dict[str, str]:
+    def info_dict(self) -> typing.Dict[str, str|int]:
         return {
             'path': parse_url(self.fpath.name),
             'title': fname_to_title(self.fpath.stem),
@@ -63,5 +63,5 @@ class ImgInfo(BaseInfo):
     
     def path_rel(self) -> pathlib.Path:
         '''Thumb path relative to base path.'''
-        fp = self.fpath.relative_to(self.config.base_path)
+        fp = self.fpath.relative_to(self.config.root_path)
         return fp
