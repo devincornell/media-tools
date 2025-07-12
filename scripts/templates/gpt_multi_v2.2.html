@@ -257,6 +257,53 @@
             if (e.key == "Escape") {
                 closePlayer()
             }
+            if (e.code === "Space") {
+                const videoPlayer = document.getElementById('videoPlayer');
+                if (videoPlayer.style.display === 'block') {
+                    const video = document.getElementById('videoElement');
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                    e.preventDefault(); // Prevent default space bar action (scrolling)
+                }
+            }
+            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                const videoPlayer = document.getElementById('videoPlayer');
+                if (videoPlayer.style.display === 'block') {
+                    const video = document.getElementById('videoElement');
+                    const speedSelect = document.getElementById('speedSelect');
+                    const currentSpeed = video.playbackRate;
+                    let newSpeed;
+
+                    if (e.key === "ArrowUp") {
+                        newSpeed = Math.min(currentSpeed + 0.25, 4);
+                    } else {
+                        newSpeed = Math.max(currentSpeed - 0.25, 0.25);
+                    }
+
+                    video.playbackRate = newSpeed;
+                    
+                    // Update the dropdown
+                    let optionFound = false;
+                    for (let option of speedSelect.options) {
+                        if (parseFloat(option.value) === newSpeed) {
+                            option.selected = true;
+                            optionFound = true;
+                            break;
+                        }
+    
+                    }
+
+                    if (!optionFound) {
+                        let newOption = new Option(newSpeed + 'x', newSpeed, true, true);
+                        speedSelect.add(newOption);
+                    }
+
+                    e.preventDefault();
+                }
+            }
         });
         const video = document.getElementById('videoElement');
         document.getElementById('speedSelect').addEventListener('change', e => {
