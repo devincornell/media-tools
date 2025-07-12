@@ -224,10 +224,17 @@
     </div>
     <div class="video-player" id="videoPlayer">
         <button class="close-btn" onclick="closePlayer()">Close</button>
-        <video controls id="videoElement">
+        <video controls id="videoElement" autoplay controls loop>
             <source id="videoSource" src="" type="video/mp4">
             Your browser does not support the video tag.
         </video>
+        <select id="speedSelect" style="margin-top: 0px; padding: 5px; padding-top: 0px;">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+        </select>
+
         <h2 id="videoTitle"></h2>
         <p id="videoInfo"></p>
         <p><a id="downloadLink" href="" download class="download-button">Download</a> | <a id="openLink" href="" class="download-button">Open</a></p>
@@ -251,6 +258,11 @@
                 closePlayer()
             }
         });
+        const video = document.getElementById('videoElement');
+        document.getElementById('speedSelect').addEventListener('change', e => {
+            video.playbackRate = parseFloat(e.target.value);
+        });
+
     </script>
 </body>
 </html>
