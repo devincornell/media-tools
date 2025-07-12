@@ -2,15 +2,6 @@ import pathlib
 import os
 from collections import defaultdict
 
-# Sample list of file paths
-#file_paths = [
-#    "/media/music/pop/song1.mp3",
-#    "/media/music/pop/song2.mp3",
-#    "/media/music/rock/song3.mp3",
-#    "/media/videos/movies/movie1.mp4",
-#    "/media/videos/shows/show1.mkv",
-#    "/documents/work/report.docx",
-#]
 
 import glob
 
