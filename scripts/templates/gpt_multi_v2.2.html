@@ -177,11 +177,12 @@
             <div id="videos" class="gallery">
                 <div class="section-title">Videos</div>
                 {% for vid in vids %}
-                    <div class="thumbnail" id="{{vid.idx}}">
-                        <div onclick="openPlayer('{{vid.vid_web}}', '{{vid.vid_title}}', '{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}')">
-                            <!--<video src="{{ vid.vid_web }}" poster="{{ vid.thumb_web }}"></video>-->
-                            <img src="{{vid.thumb_web}}"/>
-                        </div>
+                    <div class="thumbnail" 
+                         data-video-src="{{ vid.vid_web }}"
+                         data-video-title="{{ vid.vid_title }}"
+                         data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
+                         onclick="openPlayer(this)">
+                        <img src="{{vid.thumb_web}}"/>
                         <div class="title">{{ vid.vid_title }}</div>
                         <p>{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}</p>
                         <p><a href="{{vid.vid_web}}" download class="download-button">Download</a> | 
@@ -195,11 +196,12 @@
             <div id="clips" class="gallery">
                 <div class="section-title">Clips</div>
                 {% for vid in clips %}
-                    <div class="thumbnail" id="{{vid.idx}}">
-                        <div onclick="openPlayer('{{vid.vid_web}}', '{{vid.vid_title}}', '{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}')">
-                            <!--<video src="{{ vid.vid_web }}" poster="{{ vid.thumb_web }}"></video>-->
-                            <img src="{{vid.thumb_web}}"/>
-                        </div>
+                    <div class="thumbnail"
+                         data-video-src="{{ vid.vid_web }}"
+                         data-video-title="{{ vid.vid_title }}"
+                         data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
+                         onclick="openPlayer(this)">
+                        <img src="{{vid.thumb_web}}"/>
                         <div class="title">{{ vid.vid_title }}</div>
                         <p>{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}</p>
                         <p><a href="{{vid.vid_web}}" download class="download-button">Download</a> | 
@@ -240,7 +242,14 @@
         <p><a id="downloadLink" href="" download class="download-button">Download</a> | <a id="openLink" href="" class="download-button">Open</a></p>
     </div>
     <script>
-        function openPlayer(videoSrc, videoTitle, videoInfo) {
+        let currentThumbnail = null;
+
+        function openPlayer(thumbnailElement) {
+            currentThumbnail = thumbnailElement;
+            const videoSrc = thumbnailElement.dataset.videoSrc;
+            const videoTitle = thumbnailElement.dataset.videoTitle;
+            const videoInfo = thumbnailElement.dataset.videoInfo;
+
             document.getElementById('videoSource').src = videoSrc;
             document.getElementById('videoTitle').innerText = videoTitle;
             document.getElementById('videoInfo').innerText = videoInfo;
@@ -249,62 +258,83 @@
             document.getElementById('videoElement').load();
             document.getElementById('videoPlayer').style.display = 'block';
         }
+
         function closePlayer() {
             document.getElementById('videoPlayer').style.display = 'none';
             document.getElementById('videoElement').pause();
+            currentThumbnail = null;
         }
+
         document.body.addEventListener('keydown', function(e) {
-            if (e.key == "Escape") {
-                closePlayer()
+            if (e.key === "Escape") {
+                closePlayer();
+                return;
             }
+
+            const videoPlayer = document.getElementById('videoPlayer');
+            if (videoPlayer.style.display !== 'block') {
+                return;
+            }
+
             if (e.code === "Space") {
-                const videoPlayer = document.getElementById('videoPlayer');
-                if (videoPlayer.style.display === 'block') {
-                    const video = document.getElementById('videoElement');
-                    if (video.paused) {
-                        video.play();
-                    } else {
-                        video.pause();
-                    }
-                    e.preventDefault(); // Prevent default space bar action (scrolling)
+                const video = document.getElementById('videoElement');
+                if (video.paused) {
+                    video.play();
+                } else {
+                    video.pause();
                 }
-            }
-            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                const videoPlayer = document.getElementById('videoPlayer');
-                if (videoPlayer.style.display === 'block') {
-                    const video = document.getElementById('videoElement');
-                    const speedSelect = document.getElementById('speedSelect');
-                    const currentSpeed = video.playbackRate;
-                    let newSpeed;
+                e.preventDefault();
+            } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                const video = document.getElementById('videoElement');
+                const speedSelect = document.getElementById('speedSelect');
+                const currentSpeed = video.playbackRate;
+                let newSpeed;
 
-                    if (e.key === "ArrowUp") {
-                        newSpeed = Math.min(currentSpeed + 0.25, 4);
-                    } else {
-                        newSpeed = Math.max(currentSpeed - 0.25, 0.25);
-                    }
-
-                    video.playbackRate = newSpeed;
-                    
-                    // Update the dropdown
-                    let optionFound = false;
-                    for (let option of speedSelect.options) {
-                        if (parseFloat(option.value) === newSpeed) {
-                            option.selected = true;
-                            optionFound = true;
-                            break;
-                        }
-    
-                    }
-
-                    if (!optionFound) {
-                        let newOption = new Option(newSpeed + 'x', newSpeed, true, true);
-                        speedSelect.add(newOption);
-                    }
-
-                    e.preventDefault();
+                if (e.key === "ArrowUp") {
+                    newSpeed = Math.min(currentSpeed + 0.25, 4);
+                } else {
+                    newSpeed = Math.max(currentSpeed - 0.25, 0.25);
                 }
+
+                video.playbackRate = newSpeed;
+                
+                let optionFound = false;
+                for (let option of speedSelect.options) {
+                    if (parseFloat(option.value) === newSpeed) {
+                        option.selected = true;
+                        optionFound = true;
+                        break;
+                    }
+                }
+
+                if (!optionFound) {
+                    let newOption = new Option(newSpeed.toFixed(2) + 'x', newSpeed, true, true);
+                    speedSelect.add(newOption);
+                    // Sort options
+                    Array.from(speedSelect.options)
+                        .sort((a, b) => parseFloat(a.value) - parseFloat(b.value))
+                        .forEach(option => speedSelect.add(option));
+                }
+                e.preventDefault();
+            } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                if (!currentThumbnail) return;
+
+                const allThumbnails = Array.from(document.querySelectorAll('.thumbnail[data-video-src]'));
+                const currentIndex = allThumbnails.indexOf(currentThumbnail);
+                let nextIndex;
+
+                if (e.key === "ArrowLeft") {
+                    nextIndex = (currentIndex - 1 + allThumbnails.length) % allThumbnails.length;
+                } else {
+                    nextIndex = (currentIndex + 1) % allThumbnails.length;
+                }
+
+                const nextThumbnail = allThumbnails[nextIndex];
+                openPlayer(nextThumbnail);
+                e.preventDefault();
             }
         });
+
         const video = document.getElementById('videoElement');
         document.getElementById('speedSelect').addEventListener('change', e => {
             video.playbackRate = parseFloat(e.target.value);

@@ -5,7 +5,7 @@ import typing
 
 
 from mediatools.util import get_or_None_factory, VideoTime
-
+from .errors import ProbeError, NoDurationError, NoResolutionError
 
 @dataclasses.dataclass
 class BaseStreamInfo:
@@ -26,9 +26,9 @@ class AudioStreamInfo(BaseStreamInfo):
     channel_layout: str
 
     @classmethod
-    def from_dict(cls, stream_info: typing.Dict[str,typing.Any]) -> typing.Self:
+    def from_dict(cls, stream_info: typing.Dict[str,typing.Any], check_for_errors: bool = False) -> typing.Self:
         from_stream = get_or_None_factory(stream_info)
-        return cls(
+        o = cls(
             stream_ind = from_stream('index', int), # type: ignore
             codec_name = from_stream('codec_name'), # type: ignore
             codec_long_name = from_stream('codec_long_name'), # type: ignore
@@ -42,6 +42,10 @@ class AudioStreamInfo(BaseStreamInfo):
             channel_layout = from_stream('channel_layout'), # type: ignore
             disposition = {k:bool(v) for k,v in stream_info['disposition'].items()} if 'disposition' in stream_info else {},
         )
+        if check_for_errors:
+            pass # TODO: add error checking here
+
+        return o
 
 @dataclasses.dataclass
 class VideoStreamInfo(BaseStreamInfo):
@@ -67,13 +71,11 @@ class VideoStreamInfo(BaseStreamInfo):
     time_base: typing.Optional[str]
 
     @classmethod
-    def from_dict(cls, stream_info: typing.Dict[str,typing.Any]) -> typing.Self:
-        #def getter(d,k,t) -> typing.Optional[str | int| bool | float]:
-        #    result = d.get(k)
-        #    return t(result) if result is not None else None
+    def from_dict(cls, stream_info: typing.Dict[str,typing.Any], check_for_errors: bool = False) -> typing.Self:
+        '''Create a VideoStreamInfo from a stream info dictionary.'''
         from_stream = get_or_None_factory(stream_info)
 
-        return cls(
+        o = cls(
             stream_ind = from_stream('index'),
             codec_name = from_stream('codec_name'), # type: ignore
             codec_long_name = from_stream('codec_long_name'), # type: ignore
@@ -103,6 +105,15 @@ class VideoStreamInfo(BaseStreamInfo):
             refs = from_stream('refs', int), # type: ignore
             disposition = {k:bool(v) for k,v in stream_info['disposition'].items()} if 'disposition' in stream_info else {},
         )
+        if check_for_errors:
+            o.check_for_errors()
+            
+        return o
+    
+    def check_for_errors(self) -> None:
+        '''Check for errors in the video stream info.'''
+        if self.height is None or self.height == 0 or self.width is None or self.width == 0:
+            raise NoResolutionError(f'Video stream {self.stream_ind} does not have a height or width {self.height=}, {self.width=}.')
     
     @property
     def pixels(self) -> int:
@@ -110,6 +121,9 @@ class VideoStreamInfo(BaseStreamInfo):
 
     @property
     def aspect_ratio(self) -> float:
+        '''Aspect ratio of the video stream.'''
+        if self.width == 0 or self.height == 0:
+            raise NoResolutionError(f'Width or height is zero, cannot calculate aspect ratio. {self.width=}, {self.height=}')
         return self.width / self.height
 
     @property

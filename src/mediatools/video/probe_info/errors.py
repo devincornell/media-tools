@@ -10,3 +10,9 @@ class NoVideoStreamError(ProbeError):
 
 class NoAudioStreamError(ProbeError):
     pass
+
+class NoDurationError(ProbeError):
+    pass
+
+class NoResolutionError(ProbeError):
+    pass

@@ -97,13 +97,41 @@ class MediaPage:
             subpages = subpages,
         )
     
+    ############################################ writing the actual page ############################################
+    def render_and_write(self, recursive: bool = True, verbose: bool = False) -> None:
+        '''Render the page and write it to disk.'''
+        if recursive and self.subpages is not None:
+            for sp in self.subpages:
+                sp.render_and_write(
+                    recursive=recursive, 
+                    verbose=verbose,
+                )
 
+        html_str = self.config.template.render(
+            vid_thumbs = vid_thumbs,
+            vids = vids, 
+            clips = clips,
+            imgs = imgs,
+            child_paths = subpages, 
+            video_width = self.config.video_width, 
+            clip_width = self.config.clip_width,
+            name = self.local_path.name,
+        )
+
+        # write the template
+        pp = self.page_path()
+        if verbose: print(f'saving {pp} with {len(self.images)} images, {len(self.videos)} vids, and {len(self.subpages)} subfolders')
+        with pp.open('w') as f:
+            f.write(html_str)
+    
+    ############################################ extract info ############################################
     def page_count(self) -> int:
         '''Count all media files in this page and subpages.'''
         if self.subpages is not None:
             return 1 + sum([sp.page_count() for sp in self.subpages])
         else:
             return 1
-    
+
+    ############################################ Dunder methods ############################################
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(videos={len(self.videos)}, clips={len(self.clips)}, images={len(self.images)}, subpages={len(self.subpages)})'

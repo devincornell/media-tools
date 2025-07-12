@@ -11,13 +11,13 @@ def make_pages(
         fpath: pathlib.Path, 
         config: mediatools.site.SiteConfig, 
         make_thumbs: bool = True
-    ) -> mediatools.site.PageInfo:
-    page_tree = mediatools.site.PageInfo.from_fpath(fpath, config, verbose=True)
+    ) -> mediatools.mediasite.PageInfo:
+    page_tree = mediatools.mediasite.PageInfo.from_fpath(fpath, config, verbose=True)
     return make_files_recursive(page_tree, config=config, make_thumbs=make_thumbs)
 
 def make_files_recursive(
-        pinfo: mediatools.site.PageInfo, 
-        config: mediatools.site.SiteConfig, 
+        pinfo: mediatools.mediasite.PageInfo, 
+        config: mediatools.mediasite.SiteConfig, 
         make_thumbs: bool
     ):
     print(f'starting in {str(pinfo.folder_fpath)}')
@@ -44,18 +44,19 @@ def make_files_recursive(
     subpages = pinfo.get_subpages_dicts(
         sort_key=lambda sp: sp.title,
     )
+
     vid_thumbs = pinfo.get_vid_info_dicts(
-        filter_cond=lambda vi: not vi.is_clip,
+        filter_cond=lambda vi: vi.check_is_valid() and not vi.is_clip,
         sort_key=lambda vi: (-vi.aspect(), -vi.probe.duration),
     )
     clips = pinfo.get_vid_info_dicts(
-        filter_cond=lambda vi: vi.is_clip,
+        filter_cond=lambda vi: vi.check_is_valid() and vi.is_clip,
         sort_key=lambda vi: (-vi.aspect(), -vi.probe.duration),
     )
     vids = pinfo.get_vid_info_dicts(
-        filter_cond=lambda vi: not vi.is_clip,
-        #sort_key=lambda vi: (-vi.aspect(), -vi.probe.duration),
-        sort_key=lambda vi: vi.vid_title,
+        filter_cond=lambda vi: vi.check_is_valid() and not vi.is_clip,
+        sort_key=lambda vi: (-vi.aspect(), -vi.probe.duration),
+        #sort_key=lambda vi: vi.vid_title,
     )
     imgs = pinfo.get_img_info_dicts(
         sort_key=lambda vi: -vi.aspect(),
@@ -86,21 +87,22 @@ if __name__ == '__main__':
 
     thumb_path = base_path.joinpath('_thumbs/')
 
+
     print('reading template')
     #template_path = pathlib.Path('templates/band1_template.html')
-    template_path = mediatools.site.TEMPLATES['gpt_multi_v2.2']
+    template_path = pathlib.Path('templates/gpt_multi_v2.2.html')
     with template_path.open('r') as f:
         template_html = f.read()
     environment = jinja2.Environment()
     template = environment.from_string(template_html)
 
 
-    config = mediatools.SiteConfig(
+    config = mediatools.mediasite.SiteConfig(
         base_path = base_path,
         thumb_base_path = thumb_path,
         template = template,
         page_fname = 'web.html',
-        vid_extensions = ('mp4', 'MOV', 'mov', 'MP4', 'flv', 'ts', 'webm'),
+        vid_extensions = ('mp4', 'MOV', 'mov', 'MP4', 'flv', 'ts', 'webm'),#, 'mkv', 'avi', 'm4v'),
         img_extensions = ('png', 'gif', 'jpg', 'jpeg'),
         thumb_extension = '.gif',
         video_width = '85%',

@@ -81,7 +81,7 @@ def make_files_recursive(
 
 if __name__ == '__main__':
 
-    root_path = pathlib.Path('/AddStorage/personal/dwhelper/')
+    root_path = pathlib.Path('/home/devin/personal/dwhelper/')
     thumb_path = root_path.joinpath('_thumbs/')
 
     config = mediatools.SiteConfig(

@@ -43,45 +43,20 @@ class SiteConfig:
         self.thumb_path = pathlib.Path(self.thumb_path) if self.thumb_path else self.root_path.joinpath('_thumbs/')
 
         self.thumb_path.relative_to(self.root_path) # raise error if not relative. Must be relative.
+    
+    def vid_to_thumb_path(self, vid_path: pathlib.Path) -> pathlib.Path:
+        '''Get absolute or relative thumb path from vid path.'''
+        with_suffix = vid_path.with_suffix(self.thumb_extension)
 
-    @classmethod
-    def new(
-        cls,
-        root_path: pathlib.Path | str,
-        template_path: pathlib.Path | str,
-        page_fname: pathlib.Path | str = 'index.html',
-        vid_extensions: tuple[str, ...] = DEFAULT_VIDEO_EXTENSIONS,
-        img_extensions: tuple[str, ...] = DEFAULT_IMAGE_EXTENSIONS,
-        thumb_extension: str = '.gif',
-        thumb_path: pathlib.Path | str | None = None,
-        template_args: dict[str, typing.Any]|None = None,
-    ) -> typing.Self:
-        '''Create a new SiteConfig object with defaults.'''
         
-
-        return cls(
-            root_path = root_path,
-            template_path = template_path,
-            page_fname = page_fname,
-            thumb_extension = thumb_extension,
-            thumb_path = pathlib.Path(thumb_path) or root_path.joinpath('_thumbs/'),
-            vid_extensions = vid_extensions,
-            img_extensions = img_extensions,
-            template_args = template_args or dict(),
-        )
+        thumb_fname = str(with_suffix).replace('/', '.')
+        
+        
+        return self.thumb_path.joinpath(vid_path.stem + self.thumb_extension)
     
-    #def vid_to_thumb_path(self, vid_path: pathlib.Path) -> pathlib.Path:
-    #    '''Get absolute or relative thumb path from vid path.'''
-    
-    #    with_suffix = vid_path.with_suffix(self.thumb_extension)
-    #    thumb_fname = str(with_suffix).replace('/', '.')
-    #    
-    #    
-    #    return self.thumb_path.joinpath(vid_path.stem + self.thumb_extension)
-    #
-    #def rel_vid_to_rel_thumb(self, vid_path: pathlib.Path) -> pathlib.Path:
-    #    '''Get relative thumb path from vid path.'''
-    #    return self.vid_to_thumb_path(vid_path).relative_to(self.root_path)
+    def rel_vid_to_rel_thumb(self, vid_path: pathlib.Path) -> pathlib.Path:
+        '''Get relative thumb path from vid path.'''
+        return self.vid_to_thumb_path(vid_path).relative_to(self.root_path)
 
     #def thumb_path_rel(self) -> pathlib.Path:
     #    '''Thumb path relative to base path.'''

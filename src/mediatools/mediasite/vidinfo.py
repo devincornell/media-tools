@@ -15,11 +15,12 @@ import urllib.parse
 
 
 from .infobase import InfoBase
-from .util import format_memory, format_time
+from ..util import format_memory, format_time
+
 from .siteconfig import SiteConfig
 from .util import parse_url, fname_to_title, fname_to_id
 
-from ..video import VideoFile, ProbeInfo, ProbeError
+from ..video import VideoFile, ProbeInfo, ProbeError, NoDurationError, NoResolutionError
 
 @dataclasses.dataclass
 class VidInfo(InfoBase):
@@ -45,8 +46,10 @@ class VidInfo(InfoBase):
         return self.vf.fpath
     
     def aspect(self) -> float:
-        #self.probe.video.aspect_ratio
-        return self.probe.video.width / self.probe.video.height
+        return self.probe.video.aspect_ratio
+        #if self.probe.video.aspect_ratio is not None or self.probe.video.aspect_ratio != 0:
+        #    return self.probe.video.aspect_ratio
+        #return self.probe.video.width / self.probe.video.height
         
     def has_thumb(self) -> bool:
         return self.thumb_path_abs().is_file()
@@ -56,13 +59,12 @@ class VidInfo(InfoBase):
         tfp = self.thumb_path_abs()
         if not tfp.is_file(): # NOTE: delete this if trying to force write
             tfp.parent.mkdir(exist_ok=True, parents=True)
-            return self.vf.make_thumb(str(tfp))
+            return self.vf.ffmpeg.make_thumb(str(tfp))
             #return pydevin.make_thumb_ffmpeg(str(self.fpath), str(tfp))
     
     def thumb_path_rel(self) -> pathlib.Path:
         '''Thumb path relative to base path.'''
         fp = self.thumb_path_abs().relative_to(self.config.base_path)
-        #print(fp)
         return fp
 
     def thumb_path_abs(self) -> pathlib.Path:
@@ -75,9 +77,21 @@ class VidInfo(InfoBase):
         #print(self.config.thumb_base_path.joinpath(thumb_fname))
         return self.config.thumb_base_path.joinpath(thumb_fname)
     
+    def check_is_valid(self) -> bool:
+        '''Check if the video file is valid.'''
+        try:
+            self.probe.check_for_errors()
+        except (ProbeError, NoDurationError, NoResolutionError):
+            return False
+        return True
+    
     @property
     def is_clip(self) -> bool:
-        return self.probe.duration <= self.config.clip_duration
+        '''Check whether this video is a clip (short video) based on the configuration.'''
+        try:
+            return self.probe.duration <= self.config.clip_duration
+        except NoDurationError:
+            return False
     
     def info_dict(self) -> typing.Dict[str, str|int|bool]:
         return {

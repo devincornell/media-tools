@@ -12,7 +12,7 @@ import datetime
 
 import mediatools.util
 
-from .probe_info import ProbeInfo
+from .probe_info import ProbeInfo, NoDurationError
 #from .result import FFRunResult
 
 from .errors import FFMPEGCommandError#ProblemCompressingVideo, ProblemMakingThumb, ProblemSplicingVideo, ProblemCroppingVideo
@@ -82,7 +82,7 @@ class VideoFile:
         else:
             return True
 
-    def probe(self) -> ProbeInfo:
+    def probe(self, check_for_errors: bool = False) -> ProbeInfo:
         '''Probe the file in question.'''
         return ProbeInfo.read_from_file(str(self.fpath))
     
@@ -222,21 +222,26 @@ class FFMPEGTools:
             copied from here:
                 https://api.video/blog/tutorials/automatically-add-a-thumbnail-to-your-video-with-python-and-ffmpeg
         '''
-        output_fname = Path(output_fname)
-        if output_fname.exists() and not overwrite:
+        ofp = Path(output_fname)
+        if ofp.exists() and not overwrite:
             raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
         
-        probe = self.vf.probe()
+        try:
+            probe = self.vf.probe(check_for_errors=True)
+            ss = int(probe.duration * time_point)
+        except (TypeError, NoDurationError):
+            ss = .01  # default to 1 second if duration is not available
+
         stdout = self.run(
             ffmpeg_command = (
                 ffmpeg
-                .input(self.vf.fpath, ss=int(probe.duration * time_point))
+                .input(self.vf.fpath, ss=ss)
                 .filter('scale', width, height)
-                .output(str(output_fname), vframes=1, **output_kwargs)
+                .output(str(ofp), vframes=1, **output_kwargs)
             ),
             overwrite_output=overwrite,
         )
-        return NewThumbResult(output_fname, stdout)
+        return NewThumbResult(ofp, stdout)
 
     @staticmethod
     def run(ffmpeg_command, overwrite_output: bool) -> str:
@@ -252,5 +257,8 @@ class FFMPEGTools:
             raise FFMPEGCommandError.from_stderr(e.stderr, 
                 f'There was an error executing the ffmpeg command: {ffmpeg_command}.') from e
         else:
-            return '\n'.join([s.decode() for s in stdout])
+            try:
+                return '\n'.join([s.decode() for s in stdout])
+            except Exception as e:
+                return stdout
         

@@ -18,7 +18,7 @@ from .vidinfo import VidInfo
 from .imginfo import ImgInfo
 from ..util import format_memory, format_time
 
-from ..vtools import ProbeError, FFMPEGCommandError
+from ..video import ProbeError, FFMPEGCommandError
 
 
 from .util import *

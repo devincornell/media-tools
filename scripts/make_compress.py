@@ -62,61 +62,68 @@ def compress_video(
             vf.fpath.unlink(missing_ok=True)
             print(f'\n\tdeleting {str(vf.fpath)}')
         #raise e from e
+    return True
 
 def compress_all_files(
-    root_fpath: str = '/home/devin/personal/dwhelper/',
+    root_fpaths: list[str] = [
+        '/BackupDrive/personal/dwhelper/',
+        '/AddStorage/personal/dwhelper/',
+        '/home/devin/personal/dwhelper/',
+        '/DataDrive/personal/dwhelper/',
+    ],
     #root_fpath: str = '/AddStorage/personal/dwhelper/',
     crf_increment: int = 5,
     do_compress: bool = True,
     delete_old: bool = True,
     samp_size: typing.Optional[int] = None,
-    delete_errored_files: bool = False,
+    delete_errored_files: bool = True,
 ):
     #sfp = pathlib.Path(fpath_glob)
     #vfs = [pydevin.VideoFile(fn) for fn in glob.glob(fpath_glob)]
-    cand_vfs = mediatools.VideoFiles.from_rglob(root_fpath)
-    print(f'found {len(cand_vfs)} video files.')
-    
-    if samp_size is not None:
-        random.seed(0)
-        cand_vfs = random.sample(cand_vfs, samp_size)
+    for root_fpath in root_fpaths:
+        cand_vfs = mediatools.VideoFiles.from_rglob(root_fpath)
+        print(f'found {len(cand_vfs)} video files.')
+        
+        if samp_size is not None:
+            random.seed(0)
+            cand_vfs = random.sample(cand_vfs, samp_size)
 
-    ivfs: list[tuple[mediatools.ProbeInfo, mediatools.VideoFile]] = list()
-    for vf in tqdm.tqdm(cand_vfs):
-        vf: mediatools.VideoFile
-        try:
-            info = vf.probe()
-        except mediatools.ProbeError as e:
-            print(f'\n\tcould not probe {str(vf.fpath)}')
-            if delete_errored_files:
-                vf.fpath.unlink(vf.fpath)
-                print(f'\n\tdeleted file.')
-        else:
-            max_bitrate = bitrate_calculator(info)
-            
-            if info.file_bitrate > max_bitrate and not vf.fpath.stem.endswith('-c'):
-
-                new_fpath = get_new_filename(vf.fpath)
-                if new_fpath.exists():
-                    pass # idk what to do if file already exists
-
-                if do_compress:
-                    print(f'\ncompressing: {str(vf.fpath)}')
-                    result = compress_video(
-                        vf = vf, 
-                        new_fpath=new_fpath, 
-                        bitrate_cutoff=max_bitrate,
-                        crf_increment = crf_increment,
-                        delete_errored_files = delete_errored_files,
-                    )
-                    if result and delete_old:
-                        vf.fpath.unlink()
-                else:
-                    print(f'compressable video found: {str(vf.fpath)}')
+        ivfs: list[tuple[mediatools.ProbeInfo, mediatools.VideoFile]] = list()
+        for vf in tqdm.tqdm(cand_vfs):
+            vf: mediatools.VideoFile
+            try:
+                info = vf.probe()
+            except mediatools.ProbeError as e:
+                print(f'\n\tcould not probe {str(vf.fpath)}')
+                if delete_errored_files:
+                    vf.fpath.unlink(vf.fpath)
+                    print(f'\n\tdeleted file.')
+            else:
+                max_bitrate = bitrate_calculator(info)
                 
-                ivfs.append((info, vf))
+                if info.file_bitrate > max_bitrate and not vf.fpath.stem.endswith('-c'):
 
-    print(f'{len(ivfs)/len(cand_vfs)*100}% above bitrate')
+                    new_fpath = get_new_filename(vf.fpath)
+                    if new_fpath.exists():
+                        pass # idk what to do if file already exists
+
+                    if do_compress:
+                        print(f'\ncompressing: {str(vf.fpath)}')
+                        result = compress_video(
+                            vf = vf, 
+                            new_fpath=new_fpath, 
+                            bitrate_cutoff=max_bitrate,
+                            crf_increment = crf_increment,
+                            delete_errored_files = delete_errored_files,
+                        )
+                        if result and delete_old:
+                            vf.fpath.unlink()
+                    else:
+                        print(f'compressable video found: {str(vf.fpath)}')
+                    
+                    ivfs.append((info, vf))
+
+        print(f'{len(ivfs)/len(cand_vfs)*100:0.1f}% above bitrate')
 
 if __name__ == '__main__':
     compress_all_files()

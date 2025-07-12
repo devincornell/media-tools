@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import dataclasses
 import typing
+import pathlib
 
 import ffmpeg # type: ignore
 
-from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError
+from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
 
 from .stream_info import VideoStreamInfo, AudioStreamInfo
 
@@ -30,20 +31,19 @@ class ProbeInfo:
     other_streams: typing.List[typing.Dict[str, typing.Any]] # no idea if this will be used.
 
     @classmethod
-    def read_from_file(cls, input_fname: str) -> typing.Self:
+    def read_from_file(cls, input_fname: str|pathlib.Path, check_for_errors: bool = False) -> typing.Self:
         '''Read a file and return an ffprobeinfo.'''
         try:
             probe_info = ffmpeg.probe(input_fname)
         except ffmpeg.Error as e:
             raise ProbeError(f'There was a problem probing the file {input_fname}')
-        return cls.from_dict(probe_info)
+        return cls.from_dict(probe_info, check_for_errors=check_for_errors)
 
     @classmethod
-    def from_dict(cls, probe_info: typing.Dict[str,typing.Dict]) -> typing.Self:
+    def from_dict(cls, probe_info: typing.Dict[str,typing.Dict], check_for_errors: bool = False) -> typing.Self:
         '''Parse out streams and format info.'''
         from_info = get_or_None_factory(probe_info['format'])
-        #print(probe_info)
-        return cls(
+        o = cls(
             fname = from_info('filename', str), # type: ignore
             nb_streams = from_info('nb_streams',int), # type: ignore
             nb_programs = from_info('nb_programs', int), # type: ignore
@@ -55,10 +55,21 @@ class ProbeInfo:
             bit_rate = from_info('bit_rate', int), # type: ignore
             probe_score = from_info('probe_score', int), # type: ignore
             tags = from_info('tags', str), # type: ignore
-            video_streams = [VideoStreamInfo.from_dict(si) for si in probe_info['streams'] if si['codec_type']=='video'],
+            video_streams = [VideoStreamInfo.from_dict(si, check_for_errors=check_for_errors) for si in probe_info['streams'] if si['codec_type']=='video'],
             audio_streams = [AudioStreamInfo.from_dict(si) for si in probe_info['streams'] if si['codec_type']=='audio'],
             other_streams = [si for si in probe_info['streams'] if si['codec_type'] not in ('video','audio')],
         )
+        if check_for_errors:
+            o.check_for_errors()
+
+        return o
+    
+    def check_for_errors(self) -> None:
+        '''Check for errors in the probe info.'''
+        if self.dur is None or self.dur == 'N/A':
+            raise NoDurationError(f'The duration of the file {self.fname} could not be determined.')
+        if not self.video_streams:
+            raise NoVideoStreamError(f'The file {self.fname} does not contain any video streams.')
 
     @property
     def file_bitrate(self) -> float:
@@ -67,11 +78,16 @@ class ProbeInfo:
 
     @property
     def length(self) -> float:
+        if self.dur is None or self.dur == 'N/A':
+            raise NoDurationError(f'The duration of the file {self.fname} could not be determined, so could not calculate length.')
         return float(self.dur) - float(self.start_time)
     
     @property
     def duration(self) -> float:
-        return float(self.dur)
+        try:
+            return float(self.dur)
+        except (ValueError,TypeError):
+            raise NoDurationError(f'The duration of the file {self.fname} could not be determined. It is likely that the file is not a valid video file or is corrupted.')
 
     ############################# stream accessors #############################
     @property
