@@ -11,13 +11,13 @@ def make_pages(
         fpath: pathlib.Path, 
         config: mediatools.site.SiteConfig, 
         make_thumbs: bool = True
-    ) -> mediatools.mediasite.PageInfo:
-    page_tree = mediatools.mediasite.PageInfo.from_fpath(fpath, config, verbose=True)
+    ) -> mediatools.site_old.PageInfo:
+    page_tree = mediatools.site_old.PageInfo.from_fpath(fpath, config, verbose=True)
     return make_files_recursive(page_tree, config=config, make_thumbs=make_thumbs)
 
 def make_files_recursive(
-        pinfo: mediatools.mediasite.PageInfo, 
-        config: mediatools.mediasite.SiteConfig, 
+        pinfo: mediatools.site_old.PageInfo, 
+        config: mediatools.site_old.SiteConfig, 
         make_thumbs: bool
     ):
     print(f'starting in {str(pinfo.folder_fpath)}')
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     template = environment.from_string(template_html)
 
 
-    config = mediatools.mediasite.SiteConfig(
+    config = mediatools.site_old.SiteConfig(
         base_path = base_path,
         thumb_base_path = thumb_path,
         template = template,
