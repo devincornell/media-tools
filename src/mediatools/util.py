@@ -2,6 +2,7 @@ import typing
 from pathlib import Path
 import functools
 import pathlib
+import hashlib
 from collections import defaultdict
 
 
@@ -89,6 +90,22 @@ def format_memory(num_bytes: int, decimals: int = 2):
         return f'{num_bytes*1e3:0.{decimals}f} kB'
     else:
         return f'{num_bytes:0.{decimals}f} Bytes'
+
+
+
+
+
+
+def hash_file(path, hash_algo='sha256') -> str:
+    """Generate a hash for a file using the specified hash algorithm."""
+    hasher = hashlib.new(hash_algo)
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+
 
 
 
