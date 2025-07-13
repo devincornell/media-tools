@@ -13,7 +13,7 @@ import datetime
 import mediatools.util
 
 from .probe_info import ProbeInfo, NoDurationError
-#from .result import FFRunResult
+from .video_info import VideoInfo
 
 from .errors import FFMPEGCommandError#ProblemCompressingVideo, ProblemMakingThumb, ProblemSplicingVideo, ProblemCroppingVideo
 
@@ -51,6 +51,9 @@ class VideoFile:
     #        stdout = stdout,
     #    )
 
+    def get_info(self) -> VideoInfo:
+        '''Get the video information for this video file.'''
+        return VideoInfo.from_video_file(self, do_check=True)
 
     #################################### for globbing ####################################
 

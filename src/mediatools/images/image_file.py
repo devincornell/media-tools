@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 from .image import Image
-
+from .image_info import ImageInfo
 
 DEFAULT_IMAGE_FILE_EXTENSIONS = ('jpg', 'JPG', 'jpeg', 'JPEG', 'png', 'PNG', 'bmp', 'BMP', 'gif', 'GIF', 'tiff', 'TIFF', 'tif', 'TIF')
 
@@ -31,3 +31,6 @@ class ImageFile:
         '''Read the image into memory.'''
         return Image.from_file(self.fpath)
 
+    def get_info(self) -> ImageInfo:
+        '''Get the image information for this image file.'''
+        return ImageInfo.from_image_file(self)

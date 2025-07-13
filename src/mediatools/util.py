@@ -4,7 +4,7 @@ import functools
 import pathlib
 import hashlib
 from collections import defaultdict
-
+import urllib.parse
 
 
 Constant = str | int | bool | float
@@ -151,4 +151,20 @@ def print_tree(d: dict, indent=0):
         print("  " * indent + str(key))
         if isinstance(value, dict):
             print_tree(value, indent + 1)
+
+
+
+
+def fname_to_title(fname: str, max_char: int = 150) -> str:
+    replaced = fname.replace('_', ' ').replace('-', ' ')
+    return ' '.join(replaced.strip().split()).title()[:max_char]
+
+def fname_to_id(fname: str) -> str:
+    return '-'.join(fname.strip().split())
+
+def parse_url(urlstr: str) -> str:
+    try:
+        return urllib.parse.quote(urlstr)
+    except TypeError as e:
+        return ''
 
