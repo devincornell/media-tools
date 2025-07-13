@@ -10,7 +10,7 @@ import dataclasses
 #from ..util import format_memory, format_time, multi_extension_glob
 from .video import VideoFile, VideoFiles
 from .images import ImageFile, ImageFiles
-from .util import build_file_tree
+from .util import build_file_tree, hash_file
 
 @dataclasses.dataclass(repr=False)
 class MediaDir:
@@ -87,7 +87,7 @@ class MediaDir:
 
             else:
                 raise ValueError(f'Unexpected value type in data: {v}')
-        #exit()
+        
         o = cls(
             fpath = fpath,
             videos = videos,
@@ -100,5 +100,46 @@ class MediaDir:
 
         return o
     
+    def all_files(self) -> list[pathlib.Path]:
+        '''Get a list of all files in the directory, including subdirectories.
+        '''
+        files = self.video_paths() + self.image_paths() + self.other_files
+        for subdir in self.subdirs:
+            files.extend(subdir.all_files())
+        return files
+    
+    def all_media_files(self) -> list[pathlib.Path]:
+        '''Get a list of all media files in the directory, including subdirectories.
+        '''
+        files = self.video_paths() + self.image_paths()
+        for subdir in self.subdirs:
+            files.extend(subdir.all_files())
+        return files
+
+    def all_video_files(self) -> VideoFiles:
+        '''Get a list of all files in the directory, including subdirectories.
+        '''
+        videos = VideoFiles(self.videos)
+        for subdir in self.subdirs:
+            videos.extend(subdir.all_video_files())
+        return videos
+    
+    def all_image_files(self) -> ImageFiles:
+        '''Get a list of all image files in the directory, including subdirectories.
+        '''
+        images = ImageFiles(self.images)
+        for subdir in self.subdirs:
+            images.extend(subdir.all_image_files())
+        return images
+    
+    def video_paths(self) -> list[pathlib.Path]:
+        '''Get the fpaths of all video files.'''
+        return [vf.fpath for vf in self.all_video_files()]
+    
+    def image_paths(self) -> list[pathlib.Path]:
+        '''Get the fpaths of all image files.'''
+        return [ifp.fpath for ifp in self.all_image_files()]
+
+
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.fpath}")'

@@ -4,34 +4,23 @@ import sys
 sys.path.append('../src')
 import mediatools
 
+
+def make_site(root: pathlib.Path):
+    thumb_folder = root / '_thumbs'
+    mdir = mediatools.MediaDir.from_path(root, use_absolute=False, ingore_folder_names=('_thumbs',))
+    print(make_pages(mdir))
+
+def make_pages(mdir: mediatools.MediaDir):
+    print(mdir.fpath)
+    for sdir in mdir.subdirs:
+        make_pages(sdir)
+
+
 if __name__ == '__main__':
 
     # Example usage
-    root_path = pathlib.Path('/AddStorage/personal/dwhelper/')
-    #file_tree = mediatools.build_file_tree(root_path)
-    #mdir = mediatools.MediaDir.from_dict(file_tree)
-    mdir = mediatools.MediaDir.from_path(root_path, use_absolute=False, ingore_folder_names=('_thumbs',))
-
-    #mediatools.print_tree(file_tree)
-    print(mdir)
-    #exit()
-    for subdir in mdir.subdirs:
-        print(f'Subdir: {subdir.fpath}')
-        for video in subdir.videos:
-            print(f'  Video: {video.fpath}')
-        for image in subdir.images:
-            print(f'  Image: {image.fpath}')
-        for other_file in subdir.other_files:
-            print(f'  Other file: {other_file}')
-
-    import dataclasses
-    import json
-    # Print the tree structure
-    #print_tree(file_tree)
-    #print(json.dumps(dataclasses.asdict(mdir), indent=2))
-    # Optionally, you can save this tree to a file or use it as needed
-    # with open('file_tree.txt', 'w') as f:
-    #     f.write(str(file_tree))
-
+    root = pathlib.Path('/AddStorage/personal/dwhelper/')
+    make_site(root)
+    
 
 
