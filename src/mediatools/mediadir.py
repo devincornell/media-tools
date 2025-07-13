@@ -100,6 +100,14 @@ class MediaDir:
 
         return o
     
+    def all_dirs(self) -> list[typing.Self]:
+        '''Get a list of all directories in the tree, including subdirectories.
+        '''
+        dirs = [self]
+        for subdir in self.subdirs:
+            dirs.extend(subdir.all_dirs())
+        return dirs
+    
     def all_files(self) -> list[pathlib.Path]:
         '''Get a list of all files in the directory, including subdirectories.
         '''

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import typing
 import argparse
 import os
 import subprocess
@@ -8,33 +8,41 @@ import shutil
 import glob
 import random
 
-def create_montage(video_directory, clip_duration, output_filename, random_seed=0, width=1920, height=1080, fps=30):
+def create_montage(
+    video_directory: str, 
+    clip_duration: float, 
+    output_filename: str, 
+    random_seed: int = 0, 
+    width: int = 1920, 
+    height:int=1080, 
+    fps:int=30, 
+    clip_ratio:float=30,
+    supported_extensions: typing.Iterable[str] = ("*.mp4", "*.mov", "*.avi", "*.mkv", "*.flv")
+) -> None:
     """
     Creates a video montage from a directory of video files using FFmpeg.
 
-    This function finds all video files in a specified directory, extracts a clip of a given
-    duration from a random point in each video, and then concatenates them into a single
-    montage file. The video and audio are standardized to ensure compatibility.
+    This function finds all video files in a specified directory, extracts clips from each video proportional to its length, and then concatenates them into a single montage file. The video and audio are standardized to ensure compatibility.
 
     Args:
         video_directory (str): The path to the directory containing the video files.
-        clip_duration (float): The duration (in seconds) of the clip to extract from each video.
+        clip_duration (float): The duration (in seconds) of each clip to extract from each video.
         output_filename (str): The path and name of the output montage file.
-        random_seed (int, optional): The seed for the random number generator to ensure
-            reproducibility. Defaults to 0.
+        random_seed (int, optional): The seed for the random number generator to ensure reproducibility. Defaults to 0.
         width (int, optional): The width of the output video. Defaults to 1920.
         height (int, optional): The height of the output video. Defaults to 1080.
         fps (int, optional): The frames per second of the output video. Defaults to 30.
+        clip_ratio (float, optional): Ratio of video duration to number of clips (seconds per clip). Defaults to 30.
 
     Returns:
         bool: True if the montage was created successfully, False otherwise.
     """
     
     # --- Helper Functions ---
-
+    supported_extensions = set(supported_extensions)
     def find_video_files(directory):
         """Finds all video files with supported extensions in a directory."""
-        supported_extensions = ("*.mp4", "*.mov", "*.avi", "*.mkv", "*.flv")
+        #supported_extensions = ("*.mp4", "*.mov", "*.avi", "*.mkv", "*.flv")
         video_files = []
         for ext in supported_extensions:
             video_files.extend(glob.glob(os.path.join(directory, ext)))
@@ -89,31 +97,50 @@ def create_montage(video_directory, clip_duration, output_filename, random_seed=
         print(f"--- Creating montage: {output_filename} (seed: {random_seed}) ---")
         print("Processing video files...")
         processed_clips = []
+        clip_index = 0
         for i, f in enumerate(video_files):
             print(f"  - Processing '{os.path.basename(f)}'...")
             duration = get_video_duration(f)
-            if duration <= clip_duration:
-                start_time = 0
+            if duration < clip_duration:
+                num_clips = 1
             else:
-                start_time = random.uniform(0, duration - clip_duration)
-
-            processed_clip_path = os.path.join(tmp_dir, f"processed_clip_{i}.mp4")
-            
-            cmd = [
-                "ffmpeg",
-                "-ss", str(start_time),
-                "-i", os.path.abspath(f),
-                "-t", str(clip_duration),
-                "-y",
-                "-r", str(fps),
-                "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-                "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "192k",
-                processed_clip_path
-            ]
-            if run_ffmpeg_command(cmd):
-                processed_clips.append(processed_clip_path)
-            else:
-                print(f"  -> Skipping '{os.path.basename(f)}' due to processing error.")
+                num_clips = max(1, int(duration / clip_ratio))
+            print(f"    Extracting {num_clips} clip(s) from {duration:.2f}s video.")
+            possible_starts = max(1, int((duration - clip_duration) // clip_duration))
+            starts = []
+            for n in range(num_clips):
+                if duration <= clip_duration:
+                    start_time = 0
+                else:
+                    # Try to avoid overlapping clips
+                    min_start = 0
+                    max_start = duration - clip_duration
+                    if num_clips > 1:
+                        # Evenly distribute start times
+                        start_time = min_start + (max_start - min_start) * n / (num_clips)
+                        # Add some randomness
+                        jitter = (max_start - min_start) / (num_clips * 4)
+                        start_time += random.uniform(-jitter, jitter)
+                        start_time = max(min_start, min(max_start, start_time))
+                    else:
+                        start_time = random.uniform(min_start, max_start)
+                processed_clip_path = os.path.join(tmp_dir, f"processed_clip_{clip_index}.mp4")
+                cmd = [
+                    "ffmpeg",
+                    "-ss", str(start_time),
+                    "-i", os.path.abspath(f),
+                    "-t", str(clip_duration),
+                    "-y",
+                    "-r", str(fps),
+                    "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+                    "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "192k",
+                    processed_clip_path
+                ]
+                if run_ffmpeg_command(cmd):
+                    processed_clips.append(processed_clip_path)
+                else:
+                    print(f"  -> Skipping '{os.path.basename(f)}' clip {n+1} due to processing error.")
+                clip_index += 1
 
         if not processed_clips:
             print("No valid clips were processed. Montage creation failed.", file=sys.stderr)
@@ -154,18 +181,18 @@ if __name__ == '__main__':
     # This block allows the script to be run directly from the command line for testing.
     parser = argparse.ArgumentParser(
         description="Create a video montage from a directory of video files using FFmpeg.",
-        epilog="Example: ./montage_utils.py ./my_videos 5 my_montage.mp4 --random_seed 42"
+        epilog="Example: ./create_montage.py ./my_videos 5 my_montage.mp4 --random_seed 42 --clip_ratio 30"
     )
     parser.add_argument("video_directory", help="Directory containing the video files.")
     parser.add_argument("clip_duration", type=float, help="Duration of each clip in seconds.")
     parser.add_argument("output_filename", help="Name for the final output file (e.g., montage.mp4).")
     parser.add_argument("--random_seed", type=int, default=0, help="Random seed for selecting clips (default: 0).")
-    
+    parser.add_argument("--clip_ratio", type=float, default=30, help="Ratio of video time to number of clips (seconds per clip, default: 30).")
     args = parser.parse_args()
-    
     create_montage(
         video_directory=args.video_directory,
         clip_duration=args.clip_duration,
         output_filename=args.output_filename,
-        random_seed=args.random_seed
+        random_seed=args.random_seed,
+        clip_ratio=args.clip_ratio
     )

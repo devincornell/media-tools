@@ -83,12 +83,6 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
                 best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
 
 
-    
-    #print(images)
-    #for im in images:
-    #    print('-->', im)
-    #imgs = list(sorted(images, key=lambda i: -i['aspect']))
-
     html_str = template.render(
         vids = list(sorted(vids, key=lambda vi: (-vi['aspect'], -vi['duration']))),
         clips = list(sorted(clips, key=lambda vi: (-vi['aspect'], -vi['duration']))),
@@ -100,14 +94,6 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
     with (mdir.fpath / page_name).open('w') as f:
         f.write(html_str)
     print('wrote', mdir.fpath / page_name)
-    #print(f'saved {pp} with {len(pinfo.img_infos)} images, {len(pinfo.vid_infos)} vids, and {len(pinfo.subpages)} subfolders')
-
-    #thumb_fp = thumbs_path / str(rp.with_suffix('.gif')).replace('/', '.')
-    #if best_thumb is not None:
-    #    thumb_path = best_thumb.relative_to(root).with_suffix('.gif')
-    #    thumb_fp = thumb_path / str().replace('/', '.')
-    #else:
-    #    thumb_fp = None
     
     return {
         'path': f'/{str(rel_path)}/{page_name}', 
