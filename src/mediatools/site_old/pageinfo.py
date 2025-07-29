@@ -18,7 +18,7 @@ from .vidinfo import VidInfo
 from .imginfo import ImgInfo
 from ..util import format_memory, format_time
 
-from ..video import ProbeError, FFMPEGCommandError
+from ..video import ProbeError, FFMPEGError
 
 
 from .util import *
@@ -198,7 +198,7 @@ class PageInfo:
         for vi in vis:
             try:
                 vi.make_thumb()
-            except FFMPEGCommandError as e:
+            except FFMPEGError as e:
                 pass
         
     def get_best_thumb(self) -> pathlib.Path:

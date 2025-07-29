@@ -1,0 +1,215 @@
+from __future__ import annotations
+
+import dataclasses
+import subprocess
+import typing
+import shlex
+from pathlib import Path
+
+
+from .errors import FFMPEGError
+
+
+
+
+
+@dataclasses.dataclass
+class FFMPEG:
+    input_files: list[str|Path]
+    output_file: str|Path
+    overwrite_output: bool = False
+    ss: str|None = None
+    duration: str|None = None
+    vf: str|None = None
+    af: str|None = None
+    vcodec: str|None = None
+    acodec: str|None = None
+    video_bitrate: str|None = None
+    audio_bitrate: str|None = None
+    framerate: int|None = None
+    format: str|None = None
+    filter_complex: str|None = None
+    disable_audio: bool = False
+    disable_video: bool = False
+    crf: int|None = None
+    preset: str|None = None
+    hwaccel: str|None = None
+    loglevel: typing.Literal['error', 'warning', 'info', 'quiet', 'panic']|None = None
+    
+    command_args: list[tuple[str, str]]|None = None
+    command_flags: list[str]|None = None
+    
+
+    def run(
+        self,
+        timeout: float|None = None,
+        cwd: str|Path|None = None,
+        env: str|Path|None = None,
+    ) -> list[str]:
+        '''Run the FFMPEG command with the provided parameters.'''
+        return FFMPEGResult(
+            command=self, 
+            result=_run_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
+        )
+    
+
+    def get_command(self) -> str:
+        '''Return the FFMPEG command as a string.'''
+        cmd = self.build_command()
+        return ' '.join(shlex.quote(arg) for arg in cmd)
+
+
+    def build_command(self) -> list[str]:
+        '''Build the FFMPEG command as a list of strings.'''
+
+        cmd = ["ffmpeg"]
+        
+        cmd.extend([f'-{cf}' for cf in self.get_flags()] or [])
+
+        for an,av in self.get_args():
+            cmd.extend([str(an) if str(an).startswith('-') else f'-{an}', str(av)])
+
+        cmd.append(str(self.output_file))
+
+        return cmd
+
+
+    def get_flags(self) -> list[str]:
+        '''Get the command flags for the FFMPEG command.'''
+        command_flags = list(self.command_flags) if self.command_flags is not None else []
+        
+        if self.overwrite_output:
+            command_flags.append('y')
+        if self.disable_audio:
+            command_flags.append('an')
+        if self.disable_video:
+            command_flags.append('vn')
+        
+        return command_flags
+
+    def get_args(self) -> list[tuple[str,str]]:
+        '''Get the command arguments for the FFMPEG command.'''
+        command_args = list(self.command_args) if self.command_args is not None else []
+
+
+        if self.hwaccel is not None:
+            command_args.append(('hwaccel', self.hwaccel))
+
+        for input_file in self.input_files:
+            command_args.append(('i', str(input_file)))
+
+        arg_map = [
+            ("vf", self.vf),
+            ("af", self.af),
+            ("ss", self.ss),
+            ("t", self.duration),
+            ('r', self.framerate),
+            ("b:v", self.video_bitrate),
+            ("b:a", self.audio_bitrate),
+            ("c:v", self.vcodec),
+            ("c:a", self.acodec),
+            ('crf', self.crf),
+            ('f', self.format),
+            ('filter_complex', self.filter_complex),
+            ('preset', self.preset),
+            #('hwaccel', self.hwaccel),
+            ('loglevel', self.loglevel),
+        ]
+        
+        # Add non-None arguments to command_args
+        command_args.extend([(an,av) for an,av in arg_map if av is not None])
+
+        return command_args    
+
+
+@dataclasses.dataclass
+class FFMPEGResult:
+    command: FFMPEG
+    result: subprocess.CompletedProcess
+
+    @property
+    def stdout(self) -> str:
+        '''Return the standard output of the FFMPEG command.'''
+        return self.result.stdout.strip()
+    
+    @property
+    def stderr(self) -> str:
+        '''Return the standard error output of the FFMPEG command.'''
+        return self.result.stderr.strip()
+    
+    @property
+    def returncode(self) -> int:
+        '''Return the return code of the FFMPEG command.'''
+        return self.result.returncode
+
+
+
+def _run_subprocess(
+    cmd: list[str], 
+    timeout: float|None = None, 
+    cwd: str|Path|None = None, 
+    env: str|Path|None = None
+) -> subprocess.CompletedProcess:
+    '''Run a subprocess with the given command and parameters.'''
+    try:
+        # Execute the command
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+            env=env,
+            check=True
+        )
+        return result
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"FFMPEG command failed: {' '.join(cmd)}"
+        raise FFMPEGError.from_stdout_stderr(
+            stdout=e.stdout,
+            stderr=e.stderr,
+            msg=f'{error_msg} - {e.stderr.strip() if e.stderr else "<no stderr output>"}'
+        ) from e
+        
+    except subprocess.TimeoutExpired as e:
+        error_msg = f"FFMPEG command timed out after {timeout} seconds: {' '.join(cmd)}"
+        raise e
+        
+    except FileNotFoundError as e:
+        error_msg = "FFMPEG not found in PATH. Please ensure FFMPEG is installed and available."
+        raise e
+
+
+
+def check_ffmpeg_available() -> bool:
+    '''Check if FFMPEG is available on the system.'''
+    try:
+        subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            check=True,
+            timeout=10
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def get_ffmpeg_version() -> str|None:
+    '''Retrieve the version of FFMPEG installed on the system.'''
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10
+        )
+        lines = result.stdout.strip().split('\n')
+        if lines:
+            return lines[0]
+        return None
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
