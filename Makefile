@@ -29,6 +29,9 @@ mypy:
 
 
 ################################## Virtual Environments ##################################
+activate:
+	source $(VIRTUAL_ENV_NAME)/bin/activate
+
 VIRTUAL_ENV_NAME = myenv
 
 venv_new: 
