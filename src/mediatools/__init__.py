@@ -3,7 +3,7 @@
 from .video import *
 from .images import *
 from .site import *
-from .mediadir import MediaDir
+from .mediadir import MediaDir, scan_directory
 #from . import site
 
 from . import site_old

@@ -1,9 +1,11 @@
 import pathlib
 import jinja2
 import PIL
+import dataclasses
 
 import sys
 sys.path.append('../src')
+sys.path.append('src')
 import mediatools
 
 
@@ -26,43 +28,65 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
     '''Make pages for the media directory and its subdirectories.'''
     rel_path = mdir.fpath.relative_to(root)
 
+    best_subpage_thumb, best_local_thumb = BestThumbTracker(), BestThumbTracker()
+    
     child_paths = list()
-    for sdir in mdir.subdirs:
+    for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
-            child_paths.append(make_pages(root=root, mdir=sdir, template=template, thumbs_path=thumbs_path, page_name=page_name))
+            subpage_data = make_pages(root=root, mdir=sdir, template=template, thumbs_path=thumbs_path, page_name=page_name)
+            child_paths.append(subpage_data)
+
+            best_subpage_thumb.update(
+                new_path=subpage_data['subfolder_thumb'],
+                new_aspect=subpage_data['subfolder_aspect'],
+            )
 
     clips = list()
     vids = list()
-    best_thumb, best_aspect = None, None
     for vfile in mdir.videos:
         rp = vfile.fpath.relative_to(root)
         thumb_fp = thumbs_path / str(rp.with_suffix('.gif')).replace('/', '.')
         rel_thumb_fp = thumb_fp.relative_to(root)
 
-        info = vfile.get_info()
-        
-        info_dict = {
-            'vid_web': mediatools.parse_url(vfile.fpath.name),
-            'vid_title': info.title(),
-            'thumb_web': mediatools.parse_url('/'+str(rel_thumb_fp)),
-            'vid_size': info.size,
-            'vid_size_str': info.size_str(),
-            'duration': info.probe.duration,
-            'duration_str': info.duration_str(),
-            'res_str': info.resolution_str(),
-            'aspect': info.aspect_ratio(),
-            'idx': info.id(),
-        }
-        if info.probe.duration < 60:
-            clips.append(info_dict)
+        try:
+            info = vfile.get_info()
+        except mediatools.ProbeError as e:
+            print(f'Error: {vfile.fpath} could not be probed. Skipping.')
+            continue
         else:
-            vids.append(info_dict)
+            info_dict = {
+                'vid_web': mediatools.parse_url(vfile.fpath.name),
+                'vid_title': info.title(),
+                'thumb_web': mediatools.parse_url('/'+str(rel_thumb_fp)),
+                'vid_size': info.size,
+                'vid_size_str': info.size_str(),
+                'duration': info.probe.duration,
+                'duration_str': info.duration_str(),
+                'res_str': info.resolution_str(),
+                'aspect': info.aspect_ratio(),
+                'idx': info.id(),
+            }
+            if info.probe.duration < 60:
+                clips.append(info_dict)
+            else:
+                vids.append(info_dict)
 
-        # select a good thumb
-        if best_aspect is None or info.aspect_ratio() > best_aspect:
-            best_aspect = info.aspect_ratio()
-            best_thumb =  mediatools.parse_url('/'+str(rel_thumb_fp))#str(rel_thumb_fp.with_suffix('.gif')).replace('/', '.')
+            best_local_thumb.update(
+                new_path=mediatools.parse_url('/'+str(rel_thumb_fp)),
+                new_aspect=info.aspect_ratio(),
+            )
 
+            # select a good thumb
+            #if best_aspect is None or info.aspect_ratio() > best_aspect:
+            #    best_aspect = info.aspect_ratio()
+            #    best_thumb =  mediatools.parse_url('/'+str(rel_thumb_fp))#str(rel_thumb_fp.with_suffix('.gif')).replace('/', '.')
+
+            if not thumb_fp.is_file():
+                try:
+                    vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
+                except mediatools.FFMPEGCommandError as e:
+                    print(f'FFMPEG ERROR: \n{e.stderr}\n\n')
+            
 
     images = list()
     for ifile in mdir.images:
@@ -78,29 +102,37 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
                 'title': info.title(),
                 'aspect': info.aspect_ratio(),
             })
-            if best_thumb is None or info.aspect_ratio() > best_aspect:
-                best_aspect = info.aspect_ratio()
-                best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
+            #if best_thumb is None or info.aspect_ratio() > best_aspect:
+            #    best_aspect = info.aspect_ratio()
+            #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
+            best_local_thumb.update(
+                new_path=f'/{mediatools.parse_url(str(rp))}',
+                new_aspect=info.aspect_ratio(),
+            )
 
 
     html_str = template.render(
         vids = list(sorted(vids, key=lambda vi: (-vi['aspect'], -vi['duration']))),
+        #vids = list(sorted(vids, key=lambda vi: vi['vid_title'])),
         clips = list(sorted(clips, key=lambda vi: (-vi['aspect'], -vi['duration']))),
         imgs = list(sorted(images, key=lambda i: -i['aspect'])),
         child_paths = list(sorted(child_paths, key=lambda i: -i['subfolder_aspect'])), 
+        #child_paths = list(sorted(child_paths, key=lambda i: i['name'])), 
         page_name = page_name,
     )
 
     with (mdir.fpath / page_name).open('w') as f:
         f.write(html_str)
     print('wrote', mdir.fpath / page_name)
+
+    best_local_thumb.update_from_other(best_subpage_thumb)
     
     return {
         'path': f'/{str(rel_path)}/{page_name}', 
-        'path_rel': f'{str(rel_path)}/{page_name}', 
+        'path_rel': f'{str(rel_path)}/{page_name}',
         'name': mediatools.fname_to_title(rel_path.name), 
-        'subfolder_thumb': best_thumb if best_thumb is not None else '',
-        'subfolder_aspect': best_aspect if best_aspect is not None else 1.0,
+        'subfolder_thumb': best_local_thumb.get_final_path(),
+        'subfolder_aspect': best_local_thumb.get_final_aspect(),
         'num_vids': len(vids),
         'num_imgs': len(images),
         'num_subfolders': len(child_paths),
@@ -108,13 +140,44 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
         'idx': mediatools.fname_to_id(mdir.fpath.name),
     }
 
-if __name__ == '__main__':
+@dataclasses.dataclass
+class BestThumbTracker:
+    path: pathlib.Path|None = None
+    aspect: float|None = None
 
-    # Example usage
-    root = pathlib.Path('/AddStorage/personal/dwhelper/')
+    def update(self, new_path: pathlib.Path, new_aspect: float):
+        '''Update the best thumb if the new one is better.'''
+        if new_path is None or new_aspect is None:
+            return
+        if self.path is None or new_path == '' or new_aspect > self.aspect:
+            self.path = pathlib.Path(new_path)
+            self.aspect = new_aspect
+    
+    def update_from_other(self, other: 'BestThumbTracker'):
+        '''Update from another BestThumbTracker.'''
+        return self.update(new_path=other.path, new_aspect=other.aspect)
+    
+    def get_final_path(self) -> str:
+        '''Get the path as a string.'''
+        return str(self.path) if self.path is not None else ''
+
+    def get_final_aspect(self) -> float:
+        '''Get the aspect ratio.'''
+        return self.aspect if self.aspect is not None else 1.0
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Generate a media website from a directory.')
+    parser.add_argument('root', type=pathlib.Path, help='Root directory containing media files')
+    args = parser.parse_args()
+
     make_site(
-        root=root,
+        #root=args.root,
+        root=pathlib.Path(args.root).resolve(),
         template_path='templates/gpt_multi_v2.2.html',
+        thumb_folder='_thumbs',
+        page_name='web3.html',
     )
     
 

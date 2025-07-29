@@ -12,6 +12,22 @@ from .video import VideoFile, VideoFiles
 from .images import ImageFile, ImageFiles
 from .util import build_file_tree, hash_file
 
+def scan_directory(
+        root_path: pathlib.Path | str,
+        use_absolute: bool = True,
+        video_ext: typing.Iterable[str] = ('.mp4', '.mov', '.avi', '.mkv', '.webm'),
+        image_ext: typing.Iterable[str] = ('.jpg', '.jpeg', '.png', '.gif'),
+        ingore_folder_names: set[str] | None = None,
+    ) -> MediaDir:
+    '''Recursively scan a directory and return a MediaDir instance.'''
+    return MediaDir.from_path(
+        root_path=root_path,
+        use_absolute=use_absolute,
+        video_ext=video_ext,
+        image_ext=image_ext,
+        ingore_folder_names=ingore_folder_names,
+    )
+
 @dataclasses.dataclass(repr=False)
 class MediaDir:
     '''Stores information about a directory of media files (recursive data structure).
