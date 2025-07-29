@@ -14,22 +14,10 @@ import mediatools.util
 
 from .probe_info import ProbeInfo, NoDurationError
 from .video_info import VideoInfo
-
-from .errors import FFMPEGCommandError#ProblemCompressingVideo, ProblemMakingThumb, ProblemSplicingVideo, ProblemCroppingVideo
-
-def clean_stdout(out: str) -> str:
-    return ' '.join(out.split('\n'))
+from .errors import FFMPEGError, VideoFileDoesNotExistError
 
 
-class VideoFileDoesNotExistError(Exception):
-    fpath: Path
-    _msg_template: str = 'This video file does not exist: {fp}'
 
-    @classmethod
-    def from_fpath(cls, fpath: Path) -> typing.Self:
-        o = cls(cls._msg_template.format(fp=str(fpath)))
-        o.fpath = fpath
-        return o
 
 @dataclasses.dataclass(repr=False)
 class VideoFile:
@@ -105,30 +93,11 @@ class VideoFile:
         return VideoFile.from_path(new_fpath)
 
 
+
 XCoord = int
 YCoord = int
 Height = int
 Width = int
-
-
-@dataclasses.dataclass
-class NewVideoResult:
-    vf: VideoFile
-    stdout: str
-
-    @classmethod
-    def check_file_exists(cls, fpath: Path, stdout: str) -> NewVideoResult:
-        '''Check that the file exists and return a NewVideoResult.'''
-        fpath = Path(fpath)
-        if not fpath.exists():
-            raise FileNotFoundError(f'The video file "{fpath}" was not found '
-                f'even though ffmpeg did not raise an exception.')
-        return cls(vf=VideoFile.from_path(fpath), stdout=stdout)
-
-@dataclasses.dataclass
-class NewThumbResult:
-    fp: Path
-    stdout: str
 
 
 @dataclasses.dataclass
@@ -257,11 +226,32 @@ class FFMPEGTools:
             stdout = ffmpeg_command.run(capture_stdout=True, capture_stderr=True)
 
         except ffmpeg.Error as e:
-            raise FFMPEGCommandError.from_stderr(e.stderr, 
+            raise FFMPEGError.from_ffmpeg_error(e, 
                 f'There was an error executing the ffmpeg command: {ffmpeg_command}.') from e
         else:
             try:
                 return '\n'.join([s.decode() for s in stdout])
             except Exception as e:
                 return stdout
-        
+
+
+
+@dataclasses.dataclass
+class NewVideoResult:
+    vf: VideoFile
+    stdout: str
+
+    @classmethod
+    def check_file_exists(cls, fpath: Path, stdout: str) -> NewVideoResult:
+        '''Check that the file exists and return a NewVideoResult.'''
+        fpath = Path(fpath)
+        if not fpath.exists():
+            raise FileNotFoundError(f'The video file "{fpath}" was not found '
+                f'even though ffmpeg did not raise an exception.')
+        return cls(vf=VideoFile.from_path(fpath), stdout=stdout)
+
+@dataclasses.dataclass
+class NewThumbResult:
+    fp: Path
+    stdout: str
+

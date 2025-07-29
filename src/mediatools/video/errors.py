@@ -1,29 +1,59 @@
 import typing
-
-
-
+import ffmpeg
+from pathlib import Path
 ####################### FFMPEG Errors #######################
 
-class FFMPEGCommandError(Exception):
+def clean_stdout(stdout: str) -> str:
+    return ' '.join(stdout.split('\n')).strip()
+
+
+
+class FFMPEGError(Exception):
+    stdout: str
     stderr: str
 
     @classmethod
-    def from_stderr(cls, stderr: str | bytes, msg: str) -> typing.Self:
+    def from_stderr(cls, stderr: str | bytes, msg: str|None=None) -> typing.Self:
+        '''Create a FFMPEGError from stderr string.'''
+        return cls.from_stdout_stderr(stdout=None, stderr=stderr, msg=msg)
+    
+    @classmethod
+    def from_stdout(cls, stderr: str | bytes, msg: str|None=None) -> typing.Self:
+        '''Create a FFMPEGError from stdout and stderr strings.'''
+        return cls.from_stdout_stderr(stdout=None, stderr=stderr, msg=msg)
+    
+    @classmethod
+    def from_ffmpeg_error(cls, error: ffmpeg.Error, msg: str|None=None) -> typing.Self:
+        '''Create a FFMPEGError from an ffmpeg.Error.'''
+        return cls.from_stdout_stderr(stdout=error.stdout, stderr=error.stderr, msg=msg)
+    
+    @classmethod
+    def from_stdout_stderr(cls, stdout:str|bytes|None=None, stderr:str|bytes|None=None, msg:str|None=None) -> typing.Self:
+        '''Create a FFMPEGError from stdout and stderr strings.'''
         o = cls(msg)
-        try:
-            o.stderr = stderr.decode()
-        except AttributeError as e:
-            o.stderr = stderr
+        o.stdout = stdout.decode() if isinstance(stdout, bytes) else stdout
+        o.stderr = stderr.decode() if isinstance(stderr, bytes) else stderr
         return o
+    
+    def clean_stdout(self) -> str:
+        '''Clean the stdout string by removing newlines and extra spaces.'''
+        if self.stdout is None:
+            return ''
+        return clean_stdout(self.stdout)
+    
+    def clean_stderr(self) -> str:
+        '''Clean the stderr string by removing newlines and extra spaces.'''
+        if self.stderr is None:
+            return ''
+        return clean_stdout(self.stderr)
 
-#class ProblemCompressingVideo(FFMPEGCommandError):
-#    pass
 
-#class ProblemMakingThumb(FFMPEGCommandError):
-#    pass
+class VideoFileDoesNotExistError(Exception):
+    fpath: Path
+    _msg_template: str = 'This video file does not exist: {fp}'
 
-#class ProblemSplicingVideo(FFMPEGCommandError):
-#    pass
-
-#class ProblemCroppingVideo(FFMPEGCommandError):
-#    pass
+    @classmethod
+    def from_fpath(cls, fpath: Path) -> typing.Self:
+        o = cls(cls._msg_template.format(fp=str(fpath)))
+        o.fpath = fpath
+        return o
