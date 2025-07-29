@@ -36,7 +36,7 @@ class ProbeInfo:
         try:
             probe_info = ffmpeg.probe(input_fname)
         except ffmpeg.Error as e:
-            raise ProbeError(f'There was a problem probing the file {input_fname}')
+            raise ProbeError(f'There was a problem probing the file {input_fname}. stdout= {e.stdout}, stderr={e.stderr}') from e
         return cls.from_dict(probe_info, check_for_errors=check_for_errors)
 
     @classmethod
