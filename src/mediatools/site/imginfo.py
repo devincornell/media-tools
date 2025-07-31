@@ -7,7 +7,6 @@ import pprint
 import subprocess
 import os
 import tqdm
-import ffmpeg
 import sys
 import html
 import urllib.parse
