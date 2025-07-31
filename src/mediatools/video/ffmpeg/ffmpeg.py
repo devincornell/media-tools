@@ -6,15 +6,13 @@ import typing
 import shlex
 from pathlib import Path
 
-
-from .errors import FFMPEGError
-
-
+from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 
 
 
 @dataclasses.dataclass
 class FFMPEG:
+    '''A class to represent an FFMPEG command.'''
     input_files: list[str|Path]
     output_file: str|Path
     overwrite_output: bool = False
@@ -49,7 +47,7 @@ class FFMPEG:
         '''Run the FFMPEG command with the provided parameters.'''
         return FFMPEGResult(
             command=self, 
-            result=_run_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
+            result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
         )
     
 
@@ -119,10 +117,11 @@ class FFMPEG:
         # Add non-None arguments to command_args
         command_args.extend([(an,av) for an,av in arg_map if av is not None])
 
-        return command_args    
+        return command_args
 
 
-@dataclasses.dataclass
+
+@dataclasses.dataclass(repr=False)
 class FFMPEGResult:
     command: FFMPEG
     result: subprocess.CompletedProcess
@@ -141,10 +140,13 @@ class FFMPEGResult:
     def returncode(self) -> int:
         '''Return the return code of the FFMPEG command.'''
         return self.result.returncode
+    
+    def __str__(self) -> str:
+        '''Return a string representation of the FFMPEGResult.'''
+        return f"{self.__class__.__name__}(command={self.command.get_command()}, returncode={self.returncode}, stdout_size={len(self.stdout)}, stderr_size={len(self.stderr)})"
 
 
-
-def _run_subprocess(
+def run_ffmpeg_subprocess(
     cmd: list[str], 
     timeout: float|None = None, 
     cwd: str|Path|None = None, 
@@ -162,54 +164,20 @@ def _run_subprocess(
             env=env,
             check=True
         )
-        return result
         
     except subprocess.CalledProcessError as e:
         error_msg = f"FFMPEG command failed: {' '.join(cmd)}"
-        raise FFMPEGError.from_stdout_stderr(
+        raise FFMPEGExecutionError.from_stdout_stderr(
             stdout=e.stdout,
             stderr=e.stderr,
             msg=f'{error_msg} - {e.stderr.strip() if e.stderr else "<no stderr output>"}'
         ) from e
         
     except subprocess.TimeoutExpired as e:
-        error_msg = f"FFMPEG command timed out after {timeout} seconds: {' '.join(cmd)}"
-        raise e
+        raise FFMPEGCommandTimeoutError(f"FFMPEG command timed out after {timeout} seconds: {' '.join(cmd)}")
         
     except FileNotFoundError as e:
-        error_msg = "FFMPEG not found in PATH. Please ensure FFMPEG is installed and available."
-        raise e
+        raise FFMPEGNotFoundError("FFMPEG not found in PATH. Please ensure FFMPEG is installed and available.")
 
-
-
-def check_ffmpeg_available() -> bool:
-    '''Check if FFMPEG is available on the system.'''
-    try:
-        subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            check=True,
-            timeout=10
-        )
-        return True
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def get_ffmpeg_version() -> str|None:
-    '''Retrieve the version of FFMPEG installed on the system.'''
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10
-        )
-        lines = result.stdout.strip().split('\n')
-        if lines:
-            return lines[0]
-        return None
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return None
+    return result
 
