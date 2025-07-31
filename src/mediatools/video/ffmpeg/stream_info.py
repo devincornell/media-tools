@@ -5,7 +5,7 @@ import typing
 
 
 from mediatools.util import get_or_None_factory, VideoTime
-from .errors import ProbeError, NoDurationError, NoResolutionError
+from .probe_errors import ProbeError, NoDurationError, NoResolutionError
 
 @dataclasses.dataclass
 class BaseStreamInfo:

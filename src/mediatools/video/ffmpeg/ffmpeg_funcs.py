@@ -4,12 +4,13 @@ import dataclasses
 import subprocess
 import typing
 import shlex
+import json
 import datetime
 from pathlib import Path
 
 from .ffmpeg import FFMPEG, FFMPEGResult, run_ffmpeg_subprocess
 from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
-
+from .probe_info import ProbeInfo
 
 XCoord = int
 YCoord = int
@@ -189,7 +190,15 @@ def get_ffmpeg_version() -> str|None:
     return lines[0]
 
 
+
+
 def probe(fp: str|Path) -> dict[str,typing.Any]:
+    '''Retrieve the version of FFMPEG installed on the system.'''
+    return ProbeInfo.from_dict(probe_info=json.loads(probe_dict(fp)), check_for_errors=False)
+
+
+
+def probe_dict(fp: str|Path) -> dict[str,typing.Any]:
     '''Retrieve the version of FFMPEG installed on the system.'''
     result = run_ffmpeg_subprocess(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', str(fp)])
     return result.stdout

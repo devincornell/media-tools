@@ -11,10 +11,9 @@ import datetime
 
 import mediatools.util
 
-from .probe_info import ProbeInfo, NoDurationError
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFMPEGResult
+from .ffmpeg import FFMPEG, FFMPEGResult, ProbeInfo, NoDurationError
 
 
 

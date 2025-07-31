@@ -62,7 +62,23 @@ def test_ffmpeg_tools():
         assert(len(result.stdout) > 0)
 
 
+def test_ffmpeg_lowlevel():
+    with tempfile.TemporaryDirectory() as tempdir:
+        td = lambda x: Path(tempdir) / x
+        test_video_fname = 'totk_secret_attack.mkv'
+        
+        fp = Path(tempdir) / test_video_fname
+        print(f'Downloading test video file {fp}...')
+        r = requests.get('https://storage.googleapis.com/public_data_09324832787/totk_secret_attack.mkv')
+        with open(fp, 'wb') as f:
+            f.write(r.content)
+
+        print(mediatools.ffmpeg.probe(fp))
+
+
+
 
 if __name__ == '__main__':
-    test_ffmpeg_tools()
+    #test_ffmpeg_tools()
+    test_ffmpeg_lowlevel()
 

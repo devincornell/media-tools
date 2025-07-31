@@ -4,9 +4,9 @@ import dataclasses
 import typing
 import pathlib
 
-import ffmpeg # type: ignore
+#import ffmpeg # type: ignore
 
-from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
+from .probe_errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
 
 from .stream_info import VideoStreamInfo, AudioStreamInfo
 
@@ -30,14 +30,14 @@ class ProbeInfo:
     audio_streams: typing.List[AudioStreamInfo]
     other_streams: typing.List[typing.Dict[str, typing.Any]] # no idea if this will be used.
 
-    @classmethod
-    def read_from_file(cls, input_fname: str|pathlib.Path, check_for_errors: bool = False) -> typing.Self:
-        '''Read a file and return an ffprobeinfo.'''
-        try:
-            probe_info = ffmpeg.probe(input_fname)
-        except ffmpeg.Error as e:
-            raise ProbeError(f'There was a problem probing the file {input_fname}. stdout= {e.stdout}, stderr={e.stderr}') from e
-        return cls.from_dict(probe_info, check_for_errors=check_for_errors)
+    #@classmethod
+    #def read_from_file(cls, input_fname: str|pathlib.Path, check_for_errors: bool = False) -> typing.Self:
+    #    '''Read a file and return an ffprobeinfo.'''
+    #    try:
+    #        probe_info = ffmpeg.probe(input_fname)
+    #    except ffmpeg.Error as e:
+    #        raise ProbeError(f'There was a problem probing the file {input_fname}. stdout= {e.stdout}, stderr={e.stderr}') from e
+    #    return cls.from_dict(probe_info, check_for_errors=check_for_errors)
 
     @classmethod
     def from_dict(cls, probe_info: typing.Dict[str,typing.Dict], check_for_errors: bool = False) -> typing.Self:
