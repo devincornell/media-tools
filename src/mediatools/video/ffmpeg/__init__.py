@@ -8,6 +8,7 @@ from .ffmpeg_funcs import (
     splice,
     crop,
     make_thumb,
+    make_animated_thumb,
 )
 
 

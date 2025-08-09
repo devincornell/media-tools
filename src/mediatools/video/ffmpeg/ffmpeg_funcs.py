@@ -33,14 +33,6 @@ def compress(
     if not overwrite and output_fname.exists():
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
-    #result = self.run(
-    #    ffmpeg_command = (
-    #        ffmpeg
-    #        .input(str(self.vf.fpath))
-    #        .output(str(output_fname), vcodec=vcodec, crf=crf, **output_kwargs)
-    #    ),
-    #    overwrite_output=overwrite,
-    #)
     command = FFMPEG(
         input_files=[str(input_fname)],
         output_file=str(output_fname),
@@ -64,17 +56,6 @@ def splice(
     output_fname = Path(output_fname)
     if output_fname.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
-
-    #duration = duration_sec if duration_sec is not None else (end_sec - start_sec)
-    #stdout = self.run(
-    #    ffmpeg_command = (
-    #        ffmpeg
-    #        .input(self.vf.fpath, ss=start_time.total_seconds())
-    #        .output(str(output_fname), t=(end_time-start_time).total_seconds(), **output_kwargs)
-    #    ),
-    #    overwrite_output=overwrite,
-    #)
-    #return NewVideoResult.check_file_exists(fpath=output_fname, stdout=stdout)
 
     command = FFMPEG(
         input_files=[str(input_fname)],
@@ -103,17 +84,6 @@ def crop(
     output_fname = Path(output_fname)
     if output_fname.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
-
-    #stdout = self.run(
-    #    ffmpeg_command = (
-    #        ffmpeg
-    #        .input(str(self.vf.fpath))
-    #        .crop(*topleft_point, *size)
-    #        .output(str(output_fname), **output_kwargs)
-    #    ),
-    #    overwrite_output=overwrite,
-    #)
-    #return NewVideoResult.check_file_exists(fpath=output_fname, stdout=stdout)
 
     command = FFMPEG(
         input_files=[str(input_fname)],
@@ -145,22 +115,6 @@ def make_thumb(
     if ofp.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
-    #try:
-    #    probe = self.vf.probe(check_for_errors=True)
-    #    ss = int(probe.duration * time_point)
-    #except (TypeError, NoDurationError):
-    #    ss = .01  # default to 1 second if duration is not available
-
-    #stdout = self.run(
-    #    ffmpeg_command = (
-    #        ffmpeg
-    #        .input(self.vf.fpath, ss=ss)
-    #        .filter('scale', width, height)
-    #        .output(str(ofp), vframes=1, **output_kwargs)
-    #    ),
-    #    overwrite_output=overwrite,
-    #)
-    #return NewThumbResult(ofp, stdout)
     command = FFMPEG(
         input_files=[str(input_fname)],
         output_file=str(ofp),
@@ -172,6 +126,39 @@ def make_thumb(
     )
     return command.run()
 
+def make_animated_thumb(
+    input_fname: str|Path,
+    output_fname: str, 
+    vframes: int,
+    framerate: int,
+    #time_point_sec: float = 0.5, 
+    height: int = -1, 
+    width: int = -1, 
+    overwrite: bool = False, 
+    **output_kwargs
+) -> FFMPEGResult:
+    '''Make a thumbnail from this video.
+    Args:
+        time_point is the proportion of the video at which to take the thumb (e.g. 0.5 means at half way through.)
+    Notes:
+        copied from here:
+            https://api.video/blog/tutorials/automatically-add-a-thumbnail-to-your-video-with-python-and-ffmpeg
+    '''
+    ofp = Path(output_fname)
+    if ofp.exists() and not overwrite:
+        raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
+    
+    command = FFMPEG(
+        input_files=[str(input_fname)],
+        output_file=str(ofp),
+        #ss=time_point_sec,
+        vf=f'scale={width}:{height}',
+        overwrite_output=overwrite,
+        command_args={'vframes': vframes},
+        framerate=framerate,
+        **output_kwargs
+    )
+    return command.run()
 
 
 

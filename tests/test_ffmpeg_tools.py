@@ -63,7 +63,7 @@ def test_ffmpeg_tools():
 
 
 def test_ffmpeg_lowlevel():
-    with tempfile.TemporaryDirectory() as tempdir:
+    with tempfile.TemporaryDirectory(dir='./') as tempdir:
         td = lambda x: Path(tempdir) / x
         test_video_fname = 'totk_secret_attack.mkv'
         
@@ -85,10 +85,9 @@ def test_ffmpeg_lowlevel():
         assert(len(result.output) > 0)
         
         print('splicing')
-        op = td('totk_spliced.mp4')
         result = mediatools.ffmpeg.splice(
             input_fname=fp,
-            output_fname=op, 
+            output_fname=td('totk_spliced.mp4'), 
             start_time=datetime.timedelta(seconds=0), 
             end_time=datetime.timedelta(seconds=5),
             overwrite=True
@@ -97,11 +96,10 @@ def test_ffmpeg_lowlevel():
         assert(len(result.output) > 0)
 
         print('cropping')
-        op = td('totk_cropped.mp4')
         probe = mediatools.ffmpeg.probe(fp)
         result = mediatools.ffmpeg.crop(
             input_fname=fp,
-            output_fname=op, 
+            output_fname=td('totk_cropped.mp4'), 
             topleft_point=(0,0),
             size=(probe.video.width//2, probe.video.height//2),
             overwrite=True
@@ -115,10 +113,34 @@ def test_ffmpeg_lowlevel():
             output_fname=td('totk_thumb.jpg'), 
             time_point_sec=0.5,
             height=100,
+            overwrite=True,
+            framerate=10,
+        )
+        assert(result.output_file.exists())
+        assert(len(result.output) > 0)
+
+
+
+        print('making animated thumb')
+        result = mediatools.ffmpeg.make_animated_thumb(
+            input_fname=fp,
+            output_fname=td('totk_thumb_animated.gif'), 
+            vframes = 10,
+            framerate=1,
+            #time_point_sec=0.5,
+            height=100,
             overwrite=True
         )
         assert(result.output_file.exists())
         assert(len(result.output) > 0)
+
+
+
+        print('output folder:', tempdir)
+        print('waiting')
+        import time
+        time.sleep(180)
+
 
 
 if __name__ == '__main__':
