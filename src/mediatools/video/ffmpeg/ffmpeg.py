@@ -38,7 +38,10 @@ class FFMPEG:
     
     command_args: dict[str,str]|None = None
     command_flags: list[str]|None = None
-    
+
+    def __post_init__(self):
+        self.input_files = [str(f) for f in self.input_files]
+        self.output_file = str(self.output_file)    
 
     def run(
         self,
