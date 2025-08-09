@@ -12,9 +12,9 @@ import mediatools
 
 def make_site(root: pathlib.Path, template_path: pathlib.Path, thumb_folder: str = '_thumbs', page_name: str = 'web3.html'):
     '''Make the site from the root directory and template.'''
-
+    pathlib.Path(thumb_folder).mkdir(exist_ok=True)
     mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ingore_folder_names=(thumb_folder,))
-
+    
     print(f'reading template {template_path}')
     template_path = pathlib.Path(template_path)
     with template_path.open('r') as f:
@@ -83,7 +83,10 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
 
             if not thumb_fp.is_file():
                 try:
-                    mediatools.ffmpeg.make_thumb(str(vfile.fpath), str(thumb_fp), width=400)
+                    #mediatools.ffmpeg.make_thumb(vfile.fpath, thumb_fp, width=400)
+                    import random
+                    rnum = random.uniform(-0.2, 0.2)
+                    mediatools.ffmpeg.make_animated_thumb(vfile.fpath, thumb_fp, framerate=2+rnum, sample_period=120, width=400)
                     #vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
                 except mediatools.ffmpeg.FFMPEGExecutionError as e:
                     print(f'FFMPEG ERROR: \n{e.stderr}\n\n')

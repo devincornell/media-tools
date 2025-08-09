@@ -105,8 +105,6 @@ def make_thumb(
     **output_kwargs
 ) -> FFMPEGResult:
     '''Make a thumbnail from this video.
-    Args:
-        time_point is the proportion of the video at which to take the thumb (e.g. 0.5 means at half way through.)
     Notes:
         copied from here:
             https://api.video/blog/tutorials/automatically-add-a-thumbnail-to-your-video-with-python-and-ffmpeg
@@ -129,20 +127,20 @@ def make_thumb(
 def make_animated_thumb(
     input_fname: str|Path,
     output_fname: str, 
-    vframes: int,
     framerate: int,
-    #time_point_sec: float = 0.5, 
+    sample_period: int,
     height: int = -1, 
     width: int = -1, 
     overwrite: bool = False, 
     **output_kwargs
 ) -> FFMPEGResult:
-    '''Make a thumbnail from this video.
+    '''Make an animated thumbnail from this video by sampling frames evenly across its duration.
     Args:
-        time_point is the proportion of the video at which to take the thumb (e.g. 0.5 means at half way through.)
-    Notes:
-        copied from here:
-            https://api.video/blog/tutorials/automatically-add-a-thumbnail-to-your-video-with-python-and-ffmpeg
+        sample_period: the number of seconds between each frame sampled.
+        framerate: the number of frames per second in the output gif.
+        height: the height of the output gif.
+        width: the width of the output gif.
+        overwrite: whether to overwrite the output file if it exists.
     '''
     ofp = Path(output_fname)
     if ofp.exists() and not overwrite:
@@ -151,11 +149,8 @@ def make_animated_thumb(
     command = FFMPEG(
         input_files=[str(input_fname)],
         output_file=str(ofp),
-        #ss=time_point_sec,
-        vf=f'scale={width}:{height}',
+        vf=f"setpts=PTS/{sample_period},fps={framerate},scale={width}:{height}:-1",
         overwrite_output=overwrite,
-        command_args={'vframes': vframes},
-        framerate=framerate,
         **output_kwargs
     )
     return command.run()
