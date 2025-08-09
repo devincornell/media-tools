@@ -50,7 +50,7 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
 
         try:
             info = vfile.get_info()
-        except mediatools.ProbeError as e:
+        except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
             print(f'Error: {vfile.fpath} could not be probed. Skipping.')
             continue
         else:
@@ -83,8 +83,9 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
 
             if not thumb_fp.is_file():
                 try:
-                    vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
-                except mediatools.FFMPEGCommandError as e:
+                    mediatools.ffmpeg.make_thumb(str(vfile.fpath), str(thumb_fp), width=400)
+                    #vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
+                except mediatools.ffmpeg.FFMPEGExecutionError as e:
                     print(f'FFMPEG ERROR: \n{e.stderr}\n\n')
             
 
@@ -116,8 +117,8 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
         #vids = list(sorted(vids, key=lambda vi: vi['vid_title'])),
         clips = list(sorted(clips, key=lambda vi: (-vi['aspect'], -vi['duration']))),
         imgs = list(sorted(images, key=lambda i: -i['aspect'])),
-        child_paths = list(sorted(child_paths, key=lambda i: -i['subfolder_aspect'])), 
-        #child_paths = list(sorted(child_paths, key=lambda i: i['name'])), 
+        #child_paths = list(sorted(child_paths, key=lambda i: -i['subfolder_aspect'])), 
+        child_paths = list(sorted(child_paths, key=lambda i: i['path_rel'])), 
         page_name = page_name,
     )
 

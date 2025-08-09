@@ -33,8 +33,10 @@ class FFMPEG:
     preset: str|None = None
     hwaccel: str|None = None
     loglevel: typing.Literal['error', 'warning', 'info', 'quiet', 'panic']|None = None
+    hide_banner: bool = True
+    nostats: bool = True
     
-    command_args: list[tuple[str, str]]|None = None
+    command_args: dict[str,str]|None = None
     command_flags: list[str]|None = None
     
 
@@ -64,7 +66,7 @@ class FFMPEG:
         
         cmd.extend([f'-{cf}' for cf in self.get_flags()] or [])
 
-        for an,av in self.get_args():
+        for an,av in self.get_args().items():
             cmd.extend([str(an) if str(an).startswith('-') else f'-{an}', str(av)])
 
         cmd.append(str(self.output_file))
@@ -82,19 +84,22 @@ class FFMPEG:
             command_flags.append('an')
         if self.disable_video:
             command_flags.append('vn')
+        if self.hide_banner:
+            command_flags.append('hide_banner')
+        if self.nostats:
+            command_flags.append('nostats')
         
         return command_flags
 
     def get_args(self) -> list[tuple[str,str]]:
         '''Get the command arguments for the FFMPEG command.'''
-        command_args = list(self.command_args) if self.command_args is not None else []
-
+        command_args = dict()# if self.command_args is not None else dict()
 
         if self.hwaccel is not None:
-            command_args.append(('hwaccel', self.hwaccel))
+            command_args['hwaccel'] = self.hwaccel
 
         for input_file in self.input_files:
-            command_args.append(('i', str(input_file)))
+            command_args['i'] = str(input_file)
 
         arg_map = [
             ("vf", self.vf),
@@ -115,7 +120,12 @@ class FFMPEG:
         ]
         
         # Add non-None arguments to command_args
-        command_args.extend([(an,av) for an,av in arg_map if av is not None])
+        for an,av in arg_map:
+            if av is not None:
+                command_args[an] = av
+        #command_args.extend([(an,av) for an,av in arg_map if av is not None])
+        if self.command_args is not None:
+            command_args = {**command_args, **self.command_args}
 
         return command_args
 
@@ -123,19 +133,34 @@ class FFMPEG:
 
 @dataclasses.dataclass(repr=False)
 class FFMPEGResult:
+    '''A class to represent the result of an FFMPEG command.
+    Description: this is a container for both the subprocess.CompletedProcess and 
+    the FFMPEG command that was run to generate it. You can access the command's
+    output (stderrr), return code, etc. via this class.
+    '''
     command: FFMPEG
     result: subprocess.CompletedProcess
+    
+    @property
+    def output(self) -> str:
+        '''Return progress and diagnostic output of the FFMPEG command (note: ffmpeg sends it to stdout).'''
+        return self.result.stderr.strip()
+
+    #@property
+    #def stderr(self) -> str:
+    #    '''Return progress and diagnostic output of the FFMPEG command (ffmpeg sends it to stdout).'''
+    #    return self.result.stderr.strip()
+
+    #@property
+    #def stdout(self) -> str:
+    #    '''Return stdout of the FFMPEG command. This is unliklely to be useful.'''
+    #    return self.result.stdout.strip()
 
     @property
-    def stdout(self) -> str:
-        '''Return the standard output of the FFMPEG command.'''
-        return self.result.stdout.strip()
-    
-    @property
-    def stderr(self) -> str:
-        '''Return the standard error output of the FFMPEG command.'''
-        return self.result.stderr.strip()
-    
+    def output_file(self) -> Path:
+        '''Return the output file path of the FFMPEG command.'''
+        return Path(self.command.output_file)
+
     @property
     def returncode(self) -> int:
         '''Return the return code of the FFMPEG command.'''
@@ -143,7 +168,7 @@ class FFMPEGResult:
     
     def __str__(self) -> str:
         '''Return a string representation of the FFMPEGResult.'''
-        return f"{self.__class__.__name__}(command={self.command.get_command()}, returncode={self.returncode}, stdout_size={len(self.stdout)}, stderr_size={len(self.stderr)})"
+        return f"{self.__class__.__name__}(command={self.command.get_command()}, returncode={self.returncode}, output_length={len(self.result.stderr)})"
 
 
 def run_ffmpeg_subprocess(

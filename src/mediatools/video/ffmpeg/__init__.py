@@ -3,6 +3,7 @@ from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecuti
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,
     probe,
+    probe_dict,
     compress,
     splice,
     crop,

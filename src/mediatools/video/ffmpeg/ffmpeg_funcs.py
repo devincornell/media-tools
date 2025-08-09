@@ -167,6 +167,7 @@ def make_thumb(
         ss=time_point_sec,
         vf=f'scale={width}:{height}',
         overwrite_output=overwrite,
+        command_args={'vframes': '1'},
         **output_kwargs
     )
     return command.run()
@@ -181,29 +182,20 @@ def check_ffmpeg_available() -> bool:
         return True
     except FFMPEGError:
         return False
-
-
+    
 def get_ffmpeg_version() -> str|None:
     '''Retrieve the version of FFMPEG installed on the system.'''
     result = run_ffmpeg_subprocess(["ffmpeg", "-version"])
     lines = result.stdout.strip().split('\n')
     return lines[0]
 
-
-
-
-def probe(fp: str|Path) -> dict[str,typing.Any]:
-    '''Retrieve the version of FFMPEG installed on the system.'''
+def probe(fp: str|Path) -> ProbeInfo:
+    '''Probe the file in question and return a ProbeInfo object.'''
     return ProbeInfo.from_dict(probe_info=json.loads(probe_dict(fp)), check_for_errors=False)
 
-
-
 def probe_dict(fp: str|Path) -> dict[str,typing.Any]:
-    '''Retrieve the version of FFMPEG installed on the system.'''
-    result = run_ffmpeg_subprocess(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', str(fp)])
+    '''Probe the file in question and return a dictionary of the probe info.'''
+    result = run_ffmpeg_subprocess(['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', str(fp)])
     return result.stdout
-
-
-
 
 

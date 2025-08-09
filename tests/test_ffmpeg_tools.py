@@ -74,8 +74,51 @@ def test_ffmpeg_lowlevel():
             f.write(r.content)
 
         print(mediatools.ffmpeg.probe(fp))
+        print(mediatools.ffmpeg.probe_dict(fp))
 
+        #print(mediatools.ffmpeg.compress(fp))
 
+        print('compressing')
+        op = td('totk_compressed.mp4')
+        result = mediatools.ffmpeg.compress(fp, op, crf=30, loglevel='info')
+        assert(op.exists())
+        assert(len(result.output) > 0)
+        
+        print('splicing')
+        op = td('totk_spliced.mp4')
+        result = mediatools.ffmpeg.splice(
+            input_fname=fp,
+            output_fname=op, 
+            start_time=datetime.timedelta(seconds=0), 
+            end_time=datetime.timedelta(seconds=5),
+            overwrite=True
+        )
+        assert(result.output_file.exists())
+        assert(len(result.output) > 0)
+
+        print('cropping')
+        op = td('totk_cropped.mp4')
+        probe = mediatools.ffmpeg.probe(fp)
+        result = mediatools.ffmpeg.crop(
+            input_fname=fp,
+            output_fname=op, 
+            topleft_point=(0,0),
+            size=(probe.video.width//2, probe.video.height//2),
+            overwrite=True
+        )
+        assert(result.output_file.exists())
+        assert(len(result.output) > 0)
+
+        print('making thumb')
+        result = mediatools.ffmpeg.make_thumb(
+            input_fname=fp,
+            output_fname=td('totk_thumb.jpg'), 
+            time_point_sec=0.5,
+            height=100,
+            overwrite=True
+        )
+        assert(result.output_file.exists())
+        assert(len(result.output) > 0)
 
 
 if __name__ == '__main__':

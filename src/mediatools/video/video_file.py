@@ -13,7 +13,7 @@ import mediatools.util
 
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFMPEGResult, ProbeInfo, NoDurationError
+from .ffmpeg import FFMPEG, FFMPEGResult, ProbeInfo, NoDurationError, probe
 
 
 
@@ -57,7 +57,7 @@ class VideoFile:
 
     def probe(self, check_for_errors: bool = False) -> ProbeInfo:
         '''Probe the file in question.'''
-        return ProbeInfo.read_from_file(str(self.fpath))    
+        return probe(str(self.fpath))
 
     ############################# file operations #############################
     def copy(self, new_fpath: Path, overwrite: bool = False) -> VideoFile:
