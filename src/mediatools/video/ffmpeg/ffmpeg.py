@@ -36,7 +36,8 @@ class FFMPEG:
     hide_banner: bool = True
     nostats: bool = True
     
-    command_args: dict[str,str]|None = None
+    output_args: list[tuple[str,str]]|None = None
+    input_args: list[tuple[str,str]]|None = None
     command_flags: list[str]|None = None
 
     def __post_init__(self):
@@ -69,7 +70,7 @@ class FFMPEG:
         
         cmd.extend([f'-{cf}' for cf in self.get_flags()] or [])
 
-        for an,av in self.get_args().items():
+        for an,av in self.get_args():
             cmd.extend([str(an) if str(an).startswith('-') else f'-{an}', str(av)])
 
         cmd.append(str(self.output_file))
@@ -96,13 +97,17 @@ class FFMPEG:
 
     def get_args(self) -> list[tuple[str,str]]:
         '''Get the command arguments for the FFMPEG command.'''
-        command_args = dict()# if self.command_args is not None else dict()
+        command_args = list()# if self.command_args is not None else dict()
 
         if self.hwaccel is not None:
-            command_args['hwaccel'] = self.hwaccel
+            command_args.append(('hwaccel', self.hwaccel))
+
+        if self.input_args is not None:
+            for an,av in self.input_args:
+                command_args.append((an,av))
 
         for input_file in self.input_files:
-            command_args['i'] = str(input_file)
+            command_args.append(('i', str(input_file)))
 
         arg_map = [
             ("vf", self.vf),
@@ -123,13 +128,14 @@ class FFMPEG:
         ]
         
         # Add non-None arguments to command_args
-        for an,av in arg_map:
-            if av is not None:
-                command_args[an] = av
-        #command_args.extend([(an,av) for an,av in arg_map if av is not None])
-        if self.command_args is not None:
-            command_args = {**command_args, **self.command_args}
-
+        #for an,av in arg_map:
+        #    if av is not None:
+        #        command_args.append((an, av))
+        command_args.extend([(an,av) for an,av in arg_map if av is not None])
+        if self.output_args is not None:
+        #    command_args = {**command_args, **self.command_args}
+            for an,av in self.output_args:
+                command_args.append((an,av))
         return command_args
 
 
