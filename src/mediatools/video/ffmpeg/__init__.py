@@ -9,6 +9,7 @@ from .ffmpeg_funcs import (
     crop,
     make_thumb,
     make_animated_thumb,
+    make_animated_thumb_v2,
 )
 
 

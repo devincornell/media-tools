@@ -119,7 +119,7 @@ def make_thumb(
         ss=time_point_sec,
         vf=f'scale={width}:{height}',
         overwrite_output=overwrite,
-        command_args={'vframes': '1'},
+        command_args=[('vframes', '1')],
         **output_kwargs
     )
     return command.run()
@@ -154,6 +154,41 @@ def make_animated_thumb(
         **output_kwargs
     )
     return command.run()
+
+
+
+def make_animated_thumb_v2(
+    input_fname: str|Path,
+    output_fname: str, 
+    framerate: int,
+    sample_period: int,
+    height: int = -1, 
+    width: int = -1, 
+    overwrite: bool = False, 
+    **output_kwargs
+) -> FFMPEGResult:
+    '''Make an animated thumbnail from this video by sampling frames evenly across its duration.
+    Args:
+        sample_period: the number of seconds between each frame sampled.
+        framerate: the number of frames per second in the output gif.
+        height: the height of the output gif.
+        width: the width of the output gif.
+        overwrite: whether to overwrite the output file if it exists.
+    '''
+    ofp = Path(output_fname)
+    if ofp.exists() and not overwrite:
+        raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
+    #ffmpeg -i input.mp4 -vf "fps=10,scale=400:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" output.gif
+    command = FFMPEG(
+        input_files=[str(input_fname)],
+        output_file=str(ofp),
+        vf=f"fps={framerate},scale={width}:{height}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+        overwrite_output=overwrite,
+        **output_kwargs
+    )
+    return command.run()
+
+
 
 
 

@@ -85,8 +85,10 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
                 try:
                     #mediatools.ffmpeg.make_thumb(vfile.fpath, thumb_fp, width=400)
                     import random
+                    random.seed(0)
                     rnum = random.uniform(-0.2, 0.2)
-                    mediatools.ffmpeg.make_animated_thumb(vfile.fpath, thumb_fp, framerate=2+rnum, sample_period=120, width=400)
+                    print(f'Creating thumb {thumb_fp}')
+                    mediatools.ffmpeg.make_animated_thumb_v2(vfile.fpath, thumb_fp, framerate=2+rnum, sample_period=120, width=400)
                     #vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
                 except mediatools.ffmpeg.FFMPEGExecutionError as e:
                     print(f'FFMPEG ERROR: \n{e.stderr}\n\n')
