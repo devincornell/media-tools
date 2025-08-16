@@ -1,12 +1,32 @@
+import typing
 from fastapi import FastAPI, Request, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
+import argparse
+from dataclasses import dataclass
+
+@dataclass
+class ServerConfig:
+    root_path: Path|None = None
+
+    def set_values_from_args(
+        self,
+        args: argparse.Namespace,
+    ) -> typing.Self:
+        '''Set configuration values from args.'''
+        if args.root_path is None:
+            raise ValueError("Root path must be provided")
+        root_path = Path(args.root_path)
+
+        if not root_path.exists():
+            raise FileNotFoundError(f"Root path not found: {root_path}")
+
+        self.root_path = root_path
+        return self
 
 app = FastAPI()
-
-# Define paths
-thumb_path = Path("_thumbs/my_thumb_50.jpg")  # Adjust this path to your thumbnail
+config = ServerConfig()
 
 # Add CORS middleware
 #app.add_middleware(
@@ -17,7 +37,6 @@ thumb_path = Path("_thumbs/my_thumb_50.jpg")  # Adjust this path to your thumbna
 #    allow_headers=["*"],
 #)
 
-video_path = Path("my_montage2.mp4")
 CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 @app.on_event("startup")
@@ -49,14 +68,14 @@ async def page():
 
 @app.get("/thumb")
 async def thumbnail():
-    if not thumb_path.exists():
+    if not config.thumb_path or not config.thumb_path.exists():
         return Response(content="Thumbnail not found", status_code=404)
-    return FileResponse(thumb_path, media_type="image/jpeg")
+    return FileResponse(config.thumb_path, media_type="image/jpeg")
 
 
 @app.get("/video")
 async def video_endpoint(range: str = Header(None)):
-    file_size = video_path.stat().st_size
+    file_size = config.video_path.stat().st_size
     if range:
         start_str, end_str = range.replace("bytes=", "").split("-")
         start = int(start_str)
@@ -75,7 +94,7 @@ async def video_endpoint(range: str = Header(None)):
         "Cache-Control": "public, max-age=31536000",
         "Connection": "keep-alive",
     }
-    with open(video_path, "rb") as f:
+    with open(config.video_path, "rb") as f:
         f.seek(start)
         data = f.read(content_length)
     response = Response(
@@ -87,6 +106,19 @@ async def video_endpoint(range: str = Header(None)):
     return response
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+    
+    parser = argparse.ArgumentParser(description='Start a video streaming server')
+    parser.add_argument('root_path', type=str, help='Path to the video file to serve')
+    parser.add_argument('--port', type=int, default=8001, help='Port to run the server on (default: 8001)')
+    
+    args = parser.parse_args()
+    config.set_values_from_args(args)
+    
+    print(f"\nStarting server: {config.root_path}")
+    print(f"Server will be available at: http://0.0.0.0:{args.port}")
+    
+    
+    uvicorn.run(app, host="0.0.0.0", port=args.port, reload=True)
 
