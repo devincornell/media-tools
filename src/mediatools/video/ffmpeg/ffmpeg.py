@@ -8,11 +8,67 @@ from pathlib import Path
 
 from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 
+LOGLEVEL_OPTIONS = typing.Literal['error', 'warning', 'info', 'quiet', 'panic']
 
+def ffmpeg(
+    input_files: list[str|Path],
+    output_file: str|Path,
+    overwrite_output: bool = False,
+    ss: str|None = None,
+    duration: str|None = None,
+    vf: str|None = None,
+    af: str|None = None,
+    vcodec: str|None = None,
+    acodec: str|None = None,
+    video_bitrate: str|None = None,
+    audio_bitrate: str|None = None,
+    framerate: int|None = None,
+    format: str|None = None,
+    filter_complex: str|None = None,
+    disable_audio: bool = False,
+    disable_video: bool = False,
+    crf: int|None = None,
+    preset: str|None = None,
+    hwaccel: str|None = None,
+    loglevel: LOGLEVEL_OPTIONS|None = None,
+    hide_banner: bool = True,
+    nostats: bool = True,
+    output_args: list[tuple[str,str]]|None = None,
+    input_args: list[tuple[str,str]]|None = None,
+    command_flags: list[str]|None = None,
+) -> FFMPEGResult:
+    '''Execute an ffmpeg command.'''
+    return FFMPEG(
+        input_files = input_files,
+        output_file = output_file,
+        overwrite_output = overwrite_output,
+        ss = ss,
+        duration = duration,
+        vf = vf,
+        af = af,
+        vcodec = vcodec,
+        acodec = acodec,
+        video_bitrate = video_bitrate,
+        audio_bitrate = audio_bitrate,
+        framerate = framerate,
+        format = format,
+        filter_complex = filter_complex,
+        disable_audio = disable_audio,
+        disable_video = disable_video,
+        crf = crf,
+        preset = preset,
+        hwaccel = hwaccel,
+        loglevel = loglevel,
+        hide_banner = hide_banner,
+        nostats = nostats,
+        output_args = output_args,
+        input_args = input_args,
+        command_flags = command_flags,
+    ).run()
 
 @dataclasses.dataclass
 class FFMPEG:
-    '''A class to represent an FFMPEG command.'''
+    '''Dataclass used to build an FFMPEG command.'''
     input_files: list[str|Path]
     output_file: str|Path
     overwrite_output: bool = False
@@ -32,10 +88,9 @@ class FFMPEG:
     crf: int|None = None
     preset: str|None = None
     hwaccel: str|None = None
-    loglevel: typing.Literal['error', 'warning', 'info', 'quiet', 'panic']|None = None
+    loglevel: LOGLEVEL_OPTIONS|None = None
     hide_banner: bool = True
     nostats: bool = True
-    
     output_args: list[tuple[str,str]]|None = None
     input_args: list[tuple[str,str]]|None = None
     command_flags: list[str]|None = None

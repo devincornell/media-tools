@@ -1,4 +1,4 @@
-from .ffmpeg import FFMPEG, FFMPEGResult
+from .ffmpeg import FFMPEG, FFMPEGResult, LOGLEVEL_OPTIONS
 from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,
