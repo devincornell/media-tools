@@ -21,6 +21,81 @@ from mediatools.video import VideoFiles, VideoFile, VideoInfo
 from mediatools.video.ffmpeg import FFMPEG, FFMPEGResult
 
 
+def concatenate_clips_direct(clips, output_filename, tmp_dir):
+    """Concatenate clips directly using concat demuxer for small numbers of clips."""
+    # Create a concat file listing all the clips
+    concat_file_path = os.path.join(tmp_dir, "concat_list.txt")
+    with open(concat_file_path, 'w') as f:
+        for clip_path in clips:
+            # Use relative path from the concat file location
+            relative_path = os.path.relpath(clip_path, tmp_dir)
+            f.write(f"file '{relative_path}'\n")
+    
+    print(f"Created concat file: {concat_file_path}")
+    
+    # Create concatenation command using concat demuxer
+    concat_cmd = FFMPEG(
+        input_files=[concat_file_path],
+        output_file=os.path.abspath(output_filename),
+        overwrite_output=True,
+        vcodec="libx264",
+        acodec="aac",
+        loglevel="error",
+        input_args=[('f', 'concat')]
+    )
+    
+    print(f"Running direct concatenation with {len(clips)} input files...")
+    
+    # Run the command from the tmp_dir so relative paths work
+    if run_ffmpeg_command(concat_cmd, cwd=tmp_dir):
+        print(f"\nMontage created successfully: '{output_filename}'")
+        return True
+    else:
+        print(f"\nFailed to create montage: '{output_filename}'", file=sys.stderr)
+        return False
+
+
+def concatenate_clips_recursive(clips, output_filename, tmp_dir):
+    """Concatenate clips using recursive chunking strategy for large numbers of clips."""
+    chunk_size = 10  # Process clips in chunks of 10
+    
+    if len(clips) <= chunk_size:
+        # Base case: use direct concatenation
+        return concatenate_clips_direct(clips, output_filename, tmp_dir)
+    
+    print(f"Processing {len(clips)} clips in chunks of {chunk_size}...")
+    
+    # Split clips into chunks
+    chunks = [clips[i:i + chunk_size] for i in range(0, len(clips), chunk_size)]
+    print(f"Created {len(chunks)} chunks")
+    
+    # Process each chunk to create intermediate montages
+    intermediate_montages = []
+    for i, chunk in enumerate(chunks):
+        chunk_output = os.path.join(tmp_dir, f"chunk_{i}.mp4")
+        print(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk)} clips)...")
+        
+        if concatenate_clips_direct(chunk, chunk_output, tmp_dir):
+            intermediate_montages.append(chunk_output)
+        else:
+            print(f"Failed to process chunk {i+1}, skipping...")
+    
+    if not intermediate_montages:
+        print("No chunks were processed successfully. Montage creation failed.", file=sys.stderr)
+        return False
+    
+    if len(intermediate_montages) == 1:
+        # Only one chunk, just rename it to the final output
+        import shutil
+        shutil.move(intermediate_montages[0], output_filename)
+        print(f"\nMontage created successfully: '{output_filename}'")
+        return True
+    
+    # Recursively combine intermediate montages
+    print(f"Combining {len(intermediate_montages)} intermediate montages...")
+    return concatenate_clips_recursive(intermediate_montages, output_filename, tmp_dir)
+
+
 def create_montage(
     video_files: typing.List[Path], 
     clip_duration: float, 
@@ -103,12 +178,8 @@ def create_montage(
         print("Processing video files...")
         processed_clips = []
         clip_index = 0
-        max_clips = 20  # Limit for debugging
         
         for video_file in video_file_objects:
-            if len(processed_clips) >= max_clips:
-                print(f"Reached max_clips ({max_clips}), stopping further processing.")
-                break
                 
             print(f"  - Processing '{video_file.fpath.name}'...")
             duration = get_video_duration(video_file)
@@ -171,41 +242,15 @@ def create_montage(
 
         print(f"\nSuccessfully processed {len(processed_clips)} clips. Building montage...")
 
-        # Try using concat demuxer instead of complex filter (more reliable)
-        # First, create a concat file listing all the clips
-        # Use relative paths to avoid FFmpeg's "unsafe file name" error
-        concat_file_path = os.path.join(tmp_dir, "concat_list.txt")
-        with open(concat_file_path, 'w') as f:
-            for clip_path in processed_clips:
-                # Use relative path from the concat file location
-                relative_path = os.path.relpath(clip_path, tmp_dir)
-                f.write(f"file '{relative_path}'\n")
-        
-        print(f"Created concat file: {concat_file_path}")
-        print(f"Using relative paths from concat file location")
-        
-        # Create concatenation command using concat demuxer
-        # The concat demuxer needs the format specified as an input parameter
-        concat_cmd = FFMPEG(
-            input_files=[concat_file_path],
-            output_file=os.path.abspath(output_filename),
-            overwrite_output=True,
-            vcodec="libx264",
-            acodec="aac",
-            loglevel="error",
-            input_args=[('f', 'concat')]
-        )
-        
-        print(f"Running concatenation with {len(processed_clips)} input files...")
-        print(f"Input files: {processed_clips}")
-        
-        # Run the command from the tmp_dir so relative paths work
-        if run_ffmpeg_command(concat_cmd):
-            print(f"\nMontage created successfully: '{output_filename}'")
-            return True
+        # Use recursive chunking strategy for efficient concatenation
+        if len(processed_clips) <= 10:
+            # For small numbers of clips, use direct concatenation
+            print(f"Using direct concatenation for {len(processed_clips)} clips...")
+            return concatenate_clips_direct(processed_clips, output_filename, tmp_dir)
         else:
-            print(f"\nFailed to create montage: '{output_filename}'", file=sys.stderr)
-            return False
+            # For larger numbers, use recursive chunking
+            print(f"Using recursive chunking strategy for {len(processed_clips)} clips...")
+            return concatenate_clips_recursive(processed_clips, output_filename, tmp_dir)
 
     finally:
         print("Cleaning up temporary files...")
