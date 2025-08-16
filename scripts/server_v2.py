@@ -30,6 +30,7 @@ class ServerConfig:
     template_path: Path|None = None
     site_index: dict|None = None
     template: jinja2.Template|None = None
+    sort_by_name: bool|None = None
     #_config_file: Path = TMP_CONFIG_FNAME
 
     def set_values_from_args(
@@ -57,6 +58,8 @@ class ServerConfig:
         if not template_path.exists():
             raise FileNotFoundError(f"Template path not found: {template_path}")
         self.template_path = template_path
+
+        self.sort_by_name = bool(args.sort_by_name)
 
         print(f'creating index')
         self.site_index = create_site_index(root_path, thumb_path)
@@ -105,6 +108,8 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
 
     page_path_abs = mdir.fpath
     page_path_rel = mdir.fpath.relative_to(root)
+
+    best_subpage_thumb, best_video_thumb, best_image_thumb = BestThumbTracker(), BestThumbTracker(), BestThumbTracker()
     
     subpages = list()
     for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
@@ -114,10 +119,10 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
             subpages.append(subpage_index) # give this page access to all subpages
             full_index = {**full_index, **full_subpage_index} # add these subpages to the full index
             
-            #best_subpage_thumb.update(
-            #    new_path=subpage_data['subfolder_thumb'],
-            #    new_aspect=subpage_data['subfolder_aspect'],
-            #)
+            best_subpage_thumb.update(
+                new_path=subpage_index['subfolder_thumb'],
+                new_aspect=subpage_index['subfolder_aspect'],
+            )
 
     clips = list()
     vids = list()
@@ -154,10 +159,10 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
             else:
                 vids.append(info_dict)
 
-            #best_local_thumb.update(
-            #    new_path=mediatools.parse_url('/'+str(rel_thumb_fp)),
-            #    new_aspect=info.aspect_ratio(),
-            #)
+            best_video_thumb.update(
+                new_path=str(thumb_path_rel),
+                new_aspect=info.aspect_ratio(),
+            )
 
     images = list()
     for ifile in mdir.images:
@@ -180,19 +185,25 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
             #if best_thumb is None or info.aspect_ratio() > best_aspect:
             #    best_aspect = info.aspect_ratio()
             #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
-            #best_local_thumb.update(
-            #    new_path=f'/{mediatools.parse_url(str(rp))}',
-            #    new_aspect=info.aspect_ratio(),
-            #)
+            best_image_thumb.update(
+                new_path=img_path_rel,
+                new_aspect=info.aspect_ratio(),
+            )
 
+    if best_subpage_thumb.has_value():
+        best_thumb = best_subpage_thumb
+    elif best_video_thumb.has_value():
+        best_thumb = best_video_thumb
+    elif best_image_thumb.has_value():
+        best_thumb = best_image_thumb
 
     page_index = {
         'page_path_abs': str(page_path_abs),
         'page_path_rel': str(page_path_rel),
         'idx': mediatools.fname_to_id(page_path_rel.name),
         'name': mediatools.fname_to_title(page_path_rel.name), 
-        #'subfolder_thumb': best_local_thumb.get_final_path(),
-        #'subfolder_aspect': best_local_thumb.get_final_aspect(),
+        'subfolder_thumb': best_thumb.get_final_path(),
+        'subfolder_aspect': best_thumb.get_final_aspect(),
         'subpages': subpages,
         'vids': vids,
         'clips': clips,
@@ -214,6 +225,7 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
 
 @dataclasses.dataclass
 class BestThumbTracker:
+    desired_aspect: float = 0
     path: pathlib.Path|None = None
     aspect: float|None = None
 
@@ -236,6 +248,9 @@ class BestThumbTracker:
     def get_final_aspect(self) -> float:
         '''Get the aspect ratio.'''
         return self.aspect if self.aspect is not None else 1.0
+    
+    def has_value(self) -> bool:
+        return self.path is not None
 
 
 
@@ -297,7 +312,7 @@ async def page():
 
 @app.get('/page/{page_path:path}', response_class=HTMLResponse)
 async def page_with_video(page_path: str):
-    print('index_keys: ', config.site_index.keys())
+    #print('index_keys: ', config.site_index.keys())
     if page_path == '':
         page_path = '.'
 
@@ -374,6 +389,7 @@ if __name__ == "__main__":
     parser.add_argument('template', type=Path, help='Path to the HTML template file (default: template.html)')
     parser.add_argument('--port', type=int, default=8001, help='Port to run the server on (default: 8001)')
     parser.add_argument('--thumbs', type=Path, default=Path("_thumbs"), help='Directory for thumbnail images (default: _thumbs)')
+    parser.add_argument('-s', '--sort_by_name', action='store_true', help='Rebuild the site index even if a cached version exists')
 
     args = parser.parse_args()
     config.set_values_from_args(

@@ -156,16 +156,15 @@
     </div>
     <div class="container">
         <div class="header">
-            <h1>Media Gallery</h1>
+            <h1>{{name}}</h1>
         </div>
-
-        {% if child_paths|length > 0 %}
+        {% if subpages|length > 0 %}
             <div id="folders" class="gallery">
                 <div class="section-title">Folders</div>
-                {% for cp in child_paths %}
+                {% for cp in subpages %}
                     <div class="thumbnail">
-                        <a href='{{ cp.path }}'>
-                            <img src="{{ cp.subfolder_thumb }}" alt="{{cp.name}} subfolder thumb">
+                        <a href='/page/{{ cp.page_path_rel }}'>
+                            <img src="/file/{{ cp.subfolder_thumb }}" alt="{{cp.name}} subfolder thumb">
                             <div class="title">{{cp.name}}</div>
                         </a>
                         <p>{{cp.num_vids}} videos | {{cp.num_subfolders}} folders | {{cp.files_size_str}} total<br/></p>
@@ -213,10 +212,10 @@
         {% endif %}
 
 
-        {% if imgs|length > 0 %}
+        {% if images|length > 0 %}
             <div id="images" class="gallery">
                 <div class="section-title">Images</div>
-                {% for img in imgs %}
+                {% for img in images %}
                     <div class="thumbnail">
                         <a href="/file/{{img.img_path_rel}}"><img src="/file/{{img.img_path_rel}}" alt="could not show image"></a>
                         <!--<div class="title">{{img.title}}</div>-->
