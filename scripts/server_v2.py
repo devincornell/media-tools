@@ -37,34 +37,40 @@ class ServerConfig:
 
     def set_values_from_args(
         self,
-        args: argparse.Namespace,
+        #args: argparse.Namespace,
         #site_index: dict,
+        root_path: Path|str,
+        thumb_path: Path|str,
+        template_path: Path|str,
+        index_path: Path|str,
+        overwrite_index: bool,
+        sort_by_name: bool,
     ) -> typing.Self:
-        '''Set configuration values from args.'''
-        if args.root_path is None:
+        '''Set configuration values.'''
+        if root_path is None:
             raise ValueError("Root path must be provided")
-        root_path = Path(args.root_path).resolve()  # Get absolute path
+        root_path = Path(root_path).resolve()  # Get absolute path
 
         if not root_path.exists():
             raise FileNotFoundError(f"Root path not found: {root_path}")
 
         self.root_path = root_path
 
-        thumb_path = (Path(args.root_path) / args.thumbs).resolve()
+        thumb_path = root_path / thumb_path
         thumb_path.mkdir(parents=True, exist_ok=True)
         if not thumb_path.exists():
             raise FileNotFoundError(f"Thumbnail path not found: {thumb_path}")
         self.thumb_path = thumb_path
 
-        template_path = Path(args.template).resolve()
+        template_path = Path(template_path).resolve()
         if not template_path.exists():
             raise FileNotFoundError(f"Template path not found: {template_path}")
         self.template_path = template_path
 
-        self.sort_by_name = bool(args.sort_by_name)
+        self.sort_by_name = bool(sort_by_name)
 
-        index_path = Path(args.root_path) / str(args.index)
-        if index_path.exists() and not args.overwrite_index:
+        index_path = root_path / index_path
+        if index_path.exists() and not overwrite_index:
             print(f'reading index {index_path}')
             with index_path.open('r') as f:
                 self.site_index = json.load(f)
@@ -372,8 +378,8 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Start a video streaming server')
     parser.add_argument('root_path', type=Path, help='Root directory containing video files')
-    parser.add_argument('template', type=Path, help='Path to the HTML template file (default: template.html)')
-    parser.add_argument('--port', type=int, default=8001, help='Port to run the server on (default: 8001)')
+    parser.add_argument('template', type=Path, help='Path to the HTML template file.')
+    parser.add_argument('--port', type=int, default=8000, help='Port to run the server on (default: 8000)')
     parser.add_argument('-t', '--thumbs', type=Path, default=Path("_thumbs"), help='Directory for thumbnail images (default: _thumbs)')
     parser.add_argument('-s', '--sort_by_name', action='store_true', help='Rebuild the site index even if a cached version exists')
     parser.add_argument('-i', '--index', type=Path, default=Path("_site_index.json"), help='Path to the site index file (default: site_index.json)')
@@ -385,7 +391,14 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
         # Create a new config instance
         config = ServerConfig()
-        config.set_values_from_args(args=args)
+        config.set_values_from_args(
+            root_path=args.root_path,
+            thumb_path=args.thumbs,
+            template_path=args.template,
+            index_path=args.index,
+            overwrite_index=args.overwrite_index,
+            sort_by_name=args.sort_by_name
+        )
         
         # Create the FastAPI application with this config
         app = create_app(config)
