@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 import argparse
-from dataclasses import dataclass
+#from dataclasses import dataclass
 
 import pathlib
 import jinja2
@@ -15,15 +15,18 @@ import PIL
 import dataclasses
 import json
 import pprint
+import random
+
+
 import sys
 sys.path.append('../src')
 sys.path.append('src')
 import mediatools
 
 
-TMP_CONFIG_FNAME = Path(tempfile.gettempdir()) / "cocksucker.pkl"
+TMP_CONFIG_FNAME = f"web_api_config.pkl"
 
-@dataclass
+@dataclasses.dataclass
 class ServerConfig:
     root_path: Path|None = None
     thumb_path: Path|None = None
@@ -61,37 +64,36 @@ class ServerConfig:
 
         self.sort_by_name = bool(args.sort_by_name)
 
-        print(f'creating index')
-        self.site_index = create_site_index(root_path, thumb_path)
-        
-        #print(f'reading template {template_path}')
-        #with template_path.open('r') as f:
-        #    template_html = f.read()
-        #self.template = template_html
-        
-        self.save_to_file()
+        index_path = Path(args.root_path) / str(args.index)
+        if index_path.exists() and not args.overwrite_index:
+            print(f'reading index {index_path}')
+            with index_path.open('r') as f:
+                self.site_index = json.load(f)
+        else:
+            print(f'creating index {index_path}')
+            self.site_index = create_site_index(root_path, thumb_path)
+            with index_path.open('w') as f:
+                json.dump(self.site_index, f, indent=2)
+
+        #self.save_to_file()
         return self
 
-    def save_to_file(self):
-        """Save configuration to pickle file."""
-        with open(TMP_CONFIG_FNAME, 'wb') as f:
-            pickle.dump(dataclasses.asdict(self), f)
-            print(f"Saved config to {TMP_CONFIG_FNAME}")
+    #def save_to_file(self):
+    #    """Save configuration to pickle file."""
+    #    with open(TMP_CONFIG_FNAME, 'wb') as f:
+    #        pickle.dump(dataclasses.asdict(self), f)
+    #        print(f"Saved config to {TMP_CONFIG_FNAME}")
 
-    @classmethod
-    def load_from_file(cls) -> 'ServerConfig':
-        """Load configuration from pickle file."""
-        config_file = TMP_CONFIG_FNAME
-        if not config_file.exists():
-            raise ValueError(f"Config file not found: {config_file}")
-        
-        with open(config_file, 'rb') as f:
-            config = pickle.load(f)
-        return cls(**config)
-
-
-
-
+    #@classmethod
+    #def load_from_file(cls) -> 'ServerConfig':
+    #    """Load configuration from pickle file."""
+    #    config_file = TMP_CONFIG_FNAME
+    #    if not config_file.exists():
+    #        raise ValueError(f"Config file not found: {config_file}")
+    #    
+    #    with open(config_file, 'rb') as f:
+    #        config = pickle.load(f)
+    #    return cls(**config)
 
 
 
@@ -217,8 +219,8 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
     full_index[str(page_path_rel)] = page_index
 
     #pprint.pprint(full_index)
-    print(json.dumps(full_index, indent=2))
-    print('\n\n\n\n\n')
+    #print(json.dumps(full_index, indent=2))
+    #print('\n\n\n\n\n')
 
     return full_index, page_index
 
@@ -255,126 +257,133 @@ class BestThumbTracker:
 
 
 
-app = FastAPI()
+from fastapi import Depends
 
-# Try to load config from pickle file, or start with empty config
-try:
-    #raise ValueError("Config file not found")
-    config = ServerConfig.load_from_file()
-    print(f"Loaded config: root_path={config.root_path}, thumb_path={config.thumb_path}")
-except (ValueError, FileNotFoundError, pickle.UnpicklingError) as e:
-    config = ServerConfig()
-    print(f"Starting with empty config (will be set from command line): {e}")
-
-
-CHUNK_SIZE = 1024 * 1024  # 1 MB
-
-@app.on_event("startup")
-async def startup_event():
-    print("\nAvailable routes:")
-    for route in app.routes:
-        print(f"  {route.methods} {route.path}")
-    print()
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@app.get('/page', response_class=HTMLResponse)
-async def page():
-    print(f"Current config in /page route: {config}")
-    # Get list of video files
-    video_files = []
-    for ext in ['.mp4', '.mkv', '.avi', '.mov']:
-        video_files.extend(config.root_path.glob(f'**/*{ext}'))
+def create_app(config: ServerConfig) -> FastAPI:
+    """Create a new FastAPI application with the given configuration."""
+    app = FastAPI()
     
-    # Create relative paths for videos
-    video_links = [str(f.relative_to(config.root_path)) for f in video_files]
+    # Store config in app state
+    app.state.config = config
     
-    video_list_html = '\n'.join([
-        f'<li><a href="/page/{video}">{video}</a></li>'
-        for video in video_links
-    ])
-    
-    return f'''
-    <html>
-        <head>
-            <title>Video Player</title>
-        </head>
-        <body>
-            <h1>Available Videos</h1>
-            <ul>
-                {video_list_html}
-            </ul>
-        </body>
-    </html>
-    '''
+    async def get_config() -> ServerConfig:
+        """
+        Dependency that provides the server configuration.
+        """
+        return app.state.config
 
-@app.get('/page/{page_path:path}', response_class=HTMLResponse)
-async def page_with_video(page_path: str):
-    #print('index_keys: ', config.site_index.keys())
-    if page_path == '':
-        page_path = '.'
+    CHUNK_SIZE = 1024 * 1024  # 1 MB
 
-    try:
-        page_data = config.site_index[page_path]
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Page not found: {page_path}")
-    
-    with config.template_path.open('r') as f:
-        template = f.read()
-    environment = jinja2.Environment()
-    template = environment.from_string(template)
+    @app.on_event("startup")
+    async def startup_event():
+        print("\nAvailable routes:")
+        for route in app.routes:
+            print(f"  {route.methods} {route.path}")
+        print()
 
-    return template.render(**page_data)
+    @app.get("/")
+    async def root():
+        return {"message": "Hello World"}
 
-@app.get("/file/{file_path:path}")
-async def file_endpoint(file_path: Path|str):
-    file_path = Path(config.root_path) / file_path
-    if not file_path.exists():
-        print(f"File not found: {file_path}")
-        return Response(content="File not found", status_code=404)
-    return FileResponse(file_path)
+    @app.get('/page')
+    async def page(config: ServerConfig = Depends(get_config)):
+        print(f"Current config in /page route: {config}")
+        # Get list of video files
+        video_files = []
+        for ext in ['.mp4', '.mkv', '.avi', '.mov']:
+            video_files.extend(config.root_path.glob(f'**/*{ext}'))
+        
+        # Create relative paths for videos
+        video_links = [str(f.relative_to(config.root_path)) for f in video_files]
+        
+        video_list_html = '\n'.join([
+            f'<li><a href="/page/{video}">{video}</a></li>'
+            for video in video_links
+        ])
+        
+        return f'''
+        <html>
+            <head>
+                <title>Video Player</title>
+            </head>
+            <body>
+                <h1>Available Videos</h1>
+                <ul>
+                    {video_list_html}
+                </ul>
+            </body>
+        </html>
+        '''
 
+    @app.get('/page/{page_path:path}', response_class=HTMLResponse)
+    async def page_with_video(page_path: str, config: ServerConfig = Depends(get_config)):
+        if page_path == '':
+            page_path = '.'
 
-@app.get("/video/{video_path:path}")
-async def video_endpoint(video_path: str, range: str = Header(None)):
-    # Construct full path and validate
-    full_path = config.root_path / video_path
-    if not full_path.exists():
-        raise HTTPException(status_code=404, detail=f"Video not found: {video_path}")
-    if not full_path.is_file():
-        raise HTTPException(status_code=400, detail=f"Not a file: {video_path}")
-    
-    file_size = full_path.stat().st_size
-    if range:
-        start_str, end_str = range.replace("bytes=", "").split("-")
-        start = int(start_str)
-        end = int(end_str) if end_str else min(start + CHUNK_SIZE, file_size - 1)
-    else:
-        # Serve from start if no range header
-        start = 0
-        end = min(CHUNK_SIZE, file_size - 1)
+        try:
+            page_data = config.site_index[page_path]
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"Page not found: {page_path}")
+        
+        with config.template_path.open('r') as f:
+            template = f.read()
+        environment = jinja2.Environment()
+        template = environment.from_string(template)
 
-    content_length = end - start + 1
-    headers = {
-        "Content-Range": f"bytes {start}-{end}/{file_size}",
-        "Accept-Ranges": "bytes",
-        "Content-Length": str(content_length),
-        "Content-Type": "video/mp4",
-        "Cache-Control": "public, max-age=31536000",
-        "Connection": "keep-alive",
-    }
-    with open(full_path, "rb") as f:
-        f.seek(start)
-        data = f.read(content_length)
-    response = Response(
-        content=data, 
-        status_code=206 if range else 200, 
-        headers=headers, 
-        media_type="video/mp4"
-    )
-    return response
+        return template.render(**page_data)
+
+    @app.get("/file/{file_path:path}")
+    async def file_endpoint(file_path: Path|str, config: ServerConfig = Depends(get_config)):
+        file_path = Path(config.root_path) / file_path
+        if not file_path.exists():
+            print(f"File not found: {file_path}")
+            return Response(content="File not found", status_code=404)
+        return FileResponse(file_path)
+
+    @app.get("/video/{video_path:path}")
+    async def video_endpoint(
+        video_path: str, 
+        range: str = Header(None),
+        config: ServerConfig = Depends(get_config)
+    ):
+        # Construct full path and validate
+        full_path = config.root_path / video_path
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail=f"Video not found: {video_path}")
+        if not full_path.is_file():
+            raise HTTPException(status_code=400, detail=f"Not a file: {video_path}")
+        
+        file_size = full_path.stat().st_size
+        if range:
+            start_str, end_str = range.replace("bytes=", "").split("-")
+            start = int(start_str)
+            end = int(end_str) if end_str else min(start + CHUNK_SIZE, file_size - 1)
+        else:
+            # Serve from start if no range header
+            start = 0
+            end = min(CHUNK_SIZE, file_size - 1)
+
+        content_length = end - start + 1
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(content_length),
+            "Content-Type": "video/mp4",
+            "Cache-Control": "public, max-age=31536000",
+            "Connection": "keep-alive",
+        }
+        with open(full_path, "rb") as f:
+            f.seek(start)
+            data = f.read(content_length)
+        response = Response(
+            content=data, 
+            status_code=206 if range else 200, 
+            headers=headers, 
+            media_type="video/mp4"
+        )
+        return response
+
+    return app
 
 
 
@@ -388,25 +397,28 @@ if __name__ == "__main__":
     parser.add_argument('root_path', type=Path, help='Root directory containing video files')
     parser.add_argument('template', type=Path, help='Path to the HTML template file (default: template.html)')
     parser.add_argument('--port', type=int, default=8001, help='Port to run the server on (default: 8001)')
-    parser.add_argument('--thumbs', type=Path, default=Path("_thumbs"), help='Directory for thumbnail images (default: _thumbs)')
+    parser.add_argument('-t', '--thumbs', type=Path, default=Path("_thumbs"), help='Directory for thumbnail images (default: _thumbs)')
     parser.add_argument('-s', '--sort_by_name', action='store_true', help='Rebuild the site index even if a cached version exists')
+    parser.add_argument('-i', '--index', type=Path, default=Path("_site_index.json"), help='Path to the site index file (default: site_index.json)')
+    parser.add_argument('-w', '--overwrite_index', action='store_true', help='Overwrite the site index file if it exists')
 
+    print(f'creating index')
     args = parser.parse_args()
-    config.set_values_from_args(
-        args = args,
-    )
-    
-    #print(json.dumps(config.site_index, indent=2))
-    #exit()
-    print(f"\nStarting server: {config.root_path}")
-    print(f"Server will be available at: http://0.0.0.0:{args.port}")
-    print("Visit http://0.0.0.0:8001/page to see available videos")
-    
-    #TMP_CONFIG_FNAME.unlink(missing_ok=True)
-    uvicorn.run(
-        "server_v2:app",
-        host="0.0.0.0",
-        port=args.port,
-        reload=True,
-        reload_dirs=["."],  # Watch current directory for changes
-    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # Create a new config instance
+        config = ServerConfig()
+        config.set_values_from_args(args=args)
+        
+        # Create the FastAPI application with this config
+        app = create_app(config)
+        
+        print(f"\nStarting server: {config.root_path}")
+        print(f"Server will be available at: http://0.0.0.0:{args.port}")
+        print("Visit http://0.0.0.0:{args.port}/page to see available videos")
+        
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=args.port,
+        )
