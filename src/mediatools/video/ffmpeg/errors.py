@@ -4,8 +4,6 @@ import typing
 from pathlib import Path
 ####################### FFMPEG Errors #######################
 
-if typing.TYPE_CHECKING:
-    import ffmpeg  # type: ignore[import]
 
 class FFMPEGError(Exception):
     pass
@@ -23,12 +21,7 @@ class FFMPEGExecutionError(FFMPEGError):
     def from_stdout(cls, stderr: str | bytes, msg: str|None=None) -> typing.Self:
         '''Create a FFMPEGError from stdout and stderr strings.'''
         return cls.from_stdout_stderr(stdout=None, stderr=stderr, msg=msg)
-    
-    @classmethod
-    def from_ffmpeg_error(cls, error: ffmpeg.Error, msg: str|None=None) -> typing.Self:
-        '''Create a FFMPEGError from an ffmpeg.Error.'''
-        return cls.from_stdout_stderr(stdout=error.stdout, stderr=error.stderr, msg=msg)
-    
+        
     @classmethod
     def from_stdout_stderr(cls, stdout:str|bytes|None=None, stderr:str|bytes|None=None, msg:str|None=None) -> typing.Self:
         '''Create a FFMPEGError from stdout and stderr strings.'''
@@ -58,7 +51,24 @@ class FFMPEGNotFoundError(FFMPEGError):
 class FFMPEGCommandTimeoutError(FFMPEGError):
     pass
 
-
 def clean_stdout(stdout: str) -> str:
     return ' '.join(stdout.split('\n')).strip()
 
+####################### Probe Errors #######################
+class ProbeError(FFMPEGExecutionError):
+    pass
+
+class MultipleStreamsError(ProbeError):
+    pass
+
+class NoVideoStreamError(ProbeError):
+    pass
+
+class NoAudioStreamError(ProbeError):
+    pass
+
+class NoDurationError(ProbeError):
+    pass
+
+class NoResolutionError(ProbeError):
+    pass

@@ -9,7 +9,7 @@ import datetime
 from pathlib import Path
 
 from .ffmpeg import FFMPEG, FFMPEGResult, run_ffmpeg_subprocess
-from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
+from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .probe_info import ProbeInfo
 
 XCoord = int
@@ -205,14 +205,5 @@ def get_ffmpeg_version() -> str|None:
     result = run_ffmpeg_subprocess(["ffmpeg", "-version"])
     lines = result.stdout.strip().split('\n')
     return lines[0]
-
-def probe(fp: str|Path) -> ProbeInfo:
-    '''Probe the file in question and return a ProbeInfo object.'''
-    return ProbeInfo.from_dict(probe_info=json.loads(probe_dict(fp)), check_for_errors=False)
-
-def probe_dict(fp: str|Path) -> dict[str,typing.Any]:
-    '''Probe the file in question and return a dictionary of the probe info.'''
-    result = run_ffmpeg_subprocess(['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', str(fp)])
-    return result.stdout
 
 

@@ -7,24 +7,17 @@ interface instead of direct subprocess calls to ffmpeg.
 """
 
 import typing
-import argparse
 import os
 import sys
-import shutil
 import random
 from pathlib import Path
-import subprocess
 import tempfile
 import tqdm
 import multiprocessing
 
-import sys
-sys.path.append('../src/')
-from mediatools.video import VideoFiles, VideoFile, VideoInfo
-from mediatools.video.ffmpeg import FFMPEG, FFMPEGResult
-import mediatools
-
-
+from .ffmpeg import FFMPEG, FFMPEGResult
+from .probe import probe
+from .errors import FFMPEGExecutionError
 
 def create_montage(
     video_files: typing.List[Path], 
@@ -37,7 +30,7 @@ def create_montage(
     fps: int = 30, 
     num_cores: int = 16,
     verbose: bool = False,
-) -> mediatools.ffmpeg.FFMPEGResult:
+) -> FFMPEGResult:
     """
     Creates a video montage from a list of video files using the high-level FFMPEG interface.
 
@@ -56,7 +49,7 @@ def create_montage(
         clip_ratio (float, optional): Ratio of video time to number of clips (seconds per clip, default: 30).
 
     Returns:
-        bool: True if the montage was created successfully, False otherwise.
+        FFMPEGResult: The result of the concatenate FFMPEG command.
     """
     clip_infos = get_random_clips(
         video_paths=video_files,
@@ -64,7 +57,7 @@ def create_montage(
         random_seed=random_seed,
         clip_ratio=clip_ratio
     )
-    print(f'identified {len(clip_infos)} clips. now processing')
+    if verbose: print(f'identified {len(clip_infos)} clips. now processing')
     with tempfile.TemporaryDirectory() as tmp_dir:
         #for clip_info in tqdm.tqdm(clip_infos):
         clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
@@ -72,7 +65,7 @@ def create_montage(
             clip_filenames = p.starmap(extract_clip, clip_packaged_data)
         clip_filenames = [f for f in clip_filenames if f is not None]
 
-        print(f'merging {len(clip_filenames)} clips')
+        if verbose: print(f'merging {len(clip_filenames)} clips')
         result = concatenate_clips_demux(
             clip_filenames, 
             output_filename, 
@@ -92,7 +85,7 @@ def extract_clip(
     verbose: bool = False,
 ) -> str|None:
     processed_clip_path = os.path.join(tmp_dir, f"clip_{clip_info['index']}.mp4")
-    ffmpeg_cmd = mediatools.ffmpeg.FFMPEG(
+    ffmpeg_cmd = FFMPEG(
         input_files=[clip_info['fpath']],
         output_file=processed_clip_path,
         overwrite_output=True,
@@ -110,15 +103,14 @@ def extract_clip(
         command_flags=['nostdin'],
     )
     try:
-        #print(f"Starting'{clip_info['fpath']}' clip {clip_info['index']}.")
         ffmpeg_cmd.run()
-        mediatools.VideoFile.from_path(processed_clip_path).probe()  # Ensure the clip was processed correctly
-    except mediatools.ffmpeg.FFMPEGExecutionError as e:
-        print(f"\nFailed to extract '{clip_info['fpath']}' clip {clip_info['index']} due to processing error.")
+        probe(processed_clip_path)  # Ensure the clip was processed correctly
+    except FFMPEGExecutionError as e:
+        if verbose: print(f"\nFailed to extract '{clip_info['fpath']}' clip {clip_info['index']} due to processing error.")
         if verbose: print(f"{e}")
         return None
     else:
-        print('finished', processed_clip_path)
+        if verbose: print('finished', processed_clip_path)
 
     return processed_clip_path
         
@@ -133,9 +125,9 @@ def get_random_clips(
     '''Extract random clips from the given video files.'''
 
     random.seed(random_seed)
-    video_files: list[VideoFile] = [VideoFile.from_path(path) for path in video_paths]
+    video_paths: list[Path] = [Path(path) for path in video_paths]
 
-    if not all([vf.fpath.exists() for vf in video_files]):
+    if not all([vf.exists() for vf in video_paths]):
         raise ValueError("Error: One or more video files do not exist.")
 
     if clip_duration <= 0:
@@ -143,11 +135,11 @@ def get_random_clips(
     
     clip_infos: list[dict[str,typing.Any]] = []
     clip_index = 0
-    for video_file in video_files:
+    for video_path in video_paths:
         
         try:
-            duration = video_file.probe().duration
-        except mediatools.ffmpeg.FFMPEGExecutionError as e:
+            duration = probe(video_path).duration
+        except FFMPEGExecutionError as e:
             continue
         
         if duration == 0:
@@ -178,7 +170,7 @@ def get_random_clips(
             
             clip_infos.append({
                 'index': clip_index,
-                'fpath': str(video_file.fpath),
+                'fpath': str(video_path),
                 'start_time': start_time,
                 'duration': clip_duration,
             })
@@ -188,7 +180,7 @@ def get_random_clips(
 
 
 
-def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str) -> mediatools.ffmpeg.FFMPEGResult:
+def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str) -> FFMPEGResult:
     '''Concatenate video clips using demuxing (fast and lossless).'''
     if not clips:
         raise ValueError("No clips to concatenate.")
@@ -215,58 +207,4 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
     )
 
     return ffmpeg_cmd.run()
-
-
-
-
-if __name__ == '__main__':
-    # This block allows the script to be run directly from the command line for testing.
-    parser = argparse.ArgumentParser(
-        description="Create a video montage from video files in a directory using the high-level FFMPEG interface.",
-        epilog="Example: ./create_montage_v2.py ./my_videos 5 my_montage.mp4 --random_seed 42 --clip_ratio 30"
-    )
-    parser.add_argument("video_directory", help="Directory containing the video files.")
-    parser.add_argument("clip_ratio", type=float, help="Ratio of video time to number of clips (seconds per clip). For example, 30 would mean one clip for every 30 seconds of source video.")
-    parser.add_argument("clip_duration", type=float, help="Duration of each clip in seconds.")
-    parser.add_argument("output_filename", type=Path, help="Name for the final output file (e.g., montage.mp4).")
-    parser.add_argument("-c", "--num_cores", type=int, default=15, help="Number of CPU cores to use (default: 15).")
-    parser.add_argument("-s", "--random_seed", type=int, default=0, help="Random seed for selecting clips (default: 0).")
-    parser.add_argument("-v", "--verbose", action='store_true', help="Enable verbose output.")
-    parser.add_argument("--width", type=int, default=1920, help="Width of the output video (default: 1920).")
-    parser.add_argument("--height", type=int, default=1080, help="Height of the output video (default: 1080).")
-    args = parser.parse_args()
-    
-    # Find video files in the specified directory
-    try:
-        video_paths = VideoFiles.from_glob(
-            root=args.video_directory,
-            extensions=("mp4", "mov", "avi", "mkv", "flv", "webm")
-        )
-        if not video_paths:
-            print(f"No video files found in '{args.video_directory}'.", file=sys.stderr)
-            sys.exit(1)
-    except Exception as e:
-        print(f"Error finding video files: {e}", file=sys.stderr)
-        sys.exit(1)
-    
-    # Convert VideoFile objects to Path objects for the function
-    video_paths = [vf.fpath for vf in video_paths]
-    
-    mediatools.ffmpeg.create_montage(
-        video_files=video_paths,
-        clip_ratio=args.clip_ratio,
-        clip_duration=args.clip_duration,
-        output_filename=args.output_filename,
-        random_seed=args.random_seed,
-        num_cores=args.num_cores,
-        verbose=args.verbose,
-        height=args.height,
-        width=args.width,
-    )
-    
-
-
-
-
-
 

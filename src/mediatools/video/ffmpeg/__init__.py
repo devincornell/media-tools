@@ -1,9 +1,6 @@
 from .ffmpeg import FFMPEG, FFMPEGResult, LOGLEVEL_OPTIONS
-from .ffmpeg_errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,
-    probe,
-    probe_dict,
     compress,
     splice,
     crop,
@@ -11,8 +8,14 @@ from .ffmpeg_funcs import (
     make_animated_thumb,
     make_animated_thumb_v2,
 )
-
+from .ffmpeg_montage import (
+    create_montage
+)
+from .probe import (
+    probe,
+    probe_dict,
+)
 
 from .probe_info import ProbeInfo
 from .stream_info import VideoStreamInfo, AudioStreamInfo
-from .probe_errors import *
+from .errors import *
