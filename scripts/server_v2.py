@@ -4,10 +4,9 @@ import pickle
 import tempfile
 from fastapi import FastAPI, Request, Header, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from pathlib import Path
 import argparse
-#from dataclasses import dataclass
 
 import pathlib
 import jinja2
@@ -283,37 +282,15 @@ def create_app(config: ServerConfig) -> FastAPI:
 
     @app.get("/")
     async def root():
+        return RedirectResponse(url='/page/')
+    
+    @app.get("/test")
+    async def test():
         return {"message": "Hello World"}
 
     @app.get('/page')
-    async def page(config: ServerConfig = Depends(get_config)):
-        print(f"Current config in /page route: {config}")
-        # Get list of video files
-        video_files = []
-        for ext in ['.mp4', '.mkv', '.avi', '.mov']:
-            video_files.extend(config.root_path.glob(f'**/*{ext}'))
-        
-        # Create relative paths for videos
-        video_links = [str(f.relative_to(config.root_path)) for f in video_files]
-        
-        video_list_html = '\n'.join([
-            f'<li><a href="/page/{video}">{video}</a></li>'
-            for video in video_links
-        ])
-        
-        return f'''
-        <html>
-            <head>
-                <title>Video Player</title>
-            </head>
-            <body>
-                <h1>Available Videos</h1>
-                <ul>
-                    {video_list_html}
-                </ul>
-            </body>
-        </html>
-        '''
+    async def page_redirect():
+        return RedirectResponse(url='/page/')
 
     @app.get('/page/{page_path:path}', response_class=HTMLResponse)
     async def page_with_video(page_path: str, config: ServerConfig = Depends(get_config)):
