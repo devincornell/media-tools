@@ -106,6 +106,8 @@ class FFMPEG:
         env: str|Path|None = None,
     ) -> list[str]:
         '''Run the FFMPEG command with the provided parameters.'''
+        if not self.overwrite_output and self.output_file.exists():
+            raise FileExistsError(f'The output file {self.output_file} exists and overwrite_output=False.')
         return FFMPEGResult(
             command=self, 
             result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
@@ -251,7 +253,8 @@ def run_ffmpeg_subprocess(
             timeout=timeout,
             cwd=cwd,
             env=env,
-            check=True
+            check=True,
+            #stdin=subprocess.DEVNULL, # not sure if I should hard-code this, but here we are.
         )
         
     except subprocess.CalledProcessError as e:
