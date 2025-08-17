@@ -14,11 +14,13 @@ import shutil
 import random
 from pathlib import Path
 import subprocess
+import tempfile
 
 import sys
 sys.path.append('../src/')
 from mediatools.video import VideoFiles, VideoFile, VideoInfo
 from mediatools.video.ffmpeg import FFMPEG, FFMPEGResult
+import mediatools
 
 
 def concatenate_clips_direct(clips, output_filename, tmp_dir):
@@ -55,9 +57,9 @@ def concatenate_clips_direct(clips, output_filename, tmp_dir):
         return False
 
 
-def concatenate_clips_recursive(clips, output_filename, tmp_dir):
+def concatenate_clips_recursive(clips, output_filename, tmp_dir, chunk_size: int = 30):
     """Concatenate clips using recursive chunking strategy for large numbers of clips."""
-    chunk_size = 10  # Process clips in chunks of 10
+      # Process clips in chunks of 10
     
     if len(clips) <= chunk_size:
         # Base case: use direct concatenation
@@ -104,7 +106,7 @@ def create_montage(
     width: int = 1920, 
     height: int = 1080, 
     fps: int = 30, 
-    clip_ratio: float = 30
+    clip_ratio: float = 30 # one clip for every 30 seconds (10x shorter)
 ) -> bool:
     """
     Creates a video montage from a list of video files using the high-level FFMPEG interface.
@@ -127,65 +129,32 @@ def create_montage(
         bool: True if the montage was created successfully, False otherwise.
     """
     
-    # --- Helper Functions ---
-    def get_video_duration(video_file: VideoFile) -> float:
-        """Gets the duration of a video in seconds using the probe interface."""
-        try:
-            probe_info = video_file.probe()
-            return probe_info.duration
-        except Exception as e:
-            print(f"  -> Error probing video '{video_file.fpath.name}': {e}")
-            return 0
-
-    def run_ffmpeg_command(ffmpeg_cmd: FFMPEG) -> bool:
-        """Runs an FFMPEG command using the high-level interface, returning True on success."""
-        try:
-            result = ffmpeg_cmd.run()
-            return result.returncode == 0
-        except Exception as e:
-            print(f"\n[ffmpeg error] Command failed: {ffmpeg_cmd.get_command()}")
-            print(f"[ffmpeg error]: {e}")
-            return False
-
-    # --- Main Function Logic ---
     random.seed(random_seed)
+    video_files: list[VideoFile] = [VideoFile.from_path(path) for path in video_files]
 
-    if not video_files:
-        print("Error: No video files provided.", file=sys.stderr)
-        return False
+    if not all([vf.fpath.exists() for vf in video_files]):
+        raise ValueError("Error: One or more video files do not exist.")
 
     if clip_duration <= 0:
-        print("Error: Clip duration must be a positive number.", file=sys.stderr)
-        return False
+        raise ValueError("Error: Clip duration must be a positive number.")
 
-    # Convert Path objects to VideoFile objects
-    try:
-        video_file_objects = [VideoFile.from_path(path) for path in video_files]
-        if not video_file_objects:
-            print("Error: No valid video files could be created from the provided paths.", file=sys.stderr)
-            return False
-    except Exception as e:
-        print(f"Error creating video file objects: {e}", file=sys.stderr)
-        return False
-
-    tmp_dir = os.path.abspath("tmp_montage_files")
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
-    os.makedirs(tmp_dir)
-
-    try:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         print(f"--- Creating montage: {output_filename} (seed: {random_seed}) ---")
         print("Processing video files...")
-        processed_clips = []
+        processed_clips: list[str] = []
         clip_index = 0
         
-        for video_file in video_file_objects:
+        for video_file in video_files:
                 
             print(f"  - Processing '{video_file.fpath.name}'...")
-            duration = get_video_duration(video_file)
+            try:
+                duration = video_file.probe().duration
+            except mediatools.ffmpeg.FFMPEGExecutionError as e:
+                print(f"  -> Skipping '{video_file.fpath.name}' due to probe error.")
+                continue
             
             if duration == 0:
-                print(f"  -> Skipping '{video_file.fpath.name}' due to probe error.")
+                print(f"  -> Skipping '{video_file.fpath.name}' due to zero duration.")
                 continue
                 
             if duration < clip_duration:
@@ -212,7 +181,7 @@ def create_montage(
                     else:
                         start_time = random.uniform(min_start, max_start)
                 
-                processed_clip_path = os.path.join(tmp_dir, f"processed_clip_{clip_index}.mp4")
+                processed_clip_path = os.path.join(tmp_dir, f"clip_{clip_index}.mp4")
                 
                 # Use the high-level FFMPEG interface
                 ffmpeg_cmd = FFMPEG(
@@ -228,13 +197,14 @@ def create_montage(
                     audio_bitrate="192k",
                     loglevel="error"
                 )
-                
-                if run_ffmpeg_command(ffmpeg_cmd):
-                    processed_clips.append(processed_clip_path)
-                    clip_index += 1
-                    print(f"    -> Successfully created clip {clip_index}")
-                else:
+                try:
+                    ffmpeg_cmd.run()
+                except mediatools.ffmpeg.FFMPEGExecutionError as e:
                     print(f"  -> Skipping '{video_file.fpath.name}' clip {n+1} due to processing error.")
+                    continue
+
+                processed_clips.append(processed_clip_path)
+                clip_index += 1
 
         if not processed_clips:
             print("No valid clips were processed. Montage creation failed.", file=sys.stderr)
@@ -252,9 +222,6 @@ def create_montage(
             print(f"Using recursive chunking strategy for {len(processed_clips)} clips...")
             return concatenate_clips_recursive(processed_clips, output_filename, tmp_dir)
 
-    finally:
-        print("Cleaning up temporary files...")
-        shutil.rmtree(tmp_dir)
 
 
 if __name__ == '__main__':
