@@ -277,7 +277,7 @@ def create_app(config: ServerConfig) -> FastAPI:
         """
         return app.state.config
 
-    CHUNK_SIZE = 1024 * 1024  # 1 MB
+    CHUNK_SIZE = 1024 * 1024 * 2 # 2 MB
 
     @app.on_event("startup")
     async def startup_event():

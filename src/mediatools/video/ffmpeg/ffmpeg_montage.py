@@ -62,12 +62,20 @@ def create_montage(
         #for clip_info in tqdm.tqdm(clip_infos):
         clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
         with multiprocessing.Pool(num_cores) as p:
-            clip_filenames = p.starmap(extract_clip, clip_packaged_data)
+            clip_iter = p.imap_unordered(extract_clip, clip_packaged_data)
+            if verbose:
+                clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
+            
+            clip_filenames = []
+            for result in clip_iter:
+                if result is not None:
+                    clip_filenames.append(result)
+
         clip_filenames = [f for f in clip_filenames if f is not None]
 
         if verbose: print(f'merging {len(clip_filenames)} clips')
         result = concatenate_clips_demux(
-            clip_filenames, 
+            list(sorted(clip_filenames)), 
             output_filename, 
             tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
         )
@@ -75,15 +83,24 @@ def create_montage(
     return result
 
 
-def extract_clip(
-    clip_info: dict[str,typing.Any], 
-    tmp_dir: Path|str, 
-    clip_duration: float, 
-    width: int, 
-    height: int, 
-    fps: int,
-    verbose: bool = False,
-) -> str|None:
+#def extract_clip(
+#    clip_info: dict[str,typing.Any], 
+#    tmp_dir: Path|str, 
+#    clip_duration: float, 
+#    width: int, 
+#    height: int, 
+#    fps: int,
+#    verbose: bool = False,
+#) -> str|None:
+def extract_clip(args) -> str|None:
+    clip_info: dict[str,typing.Any] = args[0]
+    tmp_dir: Path|str = args[1]
+    clip_duration: float = args[2]
+    width: int = args[3]
+    height: int = args[4]
+    fps: int = args[5]
+    verbose: bool = args[6]
+
     processed_clip_path = os.path.join(tmp_dir, f"clip_{clip_info['index']}.mp4")
     ffmpeg_cmd = FFMPEG(
         input_files=[clip_info['fpath']],
@@ -110,7 +127,7 @@ def extract_clip(
         if verbose: print(f"{e}")
         return None
     else:
-        if verbose: print('finished', processed_clip_path)
+        if verbose: print('\nfinished', processed_clip_path)
 
     return processed_clip_path
         
@@ -135,8 +152,8 @@ def get_random_clips(
     
     clip_infos: list[dict[str,typing.Any]] = []
     clip_index = 0
-    for video_path in video_paths:
-        
+    for video_path in sorted(video_paths):
+
         try:
             duration = probe(video_path).duration
         except FFMPEGExecutionError as e:
