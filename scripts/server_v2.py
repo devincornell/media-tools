@@ -76,7 +76,7 @@ class ServerConfig:
                 self.site_index = json.load(f)
         else:
             print(f'creating index {index_path}')
-            self.site_index = create_site_index(root_path, thumb_path)
+            self.site_index = create_site_index(root_path, thumb_path, sort_by_name)
             with index_path.open('w') as f:
                 json.dump(self.site_index, f, indent=2)
 
@@ -102,13 +102,18 @@ class ServerConfig:
 
 
 
-def create_site_index(root: pathlib.Path, thumbs_path: Path|str):
+def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool) -> dict:
     '''Create the index page for the site.'''
     mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ingore_folder_names=(thumbs_path,))
-    index, _ = create_page_index(mdir, root, thumbs_path=Path(thumbs_path))
+    index, _ = create_page_index(mdir, root, thumbs_path=Path(thumbs_path), sort_by_name=sort_by_name)
     return index
 
-def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path: pathlib.Path) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
+def create_page_index(
+    mdir: mediatools.MediaDir, 
+    root: pathlib.Path, 
+    thumbs_path: pathlib.Path,
+    sort_by_name: bool,
+) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
 
     print(f'entering {mdir.fpath}')
     full_index = dict() # this bubbles up
@@ -121,8 +126,8 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
     subpages = list()
     for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
-            full_subpage_index, subpage_index = create_page_index(mdir=sdir, root=root, thumbs_path=thumbs_path)
-            
+            full_subpage_index, subpage_index = create_page_index(mdir=sdir, root=root, thumbs_path=thumbs_path, sort_by_name=sort_by_name)
+
             subpages.append(subpage_index) # give this page access to all subpages
             full_index = {**full_index, **full_subpage_index} # add these subpages to the full index
             
@@ -170,7 +175,7 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
                 new_path=str(thumb_path_rel),
                 new_aspect=info.aspect_ratio(),
             )
-
+    
     images = list()
     for ifile in mdir.images:
         #rp = ifile.fpath.relative_to(root)
@@ -196,6 +201,16 @@ def create_page_index(mdir: mediatools.MediaDir, root: pathlib.Path, thumbs_path
                 new_path=img_path_rel,
                 new_aspect=info.aspect_ratio(),
             )
+
+    if sort_by_name:
+        vids = sorted(vids, key=lambda v: v['vid_path_rel'])
+        clips = sorted(clips, key=lambda c: c['vid_path_rel'])
+        images = sorted(images, key=lambda i: i['img_path_rel'])
+    else:
+        vids = sorted(vids, key=lambda v: v['aspect'])
+        clips = sorted(clips, key=lambda c: c['aspect'])
+        images = sorted(images, key=lambda i: i['aspect'])
+
 
     if best_subpage_thumb.has_value():
         best_thumb = best_subpage_thumb
@@ -277,7 +292,7 @@ def create_app(config: ServerConfig) -> FastAPI:
         """
         return app.state.config
 
-    CHUNK_SIZE = 1024 * 1024 * 2 # 2 MB
+    CHUNK_SIZE = 1024 * 1024 * 1 # 2 MB
 
     @app.on_event("startup")
     async def startup_event():
