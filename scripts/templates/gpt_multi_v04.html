@@ -629,11 +629,6 @@
                                         <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
                                         <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
                                     </div>
-                                    <div class="thumbnail-actions">
-                                        <span class="action-btn">
-                                            <i class="fas fa-external-link-alt"></i> Open
-                                        </span>
-                                    </div>
                                 </div>
                             </a>
                         </div>
@@ -665,14 +660,6 @@
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}
                                 </div>
-                                <div class="thumbnail-actions">
-                                    <a href="/file/{{vid.vid_path_rel}}" download class="action-btn">
-                                        <i class="fas fa-download"></i> Download
-                                    </a>
-                                    <a href="/file/{{vid.vid_path_rel}}" class="action-btn secondary">
-                                        <i class="fas fa-external-link-alt"></i> Open
-                                    </a>
-                                </div>
                             </div>
                         </div>
                     {% endfor %}
@@ -703,14 +690,6 @@
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}
                                 </div>
-                                <div class="thumbnail-actions">
-                                    <a href="/file/{{vid.vid_path_rel}}" download class="action-btn">
-                                        <i class="fas fa-download"></i> Download
-                                    </a>
-                                    <a href="/file/{{vid.vid_path_rel}}" class="action-btn secondary">
-                                        <i class="fas fa-external-link-alt"></i> Open
-                                    </a>
-                                </div>
                             </div>
                         </div>
                     {% endfor %}
@@ -731,14 +710,6 @@
                                 <img src="/file/{{img.img_path_rel}}" alt="{{img.title if img.title else 'Image'}}" loading="lazy"/>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{img.title if img.title else 'Image'}}</div>
-                                    <div class="thumbnail-actions">
-                                        <a href="/file/{{img.img_path_rel}}" download class="action-btn">
-                                            <i class="fas fa-download"></i> Download
-                                        </a>
-                                        <a href="/file/{{img.img_path_rel}}" class="action-btn secondary">
-                                            <i class="fas fa-external-link-alt"></i> Open
-                                        </a>
-                                    </div>
                                 </div>
                             </a>
                         </div>
