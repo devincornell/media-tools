@@ -195,6 +195,33 @@
             color: var(--text-muted);
         }
 
+        .sort-controls {
+            display: flex;
+            align-items: center;
+        }
+
+        .sort-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 160px;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .sort-select:hover {
+            border-color: var(--accent-primary);
+        }
+
         .view-toggle {
             display: flex;
             background: var(--bg-tertiary);
@@ -601,6 +628,15 @@
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" class="search-input" id="searchInput" placeholder="Search media files..." onkeyup="filterMedia()">
             </div>
+            <div class="sort-controls">
+                <select id="sortSelect" class="sort-select" onchange="sortMedia()">
+                    <option value="">Sort by...</option>
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="duration-asc">Duration (Short-Long)</option>
+                    <option value="duration-desc">Duration (Long-Short)</option>
+                </select>
+            </div>
             <div class="view-toggle">
                 <button class="view-btn active" onclick="setViewMode('grid')">
                     <i class="fas fa-th"></i>
@@ -651,6 +687,7 @@
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
+                             data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <img src="/file/{{vid.thumb_path_rel}}" alt="{{ vid.vid_title }}" loading="lazy"/>
                             <div class="thumbnail-content">
@@ -681,6 +718,7 @@
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
+                             data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <img src="/file/{{vid.thumb_path_rel}}" alt="{{ vid.vid_title }}" loading="lazy"/>
                             <div class="thumbnail-content">
@@ -814,6 +852,60 @@
                     thumbnail.style.display = 'none';
                 }
             });
+        }
+
+        // Sort Media
+        function sortMedia() {
+            const sortValue = document.getElementById('sortSelect').value;
+            if (!sortValue) return;
+
+            const galleries = ['videosGallery', 'clipsGallery'];
+            
+            galleries.forEach(galleryId => {
+                const gallery = document.getElementById(galleryId);
+                if (!gallery) return;
+
+                const thumbnails = Array.from(gallery.querySelectorAll('.thumbnail'));
+                
+                thumbnails.sort((a, b) => {
+                    const aName = a.dataset.videoTitle || '';
+                    const bName = b.dataset.videoTitle || '';
+                    
+                    if (sortValue.startsWith('name')) {
+                        if (sortValue === 'name-asc') {
+                            return aName.localeCompare(bName);
+                        } else {
+                            return bName.localeCompare(aName);
+                        }
+                    } else if (sortValue.startsWith('duration')) {
+                        const aDuration = parseFloat(a.dataset.videoDuration) || 0;
+                        const bDuration = parseFloat(b.dataset.videoDuration) || 0;
+                        
+                        if (sortValue === 'duration-asc') {
+                            return aDuration - bDuration;
+                        } else {
+                            return bDuration - aDuration;
+                        }
+                    }
+                    return 0;
+                });
+
+                // Re-append sorted thumbnails
+                thumbnails.forEach(thumbnail => {
+                    gallery.appendChild(thumbnail);
+                });
+            });
+        }
+
+        // Parse duration string to seconds for sorting
+        function parseDuration(durationStr) {
+            const match = durationStr.match(/(\d+):(\d+)/);
+            if (match) {
+                const minutes = parseInt(match[1]);
+                const seconds = parseInt(match[2]);
+                return minutes * 60 + seconds;
+            }
+            return 0;
         }
 
         // Video Player Functions
