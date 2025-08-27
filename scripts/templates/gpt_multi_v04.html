@@ -964,13 +964,15 @@
 
         // Close modals when clicking outside
         document.getElementById('videoPlayer').addEventListener('click', function(e) {
-            if (e.target === this) {
+            // Close if clicking on the video player background or player container
+            if (e.target === this || e.target.classList.contains('player-container')) {
                 closePlayer();
             }
         });
 
         document.getElementById('imageLightbox').addEventListener('click', function(e) {
-            if (e.target === this) {
+            // Close if clicking on the image lightbox background or player container
+            if (e.target === this || e.target.classList.contains('player-container')) {
                 closeImageLightbox();
             }
         });
