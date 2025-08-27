@@ -43,12 +43,12 @@
             position: fixed;
             left: 0;
             top: 0;
-            width: 280px;
+            width: 50px;
             height: 100vh;
             background: linear-gradient(180deg, var(--glass-bg) 0%, rgba(0, 0, 0, 0.8) 100%);
             backdrop-filter: blur(20px);
             border-right: 1px solid var(--glass-border);
-            padding: 2rem 1.5rem;
+            padding: 1rem 0.1rem;
             z-index: 1000;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -129,8 +129,8 @@
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+            padding: 0.2rem;
+            margin-bottom: 0.5rem;
             text-align: center;
             box-shadow: var(--shadow-medium);
         }
@@ -289,7 +289,7 @@
         }
 
         .thumbnail-content {
-            padding: 1.5rem;
+            padding: 0.5rem;
         }
 
         .thumbnail-title {
@@ -317,7 +317,7 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            padding: 0.1rem 2rem;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
             text-decoration: none;
@@ -379,14 +379,14 @@
 
         .player-controls {
             position: absolute;
-            bottom: 2rem;
+            bottom: 0rem;
             left: 50%;
             transform: translateX(-50%);
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 16px;
-            padding: 1rem 1.5rem;
+            padding: 0.2rem 0.2rem;
             display: flex;
             gap: 1rem;
             align-items: center;
@@ -421,7 +421,7 @@
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 0.5rem;
+            padding: 0.1rem;
             color: var(--text-primary);
             font-size: 0.9rem;
         }
@@ -552,43 +552,39 @@
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2><i class="fas fa-photo-video"></i> Media Gallery</h2>
+            <h2><i class="fas fa-photo-video"></i> <!-- Media Gallery --></h2>
         </div>
         <nav class="sidebar-nav">
             <div class="nav-item">
                 <a href="../{{page_name}}" class="nav-link">
                     <i class="fas fa-level-up-alt"></i>
-                    <span>Go Up</span>
+                    <!-- <span>Go Up</span> -->
                 </a>
             </div>
             <div class="nav-item">
                 <a href="/" class="nav-link">
                     <i class="fas fa-home"></i>
-                    <span>Root</span>
+                    <!-- <span>Root</span> -->
                 </a>
             </div>
             <div class="nav-item">
                 <a href="#folders" class="nav-link">
                     <i class="fas fa-folder"></i>
-                    <span>Folders</span>
+                    <!-- <span>Folders</span> -->
                 </a>
             </div>
             <div class="nav-item">
                 <a href="#videos" class="nav-link">
                     <i class="fas fa-video"></i>
-                    <span>Videos</span>
+                    <!-- <span>Videos</span> -->
                 </a>
             </div>
             <div class="nav-item">
                 <a href="#images" class="nav-link">
                     <i class="fas fa-image"></i>
-                    <span>Images</span>
+                    <!-- <span>Images</span> -->
                 </a>
             </div>
-            <button class="close-player-btn" onclick="closePlayer()">
-                <i class="fas fa-times"></i>
-                <span>Close Player</span>
-            </button>
         </nav>
     </div>
 
@@ -597,7 +593,6 @@
         <!-- Header -->
         <div class="header fade-in">
             <h1>{{name}}</h1>
-            <p class="header-subtitle">Browse and manage your media collection</p>
         </div>
 
         <!-- Search and Filter Bar -->
