@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("-v", "--verbose", action='store_true', help="Enable verbose output.")
     parser.add_argument("--width", type=int, default=1920, help="Width of the output video (default: 1920).")
     parser.add_argument("--height", type=int, default=1080, help="Height of the output video (default: 1080).")
+    parser.add_argument("--fps", type=int, default=60, help="Frames per second of the output video (default: 30).")
     args = parser.parse_args()
     
     mdir = mediatools.scan_directory(
@@ -80,6 +81,7 @@ if __name__ == '__main__':
         verbose=args.verbose,
         height=args.height,
         width=args.width,
+        fps=args.fps,
     )
     
 
