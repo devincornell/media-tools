@@ -33,6 +33,7 @@ class ServerConfig:
     site_index: dict|None = None
     template: jinja2.Template|None = None
     sort_by_name: bool|None = None
+    max_clip_duration: float|None = None
     #_config_file: Path = TMP_CONFIG_FNAME
 
     def set_values_from_args(
@@ -45,6 +46,7 @@ class ServerConfig:
         index_path: Path|str,
         overwrite_index: bool,
         sort_by_name: bool,
+        max_clip_duration: float,
     ) -> typing.Self:
         '''Set configuration values.'''
         if root_path is None:
@@ -76,9 +78,11 @@ class ServerConfig:
                 self.site_index = json.load(f)
         else:
             print(f'creating index {index_path}')
-            self.site_index = create_site_index(root_path, thumb_path, sort_by_name)
+            self.site_index = create_site_index(root_path, thumb_path, sort_by_name, max_clip_duration)
             with index_path.open('w') as f:
                 json.dump(self.site_index, f, indent=2)
+
+        self.max_clip_duration = float(max_clip_duration)
 
         #self.save_to_file()
         return self
@@ -102,10 +106,10 @@ class ServerConfig:
 
 
 
-def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool) -> dict:
+def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool, max_clip_duration: float) -> dict:
     '''Create the index page for the site.'''
     mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ingore_folder_names=(thumbs_path,))
-    index, _ = create_page_index(mdir, root, thumbs_path=Path(thumbs_path), sort_by_name=sort_by_name)
+    index, _ = create_page_index(mdir, root, thumbs_path=Path(thumbs_path), sort_by_name=sort_by_name, max_clip_duration=max_clip_duration)
     return index
 
 def create_page_index(
@@ -113,6 +117,7 @@ def create_page_index(
     root: pathlib.Path, 
     thumbs_path: pathlib.Path,
     sort_by_name: bool,
+    max_clip_duration: float,
 ) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
 
     print(f'entering {mdir.fpath}')
@@ -126,7 +131,7 @@ def create_page_index(
     subpages = list()
     for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
-            full_subpage_index, subpage_index = create_page_index(mdir=sdir, root=root, thumbs_path=thumbs_path, sort_by_name=sort_by_name)
+            full_subpage_index, subpage_index = create_page_index(mdir=sdir, root=root, thumbs_path=thumbs_path, sort_by_name=sort_by_name, max_clip_duration=max_clip_duration)
 
             subpages.append(subpage_index) # give this page access to all subpages
             full_index = {**full_index, **full_subpage_index} # add these subpages to the full index
@@ -166,7 +171,7 @@ def create_page_index(
                 'res_str': info.resolution_str(),
                 'aspect': info.aspect_ratio(),
             }
-            if info.probe.duration < 60:
+            if info.probe.duration < max_clip_duration:
                 clips.append(info_dict)
             else:
                 vids.append(info_dict)
@@ -399,6 +404,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--sort_by_name', action='store_true', help='Rebuild the site index even if a cached version exists')
     parser.add_argument('-i', '--index', type=Path, default=Path("_site_index.json"), help='Path to the site index file (default: site_index.json)')
     parser.add_argument('-w', '--overwrite_index', action='store_true', help='Overwrite the site index file if it exists')
+    parser.add_argument('-m', '--max_clip_duration', type=float, default=0, help='Maximum clip duration in seconds (default: 60)')
 
     print(f'creating index')
     args = parser.parse_args()
@@ -412,7 +418,8 @@ if __name__ == "__main__":
             template_path=args.template,
             index_path=args.index,
             overwrite_index=args.overwrite_index,
-            sort_by_name=args.sort_by_name
+            sort_by_name=args.sort_by_name,
+            max_clip_duration=args.max_clip_duration,
         )
         
         # Create the FastAPI application with this config
