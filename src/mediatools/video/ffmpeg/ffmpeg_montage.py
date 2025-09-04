@@ -111,13 +111,17 @@ def extract_clip(args) -> str|None:
         framerate=fps,
         vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
         #vcodec="h264_nvenc",
-        acodec="aac",
-        audio_bitrate="192k", 
+        acodec="aac",  # Ensure audio codec is included
+        audio_bitrate="192k",  # Set audio bitrate
         loglevel="error",
         input_args=[
             ('hwaccel', 'cuda'),
         ],
         command_flags=['nostdin'],
+        output_args=[
+            ('map', "0:v:0"),
+            ('map', "0:a:0"),
+        ],
     )
     try:
         ffmpeg_cmd.run()
@@ -218,8 +222,8 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
             ('safe', '0'),
         ],
         output_args=[
-            ('c', 'copy'),
-            #('f', 'mp4'),
+            ('c', 'copy'),  # Copy both video and audio streams
+            ('f', 'mp4'),  # Ensure output format is MP4
         ],
     )
 
