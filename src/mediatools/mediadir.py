@@ -53,6 +53,9 @@ class MediaDir:
         '''Create a MediaDir instance from the current working directory.
         '''
         root_path = pathlib.Path(root_path)
+        if not root_path.is_dir():
+            raise FileNotFoundError(f'Root path not found: {root_path}')
+
         file_tree = build_file_tree(root_path)        
         return cls.from_dict(
             data=file_tree,
