@@ -4,7 +4,7 @@ import pickle
 import tempfile
 from fastapi import FastAPI, Request, Header, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, PlainTextResponse
 from pathlib import Path
 import argparse
 
@@ -104,6 +104,8 @@ class ServerConfig:
     #        config = pickle.load(f)
     #    return cls(**config)
 
+def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
+    return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
 
 
 def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool, max_clip_duration: float) -> dict:
@@ -176,10 +178,11 @@ def create_page_index(
             else:
                 vids.append(info_dict)
 
-            best_video_thumb.update(
-                new_path=str(thumb_path_rel),
-                new_aspect=info.aspect_ratio(),
-            )
+            if thumb_path.exists():
+                best_video_thumb.update(
+                    new_path=str(thumb_path_rel),
+                    new_aspect=info.aspect_ratio(),
+                )
     
     images = list()
     for ifile in mdir.images:
@@ -317,6 +320,19 @@ def create_app(config: ServerConfig) -> FastAPI:
     @app.get('/page')
     async def page_redirect():
         return RedirectResponse(url='/page/')
+
+    @app.get('/list_directories', response_class=PlainTextResponse)
+    async def list_pages(config: ServerConfig = Depends(get_config)):
+        return "\n".join(config.site_index.keys())
+
+    @app.get('/list_videos', response_class=PlainTextResponse)
+    async def list_pages(config: ServerConfig = Depends(get_config)):
+        vid_names = []
+        for pi in config.site_index.values():
+            for v in pi['vids']:
+                vid_names.append(v['vid_path_rel'])
+        return "\n".join(vid_names)
+
 
     @app.get('/page/{page_path:path}', response_class=HTMLResponse)
     async def page_with_video(page_path: str, config: ServerConfig = Depends(get_config)):
