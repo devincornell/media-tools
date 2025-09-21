@@ -226,6 +226,9 @@ def create_page_index(
         best_thumb = best_video_thumb
     elif best_image_thumb.has_value():
         best_thumb = best_image_thumb
+    else:
+        best_thumb = BestThumbTracker()
+        best_thumb.update(new_path='', new_aspect=1.0)
 
     page_index = {
         'page_path_abs': str(page_path_abs),
@@ -234,6 +237,7 @@ def create_page_index(
         'name': mediatools.fname_to_title(page_path_rel.name), 
         'subfolder_thumb': best_thumb.get_final_path(),
         'subfolder_aspect': best_thumb.get_final_aspect(),
+        'subfolder_thumbs_all': best_thumb.thumbs_list(),
         'subpages': subpages,
         'vids': vids,
         'clips': clips,
@@ -258,11 +262,13 @@ class BestThumbTracker:
     desired_aspect: float = 0
     path: pathlib.Path|None = None
     aspect: float|None = None
+    all_vids: list = dataclasses.field(default_factory=list)
 
     def update(self, new_path: pathlib.Path, new_aspect: float):
         '''Update the best thumb if the new one is better.'''
         if new_path is None or new_aspect is None:
             return
+        self.all_vids.append((new_path, new_aspect))
         if self.path is None or new_path == '' or new_aspect > self.aspect:
             self.path = pathlib.Path(new_path)
             self.aspect = new_aspect
@@ -281,6 +287,9 @@ class BestThumbTracker:
     
     def has_value(self) -> bool:
         return self.path is not None
+
+    def thumbs_list(self) -> list[str]:
+        return [str(p) for p, _ in self.all_vids]
 
 
 
