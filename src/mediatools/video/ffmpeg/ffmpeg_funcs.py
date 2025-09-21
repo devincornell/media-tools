@@ -127,7 +127,7 @@ def make_thumb(
 def make_animated_thumb(
     input_fname: str|Path,
     output_fname: str, 
-    framerate: int,
+    fps: int,
     sample_period: int,
     height: int = -1, 
     width: int = -1, 
@@ -137,7 +137,7 @@ def make_animated_thumb(
     '''Make an animated thumbnail from this video by sampling frames evenly across its duration.
     Args:
         sample_period: the number of seconds between each frame sampled.
-        framerate: the number of frames per second in the output gif.
+        fps: the number of frames per second in the output gif.
         height: the height of the output gif.
         width: the width of the output gif.
         overwrite: whether to overwrite the output file if it exists.
@@ -149,7 +149,7 @@ def make_animated_thumb(
     command = FFMPEG(
         input_files=[str(input_fname)],
         output_file=str(ofp),
-        vf=f"setpts=PTS/{sample_period},fps={framerate},scale={width}:{height}:-1",
+        vf=f"setpts=PTS/{sample_period},fps={fps},scale={width}:{height}:-1",
         overwrite_output=overwrite,
         **output_kwargs
     )
@@ -167,7 +167,8 @@ def make_animated_thumb_v2(
     overwrite: bool = False, 
     **output_kwargs
 ) -> FFMPEGResult:
-    '''Make an animated thumbnail from this video by sampling frames evenly across its duration.
+    '''DEPRICATED. USE make_animated_thumb instead.
+    Make an animated thumbnail from this video by sampling frames evenly across its duration.
     Args:
         sample_period: the number of seconds between each frame sampled.
         framerate: the number of frames per second in the output gif.

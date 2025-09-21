@@ -96,8 +96,8 @@ class FFMPEG:
     command_flags: list[str]|None = None
 
     def __post_init__(self):
-        self.input_files = [str(f) for f in self.input_files]
-        self.output_file = str(self.output_file)    
+        self.input_files = [Path(f) for f in self.input_files]
+        self.output_file = Path(self.output_file)
 
     def run(
         self,
