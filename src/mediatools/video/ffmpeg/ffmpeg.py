@@ -273,3 +273,112 @@ def run_ffmpeg_subprocess(
 
     return result
 
+
+@dataclasses.dataclass
+class FFInput:
+    '''Dataclass used to build an FFMPEG command.'''
+    file: str|Path
+    f: str|None = None
+    cv: str|None = None
+    ca: str|None = None
+    t: str|None = None
+    ss: str|None = None
+    to: str|None = None
+    itsoffset: str|None = None
+    
+    # Video Input Options
+    r: str|None = None  # Input frame rate
+    s: str|None = None  # Input frame size (WxH)
+    pix_fmt: str|None = None  # Input pixel format
+    aspect: str|None = None  # Input aspect ratio
+    vframes: int|None = None  # Number of video frames to read
+    top: int|None = None  # Top field first
+    
+    # Audio Input Options
+    ar: str|None = None  # Audio sample rate
+    ac: int|None = None  # Audio channels
+    aframes: int|None = None  # Number of audio frames to read
+    vol: str|None = None  # Audio volume (deprecated)
+    
+    # Hardware Acceleration (Input)
+    hwaccel: str|None = None  # Hardware acceleration method (cuda, vaapi, etc.)
+    hwaccel_device: str|None = None  # Hardware acceleration device
+    
+    # Stream Selection
+    map: str|None = None  # Map input streams to output
+    map_metadata: str|None = None  # Map metadata
+    map_chapters: str|None = None  # Map chapters
+    
+    # Input Format Specific
+    probesize: int|None = None  # Probe size for format detection
+    analyzeduration: int|None = None  # Analysis duration in microseconds
+    fpsprobesize: int|None = None  # Frames to probe for fps
+    safe: bool|None = None  # Safe file access (for concat demuxer)
+    
+    # Loop & Repeat
+    loop: int|None = None  # Loop input (images/video)
+    stream_loop: int|None = None  # Loop input streams
+    
+    # Seeking & Timing
+    accurate_seek: bool|None = None  # Enable accurate seeking
+    seek_timestamp: bool|None = None  # Seek by timestamp instead of frame
+
+    def to_str(self) -> str:
+        '''Convert the FFInput to a string representation for FFMPEG command.'''
+        parts = list()
+
+        def add_part(argname: str, argval: str|int|None):
+            if argval is not None:
+                parts.extend([f'-{argname}', str(argval)])
+
+        def add_flag(argname: str, add_flag: bool|None):
+            if add_flag is True:
+                parts.append(f'-{argname}')
+
+        # Video Input Options
+        add_part('r', self.r)
+        add_part('s', self.s)
+        add_part('pix_fmt', self.pix_fmt)
+        add_part('aspect', self.aspect)
+        add_part('vframes', self.vframes)
+        add_part('top', self.top)
+        
+        # Audio Input Options
+        add_part('ar', self.ar)
+        add_part('ac', self.ac)
+        add_part('aframes', self.aframes)
+        add_part('vol', self.vol)
+        
+        # Hardware Acceleration (Input)
+        add_part('hwaccel', self.hwaccel)
+        add_part('hwaccel_device', self.hwaccel_device)
+        
+        # Stream Selection
+        add_part('map', self.map)
+        add_part('map_metadata', self.map_metadata)
+        add_part('map_chapters', self.map_chapters)
+        
+        # Input Format Specific
+        add_part('probesize', self.probesize)
+        add_part('analyzeduration', self.analyzeduration)
+        add_part('fpsprobesize', self.fpsprobesize)
+        add_flag('safe', self.safe)
+        
+        # Loop & Repeat
+        add_part('loop', self.loop)
+        add_part('stream_loop', self.stream_loop)
+        
+        # Seeking & Timing
+        add_flag('accurate_seek', self.accurate_seek)
+        add_flag('seek_timestamp', self.seek_timestamp)
+        
+        # Existing attributes
+        add_part('f', self.f)
+        add_part('t', self.t)
+        add_part('ss', self.ss)
+        add_part('to', self.to)
+        add_part('c:v', self.cv)
+        add_part('c:a', self.ca)
+        add_part('i', str(self.file))
+
+        return parts
