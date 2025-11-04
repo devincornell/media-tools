@@ -366,59 +366,56 @@ class FFInput:
     def to_args(self) -> list[str]:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
 
-        #args = CmdArgs.from_dict({
-        #    'r': self.r,
-        #    's': self.s,
-        #},
-        #flags = {
-        #    'accurate_seek': self.accurate_seek,
-        #    'seek_timestamp': self.seek_timestamp,
-        #})
+        args = CmdArgs.from_dict(
+            args={
+                # Video Input Options
+                'r': self.r,
+                's': self.s,
+                'pix_fmt': self.pix_fmt,
+                'aspect': self.aspect,
+                'vframes': self.vframes,
+                'top': self.top,
+                
+                # Audio Input Options
+                'ar': self.ar,
+                'ac': self.ac,
+                'aframes': self.aframes,
+                'vol': self.vol,
+                
+                # Hardware Acceleration (Input)
+                'hwaccel': self.hwaccel,
+                'hwaccel_device': self.hwaccel_device,
+                
+                # Input Format Specific
+                'probesize': self.probesize,
+                'analyzeduration': self.analyzeduration,
+                'fpsprobesize': self.fpsprobesize,
+                
+                # Loop & Repeat
+                'loop': self.loop,
+                'stream_loop': self.stream_loop,
+                
+                # Existing attributes
+                'f': self.f,
+                't': self.t,
+                'ss': self.ss,
+                'to': self.to,
+                'c:v': self.cv,
+                'c:a': self.ca,
+                'i': str(self.file),
+            },
+            flags={
+                # Input Format Specific
+                'safe': self.safe,
+                
+                # Seeking & Timing
+                'accurate_seek': self.accurate_seek,
+                'seek_timestamp': self.seek_timestamp,
+            }
+        )
 
-        args = CmdArgs()
-
-        # Video Input Options
-        args.add_arg('r', self.r)
-        args.add_arg('s', self.s)
-        args.add_arg('pix_fmt', self.pix_fmt)
-        args.add_arg('aspect', self.aspect)
-        args.add_arg('vframes', self.vframes)
-        args.add_arg('top', self.top)
-
-        # Audio Input Options
-        args.add_arg('ar', self.ar)
-        args.add_arg('ac', self.ac)
-        args.add_arg('aframes', self.aframes)
-        args.add_arg('vol', self.vol)
-
-        # Hardware Acceleration (Input)
-        args.add_arg('hwaccel', self.hwaccel)
-        args.add_arg('hwaccel_device', self.hwaccel_device)
-
-        # Input Format Specific
-        args.add_arg('probesize', self.probesize)
-        args.add_arg('analyzeduration', self.analyzeduration)
-        args.add_arg('fpsprobesize', self.fpsprobesize)
-        args.add_flag('safe', self.safe)
-
-        # Loop & Repeat
-        args.add_arg('loop', self.loop)
-        args.add_arg('stream_loop', self.stream_loop)
-
-        # Seeking & Timing
-        args.add_flag('accurate_seek', self.accurate_seek)
-        args.add_flag('seek_timestamp', self.seek_timestamp)
-        
-        # Existing attributes
-        args.add_arg('f', self.f)
-        args.add_arg('t', self.t)
-        args.add_arg('ss', self.ss)
-        args.add_arg('to', self.to)
-        args.add_arg('c:v', self.cv)
-        args.add_arg('c:a', self.ca)
-        args.add_arg('i', str(self.file))
-
-        args.append((self.other or []))
+        if self.other:
+            args.extend(self.other)
 
         return args
 
@@ -518,90 +515,97 @@ class FFOutput:
 
     def to_args(self) -> list[str]:
         '''Convert the FFOutput to arguments for FFMPEG command.'''
-        args = CmdArgs()
+        args = CmdArgs.from_dict(
+            args={
+                # Stream Selection & Mapping
+                'map_metadata': self.map_metadata,
+                'map_chapters': self.map_chapters,
+                
+                # Timing & Seeking
+                'ss': self.ss,
+                't': self.t or self.duration,
+                'to': self.to,
+                
+                # Video Output Options
+                'c:v': self.vcodec,
+                'b:v': self.video_bitrate,
+                'crf': self.crf,
+                'q:v': self.qscale_v,
+                'maxrate': self.maxrate,
+                'bufsize': self.bufsize,
+                'r': self.framerate or self.fps,
+                's': self.s,
+                'aspect': self.aspect,
+                'pix_fmt': self.pix_fmt,
+                'vframes': self.vframes,
+                'keyint_min': self.keyint_min,
+                'g': self.g,
+                'bf': self.bf,
+                'profile:v': self.profile_v,
+                'level': self.level,
+                'tune': self.tune,
+                
+                # Audio Output Options
+                'c:a': self.acodec,
+                'b:a': self.audio_bitrate,
+                'ar': self.ar,
+                'ac': self.ac,
+                'vol': self.vol,
+                'aframes': self.aframes,
+                'profile:a': self.profile_a,
+                'q:a': self.qscale_a,
+                
+                # Filters
+                'vf': self.vf,
+                'af': self.af,
+                'filter_complex': self.filter_complex,
+                
+                # Format & Container Options
+                'f': self.format,
+                'movflags': self.movflags,
+                'brand': self.brand,
+                
+                # Hardware Acceleration
+                'hwaccel_output_format': self.hwaccel_output_format,
+                'vaapi_device': self.vaapi_device,
+                
+                # Encoding Presets & Quality
+                'preset': self.preset,
+                'x264-params': self.x264_params,
+                'x265-params': self.x265_params,
+                
+                # Subtitles
+                'c:s': self.scodec,
+                
+                # Threading & Performance
+                'threads': self.threads,
+                
+                # Logging & Output Control
+                'loglevel': self.loglevel,
+                'progress': self.progress,
+            },
+            flags={
+                # Stream Control
+                'an': self.disable_audio,
+                'vn': self.disable_video,
+                'sn': self.disable_subtitles,
+                'dn': self.disable_data,
+                
+                # Logging & Output Control
+                'hide_banner': self.hide_banner,
+                'nostats': self.nostats,
+            }
+        )
         
-        # Stream Selection & Mapping
+        # Handle maps separately since it's a list
         if self.maps:
             for map_spec in self.maps:
                 args.add_arg('map', map_spec)
-        args.add_arg('map_metadata', self.map_metadata)
-        args.add_arg('map_chapters', self.map_chapters)
         
-        # Timing & Seeking
-        args.add_arg('ss', self.ss)
-        args.add_arg('t', self.t or self.duration)
-        args.add_arg('to', self.to)
-        
-        # Video Output Options
-        args.add_arg('c:v', self.vcodec)
-        args.add_arg('b:v', self.video_bitrate)
-        args.add_arg('crf', self.crf)
-        args.add_arg('q:v', self.qscale_v)
-        args.add_arg('maxrate', self.maxrate)
-        args.add_arg('bufsize', self.bufsize)
-        args.add_arg('r', self.framerate or self.fps)
-        args.add_arg('s', self.s)
-        args.add_arg('aspect', self.aspect)
-        args.add_arg('pix_fmt', self.pix_fmt)
-        args.add_arg('vframes', self.vframes)
-        args.add_arg('keyint_min', self.keyint_min)
-        args.add_arg('g', self.g)
-        args.add_arg('bf', self.bf)
-        args.add_arg('profile:v', self.profile_v)
-        args.add_arg('level', self.level)
-        args.add_arg('tune', self.tune)
-        
-        # Audio Output Options
-        args.add_arg('c:a', self.acodec)
-        args.add_arg('b:a', self.audio_bitrate)
-        args.add_arg('ar', self.ar)
-        args.add_arg('ac', self.ac)
-        args.add_arg('vol', self.vol)
-        args.add_arg('aframes', self.aframes)
-        args.add_arg('profile:a', self.profile_a)
-        args.add_arg('q:a', self.qscale_a)
-        
-        # Filters
-        args.add_arg('vf', self.vf)
-        args.add_arg('af', self.af)
-        args.add_arg('filter_complex', self.filter_complex)
-        
-        # Format & Container Options
-        args.add_arg('f', self.format)
-        args.add_arg('movflags', self.movflags)
-        args.add_arg('brand', self.brand)
-        
-        # Hardware Acceleration
-        args.add_arg('hwaccel_output_format', self.hwaccel_output_format)
-        args.add_arg('vaapi_device', self.vaapi_device)
-        
-        # Encoding Presets & Quality
-        args.add_arg('preset', self.preset)
-        args.add_arg('x264-params', self.x264_params)
-        args.add_arg('x265-params', self.x265_params)
-        
-        # Stream Control
-        args.add_flag('an', self.disable_audio)
-        args.add_flag('vn', self.disable_video) 
-        args.add_flag('sn', self.disable_subtitles)
-        args.add_flag('dn', self.disable_data)
-        
-        # Metadata
+        # Handle metadata separately since it needs special formatting
         if self.metadata:
             for key, value in self.metadata.items():
                 args.add_arg('metadata', f'{key}={value}')
-        
-        # Subtitles
-        args.add_arg('c:s', self.scodec)
-        
-        # Threading & Performance
-        args.add_arg('threads', self.threads)
-        
-        # Logging & Output Control
-        args.add_arg('loglevel', self.loglevel)
-        args.add_flag('hide_banner', self.hide_banner)
-        args.add_flag('nostats', self.nostats)
-        args.add_arg('progress', self.progress)
         
         # Generic extensibility
         if self.output_args:
