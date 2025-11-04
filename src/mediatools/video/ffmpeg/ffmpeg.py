@@ -282,15 +282,33 @@ def run_ffmpeg_subprocess(
 
 class CmdArgs(list[str]):
     '''Class to build command line arguments for FFMPEG.'''
+    @classmethod
+    def from_dict(cls, args: dict[str, str], flags: dict[str, bool]) -> CmdArgs:
+        '''Create CmdArgs from a dictionary of name-value pairs.'''
+        cmd_args = cls()
+        cmd_args.add_args(args)
+        cmd_args.add_flags(flags)
+        return cmd_args
+    
+    def add_args(self, name_values: dict[str, str|int|None]):
+        '''Add multiple arguments to the command.'''
+        for name, value in name_values.items():
+            if value is not None:
+                self.extend([f'-{name}', str(value)])
     def add_arg(self, name: str, value: str|int|None):
         '''Add an argument to the command.'''
         if value is not None:
             self.extend([f'-{name}', str(value)])
-    
+    def add_flags(self, name_flags: dict[str, bool]):
+        '''Add multiple flags to the command.'''
+        for name, enabled in name_flags.items():
+            if bool(enabled):
+                self.append(f'-{name}')
     def add_flag(self, name: str, enabled: bool):
         '''Add a flag to the command.'''
         if bool(enabled):
             self.append(f'-{name}')
+
 
 
 
@@ -348,6 +366,15 @@ class FFInput:
     def to_args(self) -> list[str]:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
 
+        #args = CmdArgs.from_dict({
+        #    'r': self.r,
+        #    's': self.s,
+        #},
+        #flags = {
+        #    'accurate_seek': self.accurate_seek,
+        #    'seek_timestamp': self.seek_timestamp,
+        #})
+
         args = CmdArgs()
 
         # Video Input Options
@@ -398,40 +425,200 @@ class FFInput:
 
 @dataclasses.dataclass
 class FFOutput:
-    '''Dataclass used to build an FFMPEG command.'''
+    '''Dataclass used to build an FFMPEG output specification.'''
     file: str|Path
-    maps: list[Stream]|None = None
     overwrite_output: bool = False
+    
+    # Stream Selection & Mapping
+    maps: list[Stream]|None = None  # Stream mapping specifications
+    map_metadata: str|None = None  # Map metadata from input
+    map_chapters: str|None = None  # Map chapters from input
+    
+    # Timing & Seeking
+    ss: str|None = None  # Start time offset
+    t: str|None = None  # Duration (alias for duration)
+    duration: str|None = None  # Duration
+    to: str|None = None  # End time
+    
+    # Video Output Options
+    vcodec: str|None = None  # Video codec (c:v)
+    video_bitrate: str|None = None  # Video bitrate (b:v)
+    crf: int|None = None  # Constant rate factor
+    qscale_v: int|None = None  # Video quality scale (q:v)
+    maxrate: str|None = None  # Maximum bitrate
+    bufsize: str|None = None  # Buffer size
+    framerate: int|None = None  # Output frame rate (r)
+    fps: str|None = None  # Frame rate (alternative to framerate)
+    s: str|None = None  # Output frame size (WxH)
+    aspect: str|None = None  # Output aspect ratio
+    pix_fmt: str|None = None  # Output pixel format
+    vframes: int|None = None  # Number of video frames to output
+    keyint_min: int|None = None  # Minimum GOP size
+    g: int|None = None  # GOP size
+    bf: int|None = None  # B-frames
+    profile_v: str|None = None  # Video profile
+    level: str|None = None  # Video level
+    tune: str|None = None  # Encoding tune (film, animation, etc.)
+    
+    # Audio Output Options  
+    acodec: str|None = None  # Audio codec (c:a)
+    audio_bitrate: str|None = None  # Audio bitrate (b:a)
+    ar: str|None = None  # Audio sample rate
+    ac: int|None = None  # Audio channels
+    vol: str|None = None  # Audio volume
+    aframes: int|None = None  # Number of audio frames to output
+    profile_a: str|None = None  # Audio profile
+    qscale_a: int|None = None  # Audio quality scale (q:a)
+    
+    # Filters
+    vf: str|None = None  # Video filter chain
+    af: str|None = None  # Audio filter chain
+    filter_complex: str|None = None  # Complex filter graph
+    
+    # Format & Container Options
+    format: str|None = None  # Output format (f)
+    movflags: str|None = None  # MOV/MP4 specific flags
+    brand: str|None = None  # Brand for MP4
+    
+    # Hardware Acceleration (Output)
+    hwaccel: str|None = None  # Hardware acceleration method
+    hwaccel_output_format: str|None = None  # Hardware accelerated output format
+    vaapi_device: str|None = None  # VAAPI device
+    
+    # Encoding Presets & Quality
+    preset: str|None = None  # Encoding preset (ultrafast, fast, medium, etc.)
+    x264_params: str|None = None  # x264 specific parameters
+    x265_params: str|None = None  # x265 specific parameters
+    
+    # Stream Control
+    disable_audio: bool = False  # Disable audio streams (an)
+    disable_video: bool = False  # Disable video streams (vn)
+    disable_subtitles: bool = False  # Disable subtitle streams (sn)
+    disable_data: bool = False  # Disable data streams (dn)
+    
+    # Metadata
+    metadata: dict[str, str]|None = None  # Metadata key-value pairs
+    
+    # Subtitles
+    scodec: str|None = None  # Subtitle codec (c:s)
+    
+    # Threading & Performance
+    threads: int|None = None  # Number of threads
+    
+    # Logging & Output Control
+    loglevel: LOGLEVEL_OPTIONS|None = None  # Log level
+    hide_banner: bool = True  # Hide banner
+    nostats: bool = True  # No stats output
+    progress: str|None = None  # Progress output URL
+    
+    # Generic extensibility
+    output_args: list[tuple[str,str]]|None = None  # Additional output arguments
+    command_flags: list[str]|None = None  # Additional command flags
+    other: list[str]|None = None  # Other arbitrary output options
 
-
-
-    ss: str|None = None
-    duration: str|None = None
-    vf: str|None = None
-    af: str|None = None
-    vcodec: str|None = None
-    acodec: str|None = None
-    video_bitrate: str|None = None
-    audio_bitrate: str|None = None
-    framerate: int|None = None
-    format: str|None = None
-    filter_complex: str|None = None
-    disable_audio: bool = False
-    disable_video: bool = False
-    crf: int|None = None
-    preset: str|None = None
-    hwaccel: str|None = None
-    loglevel: LOGLEVEL_OPTIONS|None = None
-    hide_banner: bool = True
-    nostats: bool = True
-    output_args: list[tuple[str,str]]|None = None
-    input_args: list[tuple[str,str]]|None = None
-    command_flags: list[str]|None = None
-
-        # Stream Selection
-        #args.add_arg('map', self.map)
-        #args.add_arg('map_metadata', self.map_metadata)
-        #args.add_arg('map_chapters', self.map_chapters)
+    def to_args(self) -> list[str]:
+        '''Convert the FFOutput to arguments for FFMPEG command.'''
+        args = CmdArgs()
+        
+        # Stream Selection & Mapping
+        if self.maps:
+            for map_spec in self.maps:
+                args.add_arg('map', map_spec)
+        args.add_arg('map_metadata', self.map_metadata)
+        args.add_arg('map_chapters', self.map_chapters)
+        
+        # Timing & Seeking
+        args.add_arg('ss', self.ss)
+        args.add_arg('t', self.t or self.duration)
+        args.add_arg('to', self.to)
+        
+        # Video Output Options
+        args.add_arg('c:v', self.vcodec)
+        args.add_arg('b:v', self.video_bitrate)
+        args.add_arg('crf', self.crf)
+        args.add_arg('q:v', self.qscale_v)
+        args.add_arg('maxrate', self.maxrate)
+        args.add_arg('bufsize', self.bufsize)
+        args.add_arg('r', self.framerate or self.fps)
+        args.add_arg('s', self.s)
+        args.add_arg('aspect', self.aspect)
+        args.add_arg('pix_fmt', self.pix_fmt)
+        args.add_arg('vframes', self.vframes)
+        args.add_arg('keyint_min', self.keyint_min)
+        args.add_arg('g', self.g)
+        args.add_arg('bf', self.bf)
+        args.add_arg('profile:v', self.profile_v)
+        args.add_arg('level', self.level)
+        args.add_arg('tune', self.tune)
+        
+        # Audio Output Options
+        args.add_arg('c:a', self.acodec)
+        args.add_arg('b:a', self.audio_bitrate)
+        args.add_arg('ar', self.ar)
+        args.add_arg('ac', self.ac)
+        args.add_arg('vol', self.vol)
+        args.add_arg('aframes', self.aframes)
+        args.add_arg('profile:a', self.profile_a)
+        args.add_arg('q:a', self.qscale_a)
+        
+        # Filters
+        args.add_arg('vf', self.vf)
+        args.add_arg('af', self.af)
+        args.add_arg('filter_complex', self.filter_complex)
+        
+        # Format & Container Options
+        args.add_arg('f', self.format)
+        args.add_arg('movflags', self.movflags)
+        args.add_arg('brand', self.brand)
+        
+        # Hardware Acceleration
+        args.add_arg('hwaccel_output_format', self.hwaccel_output_format)
+        args.add_arg('vaapi_device', self.vaapi_device)
+        
+        # Encoding Presets & Quality
+        args.add_arg('preset', self.preset)
+        args.add_arg('x264-params', self.x264_params)
+        args.add_arg('x265-params', self.x265_params)
+        
+        # Stream Control
+        args.add_flag('an', self.disable_audio)
+        args.add_flag('vn', self.disable_video) 
+        args.add_flag('sn', self.disable_subtitles)
+        args.add_flag('dn', self.disable_data)
+        
+        # Metadata
+        if self.metadata:
+            for key, value in self.metadata.items():
+                args.add_arg('metadata', f'{key}={value}')
+        
+        # Subtitles
+        args.add_arg('c:s', self.scodec)
+        
+        # Threading & Performance
+        args.add_arg('threads', self.threads)
+        
+        # Logging & Output Control
+        args.add_arg('loglevel', self.loglevel)
+        args.add_flag('hide_banner', self.hide_banner)
+        args.add_flag('nostats', self.nostats)
+        args.add_arg('progress', self.progress)
+        
+        # Generic extensibility
+        if self.output_args:
+            for arg_name, arg_value in self.output_args:
+                args.add_arg(arg_name, arg_value)
+        
+        if self.command_flags:
+            for flag in self.command_flags:
+                args.add_flag(flag, True)
+        
+        if self.other:
+            args.extend(self.other)
+        
+        # Output file
+        args.append(str(self.file))
+        
+        return args
 
 
 def stream_filter(
