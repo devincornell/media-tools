@@ -8,6 +8,13 @@ from pathlib import Path
 
 from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 
+VideoStream: typing.TypeAlias = str
+AudioStream: typing.TypeAlias = str
+Stream: typing.TypeAlias = VideoStream | AudioStream
+Duration: typing.TypeAlias = str
+Time: typing.TypeAlias = str
+
+
 LOGLEVEL_OPTIONS = typing.Literal['error', 'warning', 'info', 'quiet', 'panic']
 
 def ffmpeg(
@@ -273,6 +280,19 @@ def run_ffmpeg_subprocess(
 
     return result
 
+class CmdArgs(list[str]):
+    '''Class to build command line arguments for FFMPEG.'''
+    def add_arg(self, name: str, value: str|int|None):
+        '''Add an argument to the command.'''
+        if value is not None:
+            self.extend([f'-{name}', str(value)])
+    
+    def add_flag(self, name: str, enabled: bool):
+        '''Add a flag to the command.'''
+        if bool(enabled):
+            self.append(f'-{name}')
+
+
 
 @dataclasses.dataclass
 class FFInput:
@@ -323,62 +343,117 @@ class FFInput:
     accurate_seek: bool|None = None  # Enable accurate seeking
     seek_timestamp: bool|None = None  # Seek by timestamp instead of frame
 
-    def to_str(self) -> str:
+    other: list[str]|None = None  # Other arbitrary input options
+
+    def to_args(self) -> list[str]:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
-        parts = list()
 
-        def add_part(argname: str, argval: str|int|None):
-            if argval is not None:
-                parts.extend([f'-{argname}', str(argval)])
-
-        def add_flag(argname: str, add_flag: bool|None):
-            if add_flag is True:
-                parts.append(f'-{argname}')
+        args = CmdArgs()
 
         # Video Input Options
-        add_part('r', self.r)
-        add_part('s', self.s)
-        add_part('pix_fmt', self.pix_fmt)
-        add_part('aspect', self.aspect)
-        add_part('vframes', self.vframes)
-        add_part('top', self.top)
-        
+        args.add_arg('r', self.r)
+        args.add_arg('s', self.s)
+        args.add_arg('pix_fmt', self.pix_fmt)
+        args.add_arg('aspect', self.aspect)
+        args.add_arg('vframes', self.vframes)
+        args.add_arg('top', self.top)
+
         # Audio Input Options
-        add_part('ar', self.ar)
-        add_part('ac', self.ac)
-        add_part('aframes', self.aframes)
-        add_part('vol', self.vol)
-        
+        args.add_arg('ar', self.ar)
+        args.add_arg('ac', self.ac)
+        args.add_arg('aframes', self.aframes)
+        args.add_arg('vol', self.vol)
+
         # Hardware Acceleration (Input)
-        add_part('hwaccel', self.hwaccel)
-        add_part('hwaccel_device', self.hwaccel_device)
-        
-        # Stream Selection
-        add_part('map', self.map)
-        add_part('map_metadata', self.map_metadata)
-        add_part('map_chapters', self.map_chapters)
-        
+        args.add_arg('hwaccel', self.hwaccel)
+        args.add_arg('hwaccel_device', self.hwaccel_device)
+
         # Input Format Specific
-        add_part('probesize', self.probesize)
-        add_part('analyzeduration', self.analyzeduration)
-        add_part('fpsprobesize', self.fpsprobesize)
-        add_flag('safe', self.safe)
-        
+        args.add_arg('probesize', self.probesize)
+        args.add_arg('analyzeduration', self.analyzeduration)
+        args.add_arg('fpsprobesize', self.fpsprobesize)
+        args.add_flag('safe', self.safe)
+
         # Loop & Repeat
-        add_part('loop', self.loop)
-        add_part('stream_loop', self.stream_loop)
-        
+        args.add_arg('loop', self.loop)
+        args.add_arg('stream_loop', self.stream_loop)
+
         # Seeking & Timing
-        add_flag('accurate_seek', self.accurate_seek)
-        add_flag('seek_timestamp', self.seek_timestamp)
+        args.add_flag('accurate_seek', self.accurate_seek)
+        args.add_flag('seek_timestamp', self.seek_timestamp)
         
         # Existing attributes
-        add_part('f', self.f)
-        add_part('t', self.t)
-        add_part('ss', self.ss)
-        add_part('to', self.to)
-        add_part('c:v', self.cv)
-        add_part('c:a', self.ca)
-        add_part('i', str(self.file))
+        args.add_arg('f', self.f)
+        args.add_arg('t', self.t)
+        args.add_arg('ss', self.ss)
+        args.add_arg('to', self.to)
+        args.add_arg('c:v', self.cv)
+        args.add_arg('c:a', self.ca)
+        args.add_arg('i', str(self.file))
 
-        return parts
+        args.append((self.other or []))
+
+        return args
+
+
+@dataclasses.dataclass
+class FFOutput:
+    '''Dataclass used to build an FFMPEG command.'''
+    file: str|Path
+    maps: list[Stream]|None = None
+    overwrite_output: bool = False
+
+
+
+    ss: str|None = None
+    duration: str|None = None
+    vf: str|None = None
+    af: str|None = None
+    vcodec: str|None = None
+    acodec: str|None = None
+    video_bitrate: str|None = None
+    audio_bitrate: str|None = None
+    framerate: int|None = None
+    format: str|None = None
+    filter_complex: str|None = None
+    disable_audio: bool = False
+    disable_video: bool = False
+    crf: int|None = None
+    preset: str|None = None
+    hwaccel: str|None = None
+    loglevel: LOGLEVEL_OPTIONS|None = None
+    hide_banner: bool = True
+    nostats: bool = True
+    output_args: list[tuple[str,str]]|None = None
+    input_args: list[tuple[str,str]]|None = None
+    command_flags: list[str]|None = None
+
+        # Stream Selection
+        #args.add_arg('map', self.map)
+        #args.add_arg('map_metadata', self.map_metadata)
+        #args.add_arg('map_chapters', self.map_chapters)
+
+
+def stream_filter(
+    instreams: Stream|typing.Iterable[Stream], 
+    outstreams: Stream|typing.Iterable[Stream], 
+    filter_str: str|None, 
+    **filter_args
+) -> str:
+    '''Build a filter_complex string for FFMPEG command. Each call is one filter link, so it will be used in sequence.
+    Examples:
+        stream_filter(['0:v'], ['scaled'], scale='640:480')
+        stream_filter('0:a', 'normalized', 'loudnorm', I='-16', LRA='11', TP='-1.5')
+    '''
+    if isinstance(instreams, (str)):
+        instreams = [instreams]
+    if isinstance(outstreams, (str)):
+        outstreams = [outstreams]
+    
+    in_labels = ''.join(f'[{s}]' for s in instreams) if len(instreams) > 0 else ''
+    out_labels = ''.join(f'[{s}]' for s in outstreams) if len(outstreams) > 0 else ''
+    filter_arg_str = ''.join(f':{k}={v}' for k,v in filter_args.items())
+    if filter_str is not None:
+        filter_arg_str = f'{filter_str}{filter_arg_str}'
+    return f'{in_labels}{filter_arg_str}{out_labels}'
+
