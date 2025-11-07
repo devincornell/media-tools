@@ -95,7 +95,105 @@ def ffmpeg(
 
 @dataclasses.dataclass
 class FFMPEG:
-    '''Dataclass used to build an FFMPEG command using FFInput and FFOutput specifications.'''
+    """A dataclass for building and executing FFmpeg commands with type safety and structured configuration.
+    
+    This class provides a high-level interface for constructing FFmpeg commands using
+    FFInput and FFOutput specifications. It handles command building, validation, and
+    execution with proper error handling.
+    
+    Args:
+        inputs: List of FFInput objects specifying input files and their options.
+        outputs: List of FFOutput objects specifying output files and encoding parameters.
+        filter_complex: Complex filter graph for advanced multi-input/output operations.
+        loglevel: FFmpeg logging level ('error', 'warning', 'info', 'quiet', 'panic').
+        hide_banner: Whether to hide the FFmpeg banner (default: True).
+        nostats: Whether to disable statistics output (default: True).
+        progress: File path for writing progress reports.
+        other_args: Additional command arguments as (name, value) tuples.
+        other_flags: Additional command flags as strings.
+    
+    Examples:
+        Basic video compression:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("input.mp4")],
+            ...     outputs=[FFOutput("output.mp4", vcodec="libx264", crf=23, overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Extract a video clip:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("movie.mp4", ss="00:01:30", t="00:00:10")],
+            ...     outputs=[FFOutput("clip.mp4", overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Create a thumbnail at specific time:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("video.mp4")],
+            ...     outputs=[FFOutput("thumb.jpg", ss="00:00:05", vframes=1, overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Resize video with aspect ratio preservation:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("input.mp4")],
+            ...     outputs=[FFOutput("resized.mp4", vf="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Convert to animated GIF with speed adjustment:
+            >>> from .probe import probe
+            >>> duration = probe("video.mp4").duration
+            >>> target_duration = 10  # seconds
+            >>> pts_factor = duration / target_duration
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("video.mp4")],
+            ...     outputs=[FFOutput("animation.gif", 
+            ...                      vf=f"setpts=PTS/{pts_factor},fps=10,scale=500:-1:flags=lanczos",
+            ...                      overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Crop video to specific region:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("input.mp4")],
+            ...     outputs=[FFOutput("cropped.mp4", vf="crop=640:480:100:50", overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Extract audio track:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("video.mp4")],
+            ...     outputs=[FFOutput("audio.mp3", disable_video=True, acodec="libmp3lame", overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+        
+        Concatenate multiple videos:
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("video1.mp4"), FFInput("video2.mp4"), FFInput("video3.mp4")],
+            ...     outputs=[FFOutput("combined.mp4", overwrite=True)],
+            ...     filter_complex="[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]",
+            ... )
+            >>> # Note: outputs should map the filter outputs
+            >>> cmd.outputs[0].maps = ["[outv]", "[outa]"]
+            >>> result = cmd.run()
+        
+        Apply hardware acceleration (NVIDIA):
+            >>> cmd = FFMPEG(
+            ...     inputs=[FFInput("input.mp4", hwaccel="cuda")],
+            ...     outputs=[FFOutput("output.mp4", vcodec="h264_nvenc", preset="fast", overwrite=True)]
+            ... )
+            >>> result = cmd.run()
+    
+    Returns:
+        FFMPEGResult: Container with the executed command, subprocess result, and convenience properties.
+    
+    Raises:
+        FileExistsError: When output files exist and overwrite=False.
+        FFMPEGExecutionError: When FFmpeg command fails during execution.
+        FFMPEGCommandTimeoutError: When command exceeds specified timeout.
+        FFMPEGNotFoundError: When FFmpeg executable is not found in PATH.
+    """
     inputs: list[FFInput]
     outputs: list[FFOutput]
 
