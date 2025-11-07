@@ -298,7 +298,7 @@ class FFInput:
     probesize: int|None = dataclasses.field(default=None, metadata={"arg": "probesize", 'desc': 'Probe size for format detection'})
     analyzeduration: int|None = dataclasses.field(default=None, metadata={"arg": "analyzeduration", 'desc': 'Analysis duration in microseconds'})
     fpsprobesize: int|None = dataclasses.field(default=None, metadata={"arg": "fpsprobesize", 'desc': 'Frames to probe for fps'})
-    safe: bool|None = dataclasses.field(default=None, metadata={"flag": "safe", 'desc': 'Safe file access (for concat demuxer)'})
+    safe: int|None = dataclasses.field(default=None, metadata={"arg": "safe", 'desc': 'Safe file access (for concat demuxer)'})
 
     # Loop & Repeat
     loop: int|None = dataclasses.field(default=None, metadata={"arg": "loop", 'desc': 'Loop input (images/video)'})
