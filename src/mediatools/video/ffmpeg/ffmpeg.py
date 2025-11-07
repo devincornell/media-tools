@@ -100,14 +100,15 @@ class FFMPEG:
     outputs: list[FFOutput]
 
     # Global command options
-    loglevel: LOGLEVEL_OPTIONS|None = None
-    hide_banner: bool = True
-    nostats: bool = True
-    progress: str|None = None
-    
+    filter_complex: str|list[str]|None = dataclasses.field(default=None, metadata={'desc': 'Complex filter graph'})
+    loglevel: LOGLEVEL_OPTIONS|None = dataclasses.field(default=None, metadata={"arg": "loglevel", 'desc': 'Set logging level'})
+    hide_banner: bool = dataclasses.field(default=True, metadata={"flag": "hide_banner", 'desc': 'Hide banner'})
+    nostats: bool = dataclasses.field(default=True, metadata={"flag": "nostats", 'desc': 'Disable stats'})
+    progress: str|None = dataclasses.field(default=None, metadata={"arg": "progress", 'desc': 'Write progress report to file'})
+
     # Generic extensibility
-    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
-    other_flags: list[str]|None = None  # Additional command flags
+    other_args: list[tuple[str,str]] = dataclasses.field(default_factory=list, metadata={'desc': 'Additional output arguments'})
+    other_flags: list[str] = dataclasses.field(default_factory=list, metadata={'desc': 'Additional command flags'})
 
     def __post_init__(self):
         if isinstance(self.inputs, FFInput):
@@ -132,370 +133,199 @@ class FFMPEG:
             result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
         )
     
-
     def get_command(self) -> str:
         '''Return the FFMPEG command as a string.'''
         cmd = self.build_command()
         return ' '.join(shlex.quote(arg) for arg in cmd)
 
-
     def build_command(self) -> list[str]:
         '''Build the FFMPEG command as a list of strings using FFInput and FFOutput specifications.'''
-        cmd_args = CmdArgs.from_dict(
-            args={
-                'loglevel': self.loglevel,
-                'progress': self.progress,
-            },
-            flags={
-                'hide_banner': self.hide_banner,
-                'nostats': self.nostats,
-            }
-        )
-        if self.other_args:
-            for arg_name, arg_value in self.other_args:
-                cmd_args.add_arg(arg_name, arg_value)
-        if self.other_flags:
-            for flag in self.other_flags:
-                cmd_args.add_flag(flag, True)
-        
-        
-        cmd = CmdArgs(["ffmpeg"]).extend(cmd_args)
-        
-        
-        
-        # Add input specifications
+        args = CmdArgs()
         for input_spec in self.inputs:
-            cmd.extend(input_spec.to_args())
+            args.extend(input_spec.to_args())
+
+        args.extend(CmdArgs.from_field_metadatas(self))
         
-        # Add output specifications
+        # handle complex filters
+        if self.filter_complex is not None:
+            if isinstance(self.filter_complex, str):
+                args.add_arg('filter_complex', self.filter_complex)
+            else:
+                args.add_arg('filter_complex', ';'.join(self.filter_complex))
+        
+        args.add_args(self.other_args)
+        args.add_flags(self.other_flags)
+
         for output_spec in self.outputs:
-            cmd.extend(output_spec.to_args())
-        
-        return cmd
+            args.extend(output_spec.to_args())
 
-
-    def get_global_flags(self) -> list[str]:
-        '''Get the global command flags for the FFMPEG command.'''
-        flags = list(self.global_flags) if self.global_flags is not None else []
-        
-        # Add built-in global flags
-        if self.hide_banner:
-            flags.append('hide_banner')
-        if self.nostats:
-            flags.append('nostats')
-        
-        return flags
-
-    def get_global_args(self) -> list[tuple[str,str]]:
-        '''Get the global command arguments for the FFMPEG command.'''
-        args = list(self.global_args) if self.global_args is not None else []
-        
-        # Add built-in global args
-        if self.loglevel is not None:
-            args.append(('loglevel', self.loglevel))
-        
-        return args
-
+        return CmdArgs(["ffmpeg"] + args)
 
 
 @dataclasses.dataclass
 class FFInput:
     '''Dataclass used to build an FFMPEG command.'''
     file: str|Path
-    f: str|None = None
-    cv: str|None = None
-    ca: str|None = None
-    t: str|None = None
-    ss: str|None = None
-    to: str|None = None
-    itsoffset: str|None = None
-    
+    f: str|None = dataclasses.field(default=None, metadata={"arg": "f", 'desc': 'Input format'})
+    t: str|None = dataclasses.field(default=None, metadata={"arg": "t", 'desc': 'Input duration'})
+    ss: str|None = dataclasses.field(default=None, metadata={"arg": "ss", 'desc': 'Input start time'})
+    to: str|None = dataclasses.field(default=None, metadata={"arg": "to", 'desc': 'Input end time'})
+    itsoffset: str|None = dataclasses.field(default=None, metadata={"arg": "itsoffset", 'desc': 'Input timestamp offset'})
+    cv: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", 'desc': 'Video codec'})
+    ca: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", 'desc': 'Audio codec'})
+
     # Video Input Options
-    r: str|None = None  # Input frame rate
-    s: str|None = None  # Input frame size (WxH)
-    pix_fmt: str|None = None  # Input pixel format
-    aspect: str|None = None  # Input aspect ratio
-    vframes: int|None = None  # Number of video frames to read
-    top: int|None = None  # Top field first
-    
+    r: Time|None = dataclasses.field(default=None, metadata={"arg": "r", 'desc': 'Input frame rate'})
+    s: str|None = dataclasses.field(default=None, metadata={"arg": "s", 'desc': 'Input frame size (WxH)'})
+    pix_fmt: str|None = dataclasses.field(default=None, metadata={"arg": "pix_fmt", 'desc': 'Input pixel format'})
+    aspect: str|None = dataclasses.field(default=None, metadata={"arg": "aspect", 'desc': 'Input aspect ratio'})
+    vframes: int|None = dataclasses.field(default=None, metadata={"arg": "vframes", 'desc': 'Number of video frames to read'})
+    top: int|None = dataclasses.field(default=None, metadata={"arg": "top", 'desc': 'Top field first'})
+
     # Audio Input Options
-    ar: str|None = None  # Audio sample rate
-    ac: int|None = None  # Audio channels
-    aframes: int|None = None  # Number of audio frames to read
-    vol: str|None = None  # Audio volume (deprecated)
-    
+    ar: str|None = dataclasses.field(default=None, metadata={"arg": "ar", 'desc': 'Audio sample rate'})
+    ac: int|None = dataclasses.field(default=None, metadata={"arg": "ac", 'desc': 'Audio channels'})
+    aframes: int|None = dataclasses.field(default=None, metadata={"arg": "aframes", 'desc': 'Number of audio frames to read'})
+    vol: str|None = dataclasses.field(default=None, metadata={"arg": "vol", 'desc': 'Audio volume (deprecated)'})
+
     # Hardware Acceleration (Input)
-    hwaccel: str|None = None  # Hardware acceleration method (cuda, vaapi, etc.)
-    hwaccel_device: str|None = None  # Hardware acceleration device
-    
+    hwaccel: str|None = dataclasses.field(default=None, metadata={"arg": "hwaccel", 'desc': 'Hardware acceleration method (cuda, vaapi, etc.)'})
+    hwaccel_device: str|None = dataclasses.field(default=None, metadata={"arg": "hwaccel_device", 'desc': 'Hardware acceleration device'})
+
     # Stream Selection
-    map: str|None = None  # Map input streams to output
-    map_metadata: str|None = None  # Map metadata
-    map_chapters: str|None = None  # Map chapters
-    
+    map_metadata: str|None = dataclasses.field(default=None, metadata={"arg": "map_metadata", 'desc': 'Map metadata'})
+    map_chapters: str|None = dataclasses.field(default=None, metadata={"arg": "map_chapters", 'desc': 'Map chapters'})
+
     # Input Format Specific
-    probesize: int|None = None  # Probe size for format detection
-    analyzeduration: int|None = None  # Analysis duration in microseconds
-    fpsprobesize: int|None = None  # Frames to probe for fps
-    safe: bool|None = None  # Safe file access (for concat demuxer)
-    
+    probesize: int|None = dataclasses.field(default=None, metadata={"arg": "probesize", 'desc': 'Probe size for format detection'})
+    analyzeduration: int|None = dataclasses.field(default=None, metadata={"arg": "analyzeduration", 'desc': 'Analysis duration in microseconds'})
+    fpsprobesize: int|None = dataclasses.field(default=None, metadata={"arg": "fpsprobesize", 'desc': 'Frames to probe for fps'})
+    safe: bool|None = dataclasses.field(default=None, metadata={"flag": "safe", 'desc': 'Safe file access (for concat demuxer)'})
+
     # Loop & Repeat
-    loop: int|None = None  # Loop input (images/video)
-    stream_loop: int|None = None  # Loop input streams
-    
+    loop: int|None = dataclasses.field(default=None, metadata={"arg": "loop", 'desc': 'Loop input (images/video)'})
+    stream_loop: int|None = dataclasses.field(default=None, metadata={"arg": "stream_loop", 'desc': 'Loop input streams'})
+
     # Seeking & Timing
-    accurate_seek: bool|None = None  # Enable accurate seeking
-    seek_timestamp: bool|None = None  # Seek by timestamp instead of frame
+    accurate_seek: bool|None = dataclasses.field(default=None, metadata={"flag": "accurate_seek", 'desc': 'Enable accurate seeking'})
+    seek_timestamp: bool|None = dataclasses.field(default=None, metadata={"flag": "seek_timestamp", 'desc': 'Seek by timestamp instead of frame'})
 
     # Generic extensibility
-    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
-    other_flags: list[str]|None = None  # Additional command flags
+    other_args: list[tuple[str,str]] = dataclasses.field(default_factory=list)  # Additional output arguments
+    other_flags: list[str] = dataclasses.field(default_factory=list)  # Additional command flags
 
-    def to_args(self) -> list[str]:
+    def to_args(self) -> CmdArgs:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
 
-        args = CmdArgs.from_dict(
-            args={
-                # Video Input Options
-                'r': self.r,
-                's': self.s,
-                'pix_fmt': self.pix_fmt,
-                'aspect': self.aspect,
-                'vframes': self.vframes,
-                'top': self.top,
-                
-                # Audio Input Options
-                'ar': self.ar,
-                'ac': self.ac,
-                'aframes': self.aframes,
-                'vol': self.vol,
-                
-                # Hardware Acceleration (Input)
-                'hwaccel': self.hwaccel,
-                'hwaccel_device': self.hwaccel_device,
-                
-                # Input Format Specific
-                'probesize': self.probesize,
-                'analyzeduration': self.analyzeduration,
-                'fpsprobesize': self.fpsprobesize,
-                
-                # Loop & Repeat
-                'loop': self.loop,
-                'stream_loop': self.stream_loop,
-                
-                # Existing attributes
-                'f': self.f,
-                't': self.t,
-                'ss': self.ss,
-                'to': self.to,
-                'c:v': self.cv,
-                'c:a': self.ca,
-                'i': str(self.file),
-            },
-            flags={
-                # Input Format Specific
-                'safe': self.safe,
-                
-                # Seeking & Timing
-                'accurate_seek': self.accurate_seek,
-                'seek_timestamp': self.seek_timestamp,
-            }
-        )
+        cmd = CmdArgs.from_field_metadatas(self)
+        cmd.add_args(self.other_args)
+        cmd.add_flags(self.other_flags)
+        cmd.add_arg('i', str(self.file))
 
-        if self.other_args:
-            args.add_args(self.other_args)
-
-        if self.other_flags:
-            for flag in self.other_flags:
-                args.append(flag)
-
-        return args
+        return cmd
 
 
 @dataclasses.dataclass
 class FFOutput:
     '''Dataclass used to build an FFMPEG output specification.'''
     file: str|Path
-    overwrite: bool = False
+    overwrite: bool = dataclasses.field(default=False, metadata={"flag": "y", "desc": 'Overwrite output file if it exists'})
     
     # Stream Selection & Mapping
-    maps: list[Stream]|None = None  # Stream mapping specifications
-    map_metadata: str|None = None  # Map metadata from input
-    map_chapters: str|None = None  # Map chapters from input
-    
+    maps: list[Stream] = dataclasses.field(default_factory=list, metadata={"desc": 'Stream mapping specifications'})
+    map_metadata: str|None = dataclasses.field(default=None, metadata={"arg": "map_metadata", "desc": "Map metadata from input"})
+    map_chapters: str|None = dataclasses.field(default=None, metadata={"arg": "map_chapters", "desc": "Map chapters from input"})
+
     # Timing & Seeking
-    ss: str|None = None  # Start time offset
-    t: str|None = None  # Duration (alias for duration)
-    duration: str|None = None  # Duration
-    to: str|None = None  # End time
-    
+    ss: Time|None = dataclasses.field(default=None, metadata={"arg": "ss", "desc": "Start time offset"})
+    t: Time|None = dataclasses.field(default=None, metadata={"arg": "t", "desc": "Duration (alias for duration)"})
+    duration: Duration|None = dataclasses.field(default=None, metadata={"arg": "duration", "desc": "Duration"})
+    to: Time|None = dataclasses.field(default=None, metadata={"arg": "to", "desc": "End time"})
+
     # Video Output Options
-    vcodec: str|None = None  # Video codec (c:v)
-    video_bitrate: str|None = None  # Video bitrate (b:v)
-    crf: int|None = None  # Constant rate factor
-    qscale_v: int|None = None  # Video quality scale (q:v)
-    maxrate: str|None = None  # Maximum bitrate
-    bufsize: str|None = None  # Buffer size
-    framerate: int|None = None  # Output frame rate (r)
-    fps: str|None = None  # Frame rate (alternative to framerate)
-    s: str|None = None  # Output frame size (WxH)
-    aspect: str|None = None  # Output aspect ratio
-    pix_fmt: str|None = None  # Output pixel format
-    vframes: int|None = None  # Number of video frames to output
-    keyint_min: int|None = None  # Minimum GOP size
-    g: int|None = None  # GOP size
-    bf: int|None = None  # B-frames
-    profile_v: str|None = None  # Video profile
-    level: str|None = None  # Video level
-    tune: str|None = None  # Encoding tune (film, animation, etc.)
-    
-    # Audio Output Options  
-    acodec: str|None = None  # Audio codec (c:a)
-    audio_bitrate: str|None = None  # Audio bitrate (b:a)
-    ar: str|None = None  # Audio sample rate
-    ac: int|None = None  # Audio channels
-    vol: str|None = None  # Audio volume
-    aframes: int|None = None  # Number of audio frames to output
-    profile_a: str|None = None  # Audio profile
-    qscale_a: int|None = None  # Audio quality scale (q:a)
-    
+    vcodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", "desc": "Video codec (c:v)"})
+    video_bitrate: str|None = dataclasses.field(default=None, metadata={"arg": "b:v", "desc": "Video bitrate (b:v)"})
+    crf: int|None = dataclasses.field(default=None, metadata={"arg": "crf", "desc": "Constant rate factor"})
+    qscale_v: int|None = dataclasses.field(default=None, metadata={"arg": "q:v", "desc": "Video quality scale (q:v)"})
+    maxrate: str|None = dataclasses.field(default=None, metadata={"arg": "maxrate", "desc": "Maximum bitrate"})
+    bufsize: str|None = dataclasses.field(default=None, metadata={"arg": "bufsize", "desc": "Buffer size"})
+    framerate: int|None = dataclasses.field(default=None, metadata={"arg": "r", "desc": "Output frame rate (r)"})
+    fps: str|None = dataclasses.field(default=None, metadata={"arg": "fps", "desc": "Frame rate (alternative to framerate)"})
+    s: str|None = dataclasses.field(default=None, metadata={"arg": "s", "desc": "Output frame size (WxH)"})
+    aspect: str|None = dataclasses.field(default=None, metadata={"arg": "aspect", "desc": "Output aspect ratio"})
+    pix_fmt: str|None = dataclasses.field(default=None, metadata={"arg": "pix_fmt", "desc": "Output pixel format"})
+    vframes: int|None = dataclasses.field(default=None, metadata={"arg": "vframes", "desc": "Number of video frames to output"})
+    keyint_min: int|None = dataclasses.field(default=None, metadata={"arg": "keyint_min", "desc": "Minimum GOP size"})
+    g: int|None = dataclasses.field(default=None, metadata={"arg": "g", "desc": "GOP size"})
+    bf: int|None = dataclasses.field(default=None, metadata={"arg": "bf", "desc": "B-frames"})
+    profile_v: str|None = dataclasses.field(default=None, metadata={"arg": "profile:v", "desc": "Video profile"})
+    level: str|None = dataclasses.field(default=None, metadata={"arg": "level", "desc": "Video level"})
+    tune: str|None = dataclasses.field(default=None, metadata={"arg": "tune", "desc": "Encoding tune (film, animation, etc.)"})
+
+    # Audio Output Options
+    acodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", "desc": "Audio codec (c:a)"})
+    audio_bitrate: str|None = dataclasses.field(default=None, metadata={"arg": "b:a", "desc": "Audio bitrate (b:a)"})
+    ar: str|None = dataclasses.field(default=None, metadata={"arg": "ar", "desc": "Audio sample rate"})
+    ac: int|None = dataclasses.field(default=None, metadata={"arg": "ac", "desc": "Audio channels"})
+    vol: str|None = dataclasses.field(default=None, metadata={"arg": "vol", "desc": "Audio volume"})
+    aframes: int|None = dataclasses.field(default=None, metadata={"arg": "aframes", "desc": "Number of audio frames to output"})
+    profile_a: str|None = dataclasses.field(default=None, metadata={"arg": "profile:a", "desc": "Audio profile"})
+    qscale_a: int|None = dataclasses.field(default=None, metadata={"arg": "q:a", "desc": "Audio quality scale (q:a)"})
+
     # Filters
-    vf: str|None = None  # Video filter chain
-    af: str|None = None  # Audio filter chain
-    filter_complex: str|None = None  # Complex filter graph
-    
+    vf: str|None = dataclasses.field(default=None, metadata={"arg": "vf", "desc": "Video filter chain"})
+    af: str|None = dataclasses.field(default=None, metadata={"arg": "af", "desc": "Audio filter chain"})
+    filter_complex: str|None = dataclasses.field(default=None, metadata={"arg": "filter_complex", "desc": "Complex filter graph"})
+
     # Format & Container Options
-    format: str|None = None  # Output format (f)
-    movflags: str|None = None  # MOV/MP4 specific flags
-    brand: str|None = None  # Brand for MP4
-    
+    format: str|None = dataclasses.field(default=None, metadata={"arg": "f", "desc": "Output format (f)"})
+    movflags: str|None = dataclasses.field(default=None, metadata={"arg": "movflags", "desc": "MOV/MP4 specific flags"})
+    brand: str|None = dataclasses.field(default=None, metadata={"arg": "brand", "desc": "Brand for MP4"})
+
     # Hardware Acceleration (Output)
-    hwaccel: str|None = None  # Hardware acceleration method
-    hwaccel_output_format: str|None = None  # Hardware accelerated output format
-    vaapi_device: str|None = None  # VAAPI device
-    
+    hwaccel: str|None = dataclasses.field(default=None, metadata={"arg": "hwaccel", "desc": "Hardware acceleration method"})
+    hwaccel_output_format: str|None = dataclasses.field(default=None, metadata={"arg": "hwaccel_output_format", "desc": "Hardware accelerated output format"})
+    vaapi_device: str|None = dataclasses.field(default=None, metadata={"arg": "vaapi_device", "desc": "VAAPI device"})
+
     # Encoding Presets & Quality
-    preset: str|None = None  # Encoding preset (ultrafast, fast, medium, etc.)
-    x264_params: str|None = None  # x264 specific parameters
-    x265_params: str|None = None  # x265 specific parameters
-    
+    preset: str|None = dataclasses.field(default=None, metadata={"arg": "preset", "desc": "Encoding preset (ultrafast, fast, medium, etc.)"})
+    x264_params: str|None = dataclasses.field(default=None, metadata={"arg": "x264_params", "desc": "x264 specific parameters"})
+    x265_params: str|None = dataclasses.field(default=None, metadata={"arg": "x265_params", "desc": "x265 specific parameters"})
+
     # Stream Control
-    disable_audio: bool = False  # Disable audio streams (an)
-    disable_video: bool = False  # Disable video streams (vn)
-    disable_subtitles: bool = False  # Disable subtitle streams (sn)
-    disable_data: bool = False  # Disable data streams (dn)
-    
+    disable_audio: bool = dataclasses.field(default=False, metadata={"flag": "an", "desc": "Disable audio streams (an)"})
+    disable_video: bool = dataclasses.field(default=False, metadata={"flag": "vn", "desc": "Disable video streams (vn)"})
+    disable_subtitles: bool = dataclasses.field(default=False, metadata={"flag": "sn", "desc": "Disable subtitle streams (sn)"})
+    disable_data: bool = dataclasses.field(default=False, metadata={"flag": "dn", "desc": "Disable data streams (dn)"})
+
     # Metadata
-    metadata: dict[str, str]|None = None  # Metadata key-value pairs
+    metadata: dict[str, str] = dataclasses.field(default_factory=dict, metadata={"desc": "Metadata key-value pairs"})
     
     # Subtitles
-    scodec: str|None = None  # Subtitle codec (c:s)
-    
+    scodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:s", "desc": "Subtitle codec (c:s)"})
+
     # Threading & Performance
-    threads: int|None = None  # Number of threads
-        
+    threads: int|None = dataclasses.field(default=None, metadata={"arg": "threads", "desc": "Number of threads"})
+
     # Generic extensibility
-    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
-    other_flags: list[str]|None = None  # Additional command flags
+    other_args: list[tuple[str,str]] = dataclasses.field(default_factory=list, metadata={"desc": "Additional output arguments"})
+    other_flags: list[str] = dataclasses.field(default_factory=list, metadata={"desc": "Additional command flags"})
 
     def to_args(self) -> list[str]:
         '''Convert the FFOutput to arguments for FFMPEG command.'''
-        args = CmdArgs.from_dict(
-            args={
-                # Stream Selection & Mapping
-                'map_metadata': self.map_metadata,
-                'map_chapters': self.map_chapters,
-                
-                # Timing & Seeking
-                'ss': self.ss,
-                't': self.t or self.duration,
-                'to': self.to,
-                
-                # Video Output Options
-                'c:v': self.vcodec,
-                'b:v': self.video_bitrate,
-                'crf': self.crf,
-                'q:v': self.qscale_v,
-                'maxrate': self.maxrate,
-                'bufsize': self.bufsize,
-                'r': self.framerate or self.fps,
-                's': self.s,
-                'aspect': self.aspect,
-                'pix_fmt': self.pix_fmt,
-                'vframes': self.vframes,
-                'keyint_min': self.keyint_min,
-                'g': self.g,
-                'bf': self.bf,
-                'profile:v': self.profile_v,
-                'level': self.level,
-                'tune': self.tune,
-                
-                # Audio Output Options
-                'c:a': self.acodec,
-                'b:a': self.audio_bitrate,
-                'ar': self.ar,
-                'ac': self.ac,
-                'vol': self.vol,
-                'aframes': self.aframes,
-                'profile:a': self.profile_a,
-                'q:a': self.qscale_a,
-                
-                # Filters
-                'vf': self.vf,
-                'af': self.af,
-                'filter_complex': self.filter_complex,
-                
-                # Format & Container Options
-                'f': self.format,
-                'movflags': self.movflags,
-                'brand': self.brand,
-                
-                # Hardware Acceleration
-                'hwaccel_output_format': self.hwaccel_output_format,
-                'vaapi_device': self.vaapi_device,
-                
-                # Encoding Presets & Quality
-                'preset': self.preset,
-                'x264-params': self.x264_params,
-                'x265-params': self.x265_params,
-                
-                # Subtitles
-                'c:s': self.scodec,
-                
-                # Threading & Performance
-                'threads': self.threads,
-            },
-            flags={
-                # Stream Control
-                'an': self.disable_audio,
-                'vn': self.disable_video,
-                'sn': self.disable_subtitles,
-                'dn': self.disable_data,
-                'y': self.overwrite,
-                
-            }
-        )
+        args = CmdArgs.from_field_metadatas(self)
         
         # Handle maps separately since it's a list
-        if self.maps:
-            for map_spec in self.maps:
-                args.add_arg('map', map_spec)
+        for map_spec in self.maps:
+            args.add_arg('map', map_spec)
         
         # Handle metadata separately since it needs special formatting
-        if self.metadata:
-            for key, value in self.metadata.items():
-                args.add_arg('metadata', f'{key}={value}')
+        for key, value in self.metadata.items():
+            args.add_arg('metadata', f'{key}={value}')
         
         # Generic extensibility
-        if self.other_args:
-            for arg_name, arg_value in self.other_args:
-                args.add_arg(arg_name, arg_value)
-
-        if self.other_flags:
-            for flag in self.other_flags:
-                args.add_flag(flag, True)
-                
-        # Output file
+        args.add_args(self.other_args)
+        args.add_flags(self.other_flags)
         args.append(str(self.file))
         
         return args
@@ -616,8 +446,8 @@ class CmdArgs(list[str]):
     def from_dict(cls, args: dict[str, str], flags: dict[str, bool]) -> typing.Self:
         '''Create CmdArgs from a dictionary of name-value pairs.'''
         cmd_args = cls()
-        cmd_args.add_args(args)
-        cmd_args.add_flags(flags)
+        cmd_args.add_args(list(args.items()))
+        cmd_args.add_flags([f for f,b in flags if b])
         return cmd_args
 
     def add_args(self, name_values: list[tuple[str, str|int|None]]):
@@ -631,13 +461,12 @@ class CmdArgs(list[str]):
         if value is not None:
             self.extend([CmdArgs.add_dash(name), str(value)])
 
-    def add_flags(self, name_flags: list[tuple[str, bool]]):
+    def add_flags(self, names: list[str]):
         '''Add multiple flags to the command.'''
-        for name, enabled in name_flags:
-            if bool(enabled):
-                self.append(CmdArgs.add_dash(name))
+        for name in names:
+            self.append(CmdArgs.add_dash(name))
 
-    def add_flag(self, name: str, enabled: bool):
+    def add_flag(self, name: str, enabled: bool = True):
         '''Add a flag to the command.'''
         if bool(enabled):
             self.append(CmdArgs.add_dash(name))
@@ -647,5 +476,33 @@ class CmdArgs(list[str]):
         '''Ensure the argument name starts with a dash.'''
         return name if name.startswith('-') else f'-{name}'
 
+    @classmethod
+    def from_annotated_types(cls, instance: typing.Type) -> typing.Self:
+        '''Create CmdArgs from a dataclass with Annotated types.'''
+        cmd_args = cls()
+        for f in dataclasses.fields(instance):
+            if typing.get_origin(f.type) is typing.Annotated:
+                type_desc: str = typing.get_args(f.type)[1]
+                value = getattr(instance, f.name)
+                if value is not None:
+                    if type_desc.startswith('arg='):
+                        arg_name = type_desc.split('=',1)[1]
+                        cmd_args.add_arg(arg_name, value)
+                    elif type_desc.startswith('flag='):
+                        flag_name = type_desc.split('=',1)[1]
+                        cmd_args.add_flag(flag_name, value)
+                    else:
+                        raise NotImplementedError(f"Unsupported annotation type: {type_desc}. Check the class definition!")
+        return cmd_args
 
+    @classmethod
+    def from_field_metadatas(cls, instance: typing.Type) -> typing.Self:
+        '''Create CmdArgs from a dataclass with field metadata.'''
+        cmd_args = cls()
+        for f in dataclasses.fields(instance):
+            if 'arg' in f.metadata and (value := getattr(instance, f.name)) is not None:
+                cmd_args.add_arg(f.metadata['arg'], value)
+            elif 'flag' in f.metadata and (value := getattr(instance, f.name)):
+                cmd_args.add_flag(f.metadata['flag'], value)
 
+        return cmd_args
