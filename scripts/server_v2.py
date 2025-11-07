@@ -178,7 +178,7 @@ def create_page_index(
             else:
                 vids.append(info_dict)
 
-            if thumb_path.exists():
+            if thumb_path.exists() and thumb_path.stat().st_size > 0:
                 best_video_thumb.update(
                     new_path=str(thumb_path_rel),
                     new_aspect=info.aspect_ratio(),
@@ -205,10 +205,11 @@ def create_page_index(
             #if best_thumb is None or info.aspect_ratio() > best_aspect:
             #    best_aspect = info.aspect_ratio()
             #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
-            best_image_thumb.update(
-                new_path=img_path_rel,
-                new_aspect=info.aspect_ratio(),
-            )
+            if img_path_rel.exists() and img_path_rel.stat().st_size > 0:
+                best_image_thumb.update(
+                    new_path=img_path_rel,
+                    new_aspect=info.aspect_ratio(),
+                )
 
     if sort_by_name:
         vids = sorted(vids, key=lambda v: v['vid_path_rel'])
