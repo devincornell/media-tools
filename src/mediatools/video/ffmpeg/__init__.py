@@ -1,4 +1,11 @@
-from .ffmpeg import FFMPEG, FFMPEGResult, LOGLEVEL_OPTIONS
+from .ffmpeg import (
+    FFMPEG, 
+    FFMPEGResult, 
+    FFInput, 
+    FFOutput, 
+    stream_filter,
+    LOGLEVEL_OPTIONS
+)
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,
     compress,
@@ -6,7 +13,7 @@ from .ffmpeg_funcs import (
     crop,
     make_thumb,
     make_animated_thumb,
-    make_animated_thumb_v2,
+    #make_animated_thumb_old,
 )
 from .ffmpeg_montage import (
     create_montage

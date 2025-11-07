@@ -8,9 +8,10 @@ import json
 import datetime
 from pathlib import Path
 
-from .ffmpeg import FFMPEG, FFMPEGResult, run_ffmpeg_subprocess
+from .ffmpeg import FFMPEG, FFInput, FFOutput, stream_filter, FFMPEGResult, run_ffmpeg_subprocess
 from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .probe_info import ProbeInfo
+from .probe import probe
 
 XCoord = int
 YCoord = int
@@ -23,7 +24,7 @@ def compress(
     input_fname: str|Path,
     output_fname: Path, 
     vcodec: str = 'libx264', 
-    crf: int = 30, 
+    crf: int|None = 30, 
     overwrite: bool = False, 
     **output_kwargs
 ) -> FFMPEGResult:
@@ -34,11 +35,8 @@ def compress(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
     command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(output_fname),
-        vcodec=vcodec,
-        crf=crf,
-        overwrite_output=overwrite,
+        inputs=[FFInput(str(input_fname))],
+        outputs=[FFOutput(str(output_fname), vcodec=vcodec, crf=crf, overwrite=overwrite)],
         **output_kwargs
     )
 
@@ -58,11 +56,8 @@ def splice(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
     command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(output_fname),
-        ss=start_time.total_seconds(),
-        duration=(end_time - start_time).total_seconds(),
-        overwrite_output=overwrite,
+        inputs=[FFInput(str(input_fname), ss=start_time.total_seconds(), to=end_time.total_seconds())],
+        outputs=[FFOutput(str(output_fname), overwrite=overwrite)],
         **output_kwargs
     )
     return command.run()
@@ -86,10 +81,8 @@ def crop(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
     command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(output_fname),
-        vf=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}',
-        overwrite_output=overwrite,
+        inputs=[FFInput(str(input_fname))],
+        outputs=[FFOutput(str(output_fname), vf=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}', overwrite=overwrite)],
         **output_kwargs
     )
     return command.run()
@@ -114,12 +107,9 @@ def make_thumb(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
     command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(ofp),
+        inputs=[FFInput(str(input_fname))],
+        outputs=[FFOutput(str(ofp), overwrite=overwrite, vf=f'scale={width}:{height}', vframes=1)],
         ss=time_point_sec,
-        vf=f'scale={width}:{height}',
-        overwrite_output=overwrite,
-        command_args=[('vframes', '1')],
         **output_kwargs
     )
     return command.run()
@@ -128,15 +118,15 @@ def make_animated_thumb(
     input_fname: str|Path,
     output_fname: str, 
     fps: int,
-    sample_period: int,
+    target_period: int,
     height: int = -1, 
     width: int = -1, 
     overwrite: bool = False, 
     **output_kwargs
 ) -> FFMPEGResult:
-    '''Make an animated thumbnail from this video by sampling frames evenly across its duration.
+    '''Make an animated thumbnail from this video by speeding up the video and sampling frames evenly.
     Args:
-        sample_period: the number of seconds between each frame sampled.
+        target_period: the number of seconds the output gif should last.
         fps: the number of frames per second in the output gif.
         height: the height of the output gif.
         width: the width of the output gif.
@@ -146,48 +136,17 @@ def make_animated_thumb(
     if ofp.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
+    duration = probe(input_fname).duration
+    pts = duration / target_period
+
     command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(ofp),
-        vf=f"setpts=PTS/{sample_period},fps={fps},scale={width}:{height}:-1",
-        overwrite_output=overwrite,
+        inputs=[FFInput(str(input_fname))],
+        outputs=[FFOutput(str(ofp), vf=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", overwrite=overwrite)],
         **output_kwargs
     )
+    
     return command.run()
 
-
-
-def make_animated_thumb_v2(
-    input_fname: str|Path,
-    output_fname: str, 
-    framerate: int,
-    sample_period: int,
-    height: int = -1, 
-    width: int = -1, 
-    overwrite: bool = False, 
-    **output_kwargs
-) -> FFMPEGResult:
-    '''DEPRICATED. USE make_animated_thumb instead.
-    Make an animated thumbnail from this video by sampling frames evenly across its duration.
-    Args:
-        sample_period: the number of seconds between each frame sampled.
-        framerate: the number of frames per second in the output gif.
-        height: the height of the output gif.
-        width: the width of the output gif.
-        overwrite: whether to overwrite the output file if it exists.
-    '''
-    ofp = Path(output_fname)
-    if ofp.exists() and not overwrite:
-        raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
-    #ffmpeg -i input.mp4 -vf "fps=10,scale=400:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" output.gif
-    command = FFMPEG(
-        input_files=[str(input_fname)],
-        output_file=str(ofp),
-        vf=f"fps={framerate},scale={width}:{height}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-        overwrite_output=overwrite,
-        **output_kwargs
-    )
-    return command.run()
 
 
 
