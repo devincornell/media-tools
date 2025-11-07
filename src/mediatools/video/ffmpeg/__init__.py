@@ -16,7 +16,8 @@ from .ffmpeg_funcs import (
     #make_animated_thumb_old,
 )
 from .ffmpeg_compilations import (
-    create_montage
+    create_montage,
+    create_compilation,
 )
 from .probe import (
     probe,
