@@ -262,7 +262,78 @@ class FFMPEG:
 
 @dataclasses.dataclass
 class FFInput:
-    '''Dataclass used to build an FFMPEG command.'''
+    """Dataclass representing FFmpeg input specifications with comprehensive options.
+    
+    This class encapsulates all input-related FFmpeg options including file paths, codecs,
+    timing, hardware acceleration, and format-specific settings. Each parameter corresponds
+    directly to FFmpeg command-line arguments.
+    
+    Args:
+        file: Input file path or URL.
+        f: Input format override (FFmpeg: `-f`).
+        t: Input duration limit in seconds or time format (FFmpeg: `-t`).
+        ss: Input start time/seek position (FFmpeg: `-ss`).
+        to: Input end time (FFmpeg: `-to`).
+        itsoffset: Input timestamp offset in seconds (FFmpeg: `-itsoffset`).
+        cv: Video codec for input decoding (FFmpeg: `-c:v`).
+        ca: Audio codec for input decoding (FFmpeg: `-c:a`).
+        
+        # Video Input Options
+        r: Input frame rate override (FFmpeg: `-r`).
+        s: Input frame size as 'WxH' format (FFmpeg: `-s`).
+        pix_fmt: Input pixel format (FFmpeg: `-pix_fmt`).
+        aspect: Input aspect ratio override (FFmpeg: `-aspect`).
+        vframes: Maximum number of video frames to read (FFmpeg: `-vframes`).
+        top: Top field first flag for interlaced content (FFmpeg: `-top`).
+        
+        # Audio Input Options
+        ar: Audio sample rate in Hz (FFmpeg: `-ar`).
+        ac: Number of audio channels (FFmpeg: `-ac`).
+        aframes: Maximum number of audio frames to read (FFmpeg: `-aframes`).
+        vol: Audio volume adjustment, deprecated (FFmpeg: `-vol`).
+        
+        # Hardware Acceleration
+        hwaccel: Hardware acceleration method like 'cuda', 'vaapi', 'qsv' (FFmpeg: `-hwaccel`).
+        hwaccel_device: Specific hardware device to use (FFmpeg: `-hwaccel_device`).
+        
+        # Stream Selection
+        map_metadata: Metadata mapping specification (FFmpeg: `-map_metadata`).
+        map_chapters: Chapter mapping specification (FFmpeg: `-map_chapters`).
+        
+        # Input Format Specific
+        probesize: Buffer size for format detection in bytes (FFmpeg: `-probesize`).
+        analyzeduration: Analysis duration in microseconds (FFmpeg: `-analyzeduration`).
+        fpsprobesize: Number of frames to probe for fps detection (FFmpeg: `-fpsprobesize`).
+        safe: Enable safe file access for concat demuxer (FFmpeg: `-safe`).
+        
+        # Loop & Repeat
+        loop: Loop input file, useful for images (FFmpeg: `-loop`).
+        stream_loop: Loop input streams specified number of times (FFmpeg: `-stream_loop`).
+        
+        # Seeking & Timing
+        accurate_seek: Enable accurate seeking at cost of speed (FFmpeg: `-accurate_seek`).
+        seek_timestamp: Seek by timestamp instead of frame number (FFmpeg: `-seek_timestamp`).
+        
+        # Extensibility
+        other_args: Additional input arguments as (name, value) tuples.
+        other_flags: Additional input flags as strings.
+    
+    Examples:
+        Basic input file:
+            >>> input_spec = FFInput("video.mp4")
+        
+        Seek to specific time and duration:
+            >>> input_spec = FFInput("movie.mp4", ss="00:01:30", t="00:00:10")
+        
+        Hardware accelerated input:
+            >>> input_spec = FFInput("video.mp4", hwaccel="cuda")
+        
+        Image sequence with frame rate:
+            >>> input_spec = FFInput("frame_%03d.jpg", r="25", f="image2")
+        
+        Loop image input:
+            >>> input_spec = FFInput("background.jpg", loop=1, t="10")
+    """
     file: str|Path
     f: str|None = dataclasses.field(default=None, metadata={"arg": "f", 'desc': 'Input format'})
     t: str|None = dataclasses.field(default=None, metadata={"arg": "t", 'desc': 'Input duration'})
@@ -325,7 +396,118 @@ class FFInput:
 
 @dataclasses.dataclass
 class FFOutput:
-    '''Dataclass used to build an FFMPEG output specification.'''
+    """Dataclass representing FFmpeg output specifications with comprehensive encoding options.
+    
+    This class encapsulates all output-related FFmpeg options including file paths, codecs,
+    quality settings, filters, and format specifications. Each parameter corresponds directly
+    to FFmpeg command-line arguments for precise control over output encoding.
+    
+    Args:
+        file: Output file path.
+        overwrite: Overwrite output file if it exists (FFmpeg: `-y`).
+        
+        # Stream Selection & Mapping
+        maps: List of stream mapping specifications like '0:v:0' (FFmpeg: `-map`).
+        map_metadata: Metadata mapping from input (FFmpeg: `-map_metadata`).
+        map_chapters: Chapter mapping from input (FFmpeg: `-map_chapters`).
+        
+        # Timing & Seeking
+        ss: Start time offset for output (FFmpeg: `-ss`).
+        t: Output duration, alias for duration (FFmpeg: `-t`).
+        duration: Output duration in seconds or time format (FFmpeg: `-duration`).
+        to: End time for output (FFmpeg: `-to`).
+        
+        # Video Output Options
+        vcodec: Video codec like 'libx264', 'libx265' (FFmpeg: `-c:v`).
+        video_bitrate: Video bitrate like '1000k', '2M' (FFmpeg: `-b:v`).
+        crf: Constant rate factor for quality-based encoding 0-51 (FFmpeg: `-crf`).
+        qscale_v: Video quality scale, lower is better (FFmpeg: `-q:v`).
+        maxrate: Maximum bitrate for rate control (FFmpeg: `-maxrate`).
+        bufsize: Buffer size for rate control (FFmpeg: `-bufsize`).
+        framerate: Output frame rate (FFmpeg: `-r`).
+        fps: Alternative frame rate specification (FFmpeg: `-fps`).
+        s: Output frame size as 'WxH' format (FFmpeg: `-s`).
+        aspect: Output aspect ratio (FFmpeg: `-aspect`).
+        pix_fmt: Output pixel format like 'yuv420p' (FFmpeg: `-pix_fmt`).
+        vframes: Number of video frames to output (FFmpeg: `-vframes`).
+        keyint_min: Minimum GOP size (FFmpeg: `-keyint_min`).
+        g: GOP size, keyframe interval (FFmpeg: `-g`).
+        bf: Number of B-frames (FFmpeg: `-bf`).
+        profile_v: Video profile like 'main', 'high' (FFmpeg: `-profile:v`).
+        level: Video level specification (FFmpeg: `-level`).
+        tune: Encoding tune like 'film', 'animation' (FFmpeg: `-tune`).
+        
+        # Audio Output Options
+        acodec: Audio codec like 'aac', 'libmp3lame' (FFmpeg: `-c:a`).
+        audio_bitrate: Audio bitrate like '128k', '320k' (FFmpeg: `-b:a`).
+        ar: Audio sample rate in Hz (FFmpeg: `-ar`).
+        ac: Number of audio channels (FFmpeg: `-ac`).
+        vol: Audio volume adjustment (FFmpeg: `-vol`).
+        aframes: Number of audio frames to output (FFmpeg: `-aframes`).
+        profile_a: Audio profile specification (FFmpeg: `-profile:a`).
+        qscale_a: Audio quality scale (FFmpeg: `-q:a`).
+        
+        # Filters
+        vf: Video filter chain like 'scale=1280:720' (FFmpeg: `-vf`).
+        af: Audio filter chain like 'volume=0.5' (FFmpeg: `-af`).
+        filter_complex: Complex filter graph for multi-input operations (FFmpeg: `-filter_complex`).
+        
+        # Format & Container Options
+        format: Output format like 'mp4', 'avi', 'gif' (FFmpeg: `-f`).
+        movflags: MOV/MP4 specific flags like 'faststart' (FFmpeg: `-movflags`).
+        brand: Brand for MP4 container (FFmpeg: `-brand`).
+        
+        # Hardware Acceleration
+        hwaccel: Hardware acceleration method (FFmpeg: `-hwaccel`).
+        hwaccel_output_format: Hardware accelerated output format (FFmpeg: `-hwaccel_output_format`).
+        vaapi_device: VAAPI device specification (FFmpeg: `-vaapi_device`).
+        
+        # Encoding Presets & Quality
+        preset: Encoding preset like 'ultrafast', 'medium', 'slow' (FFmpeg: `-preset`).
+        x264_params: x264-specific parameters (FFmpeg: `-x264_params`).
+        x265_params: x265-specific parameters (FFmpeg: `-x265_params`).
+        
+        # Stream Control
+        disable_audio: Disable audio streams (FFmpeg: `-an`).
+        disable_video: Disable video streams (FFmpeg: `-vn`).
+        disable_subtitles: Disable subtitle streams (FFmpeg: `-sn`).
+        disable_data: Disable data streams (FFmpeg: `-dn`).
+        
+        # Metadata
+        metadata: Metadata key-value pairs for output file (FFmpeg: `-metadata`).
+        
+        # Subtitles
+        scodec: Subtitle codec (FFmpeg: `-c:s`).
+        
+        # Threading & Performance
+        threads: Number of encoding threads (FFmpeg: `-threads`).
+        
+        # Extensibility
+        other_args: Additional output arguments as (name, value) tuples.
+        other_flags: Additional output flags as strings.
+    
+    Examples:
+        Basic video compression:
+            >>> output = FFOutput("compressed.mp4", vcodec="libx264", crf=23, overwrite=True)
+        
+        High quality with specific bitrate:
+            >>> output = FFOutput("output.mp4", vcodec="libx264", video_bitrate="5M", 
+            ...                   acodec="aac", audio_bitrate="128k", overwrite=True)
+        
+        Resize and convert to GIF:
+            >>> output = FFOutput("animation.gif", vf="scale=500:-1,fps=10", overwrite=True)
+        
+        Extract audio only:
+            >>> output = FFOutput("audio.mp3", disable_video=True, acodec="libmp3lame", overwrite=True)
+        
+        Hardware accelerated encoding:
+            >>> output = FFOutput("output.mp4", vcodec="h264_nvenc", preset="fast", 
+            ...                   crf=20, overwrite=True)
+        
+        Custom metadata:
+            >>> output = FFOutput("video.mp4", vcodec="libx264", 
+            ...                   metadata={"title": "My Video", "artist": "Author"}, overwrite=True)
+    """
     file: str|Path
     overwrite: bool = dataclasses.field(default=False, metadata={"flag": "y", "desc": 'Overwrite output file if it exists'})
     
