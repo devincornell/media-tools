@@ -15,14 +15,14 @@ import tempfile
 import tqdm
 import multiprocessing
 
-from .ffmpeg import FFMPEG, FFMPEGResult
+from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, stream_filter)
 from .probe import probe
 from .errors import FFMPEGExecutionError
 
 def create_montage(
     video_files: typing.List[Path], 
     output_filename: str, 
-    clip_ratio: float, # one clip for every 30 seconds (10x shorter)
+    clip_ratio: float, # 30 would be one clip for every 30 seconds (10x shorter)
     clip_duration: float, 
     random_seed: int = 0, 
     width: int = 1920, 
@@ -102,29 +102,36 @@ def extract_clip(args) -> str|None:
     verbose: bool = args[6]
 
     processed_clip_path = os.path.join(tmp_dir, f"clip_{clip_info['index']}.mp4")
-    ffmpeg_cmd = FFMPEG(
-        input_files=[clip_info['fpath']],
-        output_file=processed_clip_path,
-        overwrite_output=True,
-        ss=str(clip_info['start_time']),
-        duration=str(clip_duration),
-        framerate=fps,
-        vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-        #vcodec="h264_nvenc",
-        acodec="aac",  # Ensure audio codec is included
-        audio_bitrate="192k",  # Set audio bitrate
-        loglevel="error",
-        input_args=[
-            ('hwaccel', 'cuda'),
-        ],
-        command_flags=['nostdin'],
-        output_args=[
-            ('map', "0:v:0"),
-            ('map', "0:a:0"),
-        ],
+    #ffmpeg_cmd = FFMPEG(
+    #    input_files=[clip_info['fpath']],
+    #    output_file=processed_clip_path,
+    #    overwrite_output=True,
+    #    ss=str(clip_info['start_time']),
+    #    duration=str(clip_duration),
+    #    framerate=fps,
+    #    vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+    #    #vcodec="h264_nvenc",
+    #    acodec="aac",  # Ensure audio codec is included
+    #    audio_bitrate="192k",  # Set audio bitrate
+    #    loglevel="error",
+    #    input_args=[
+    #        ('hwaccel', 'cuda'),
+    #    ],
+    #    command_flags=['nostdin'],
+    #    output_args=[
+    #        ('map', "0:v:0"),
+    #        ('map', "0:a:0"),
+    #    ],
+    #)
+    vf = f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1'
+    cmd = FFMPEG(
+        inputs = [FFInput(clip_info['fpath'], ss=str(clip_info['start_time']), t=str(clip_duration))],#, hwaccel='cuda'
+        outputs = [FFOutput(processed_clip_path, maps=['0:v:0', '0:a:0'], overwrite=True, vf=vf, framerate=fps, vcodec='h264', acodec='aac', audio_bitrate='192k')],#vcodec='h264_nvenc', 
+        loglevel = 'error',
+        other_flags=['nostdin'],
     )
     try:
-        ffmpeg_cmd.run()
+        cmd.run()
         probe(processed_clip_path)  # Ensure the clip was processed correctly
     except FFMPEGExecutionError as e:
         if verbose: print(f"\nFailed to extract '{clip_info['fpath']}' clip {clip_info['index']} due to processing error.")
@@ -211,21 +218,26 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
         f.write("\n".join([f"file '{c}'" for c in clips]))
 
     # Build the ffmpeg command
-    ffmpeg_cmd = FFMPEG(
-        input_files=[str(tmp_file_path)],
-        output_file=output_filename,
-        overwrite_output=True,
-        loglevel="error",
-        input_args=[
-            ('hwaccel', 'cuda'),
-            ('f', 'concat'),
-            ('safe', '0'),
-        ],
-        output_args=[
-            ('c', 'copy'),  # Copy both video and audio streams
-            ('f', 'mp4'),  # Ensure output format is MP4
-        ],
+    #ffmpeg_cmd = FFMPEG(
+    #    input_files=[str(tmp_file_path)],
+    #    output_file=output_filename,
+    #    overwrite_output=True,
+    #    loglevel="error",
+    #    input_args=[
+    #        ('hwaccel', 'cuda'),
+    #        ('f', 'concat'),
+    #        ('safe', '0'),
+    #    ],
+    #    output_args=[
+    #        ('c', 'copy'),  # Copy both video and audio streams
+    #        ('f', 'mp4'),  # Ensure output format is MP4
+    #    ],
+    #)
+    cmd = FFMPEG(
+        loglevel = 'error',
+        inputs = [FFInput(str(tmp_file_path), f='concat', safe='0')],
+        outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
     )
 
-    return ffmpeg_cmd.run()
+    return cmd.run()
 
