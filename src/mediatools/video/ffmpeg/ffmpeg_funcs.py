@@ -148,6 +148,15 @@ def make_animated_thumb(
     return command.run()
 
 
+def make_compilation(input_files: list[tuple[str|Path, str|int, str|int]], output_fname: str|Path, overwrite: bool = False, **output_kwargs) -> FFMPEGResult:
+
+    #ffmpeg -i [INPUT_FILE.mov] \
+    #    -c:v libx264 -crf 18 \
+    #    -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1,fps=30" \
+    #    -pix_fmt yuv420p \
+    #    -c:a aac -ar 44100 -ac 2 \
+    #    [OUTPUT_FILE_processed.mp4]
+    pass
 
 
 
