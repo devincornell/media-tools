@@ -60,17 +60,18 @@ def make_thumbs(
 
         rel_path = vf.fpath.relative_to(mdir.fpath)
         thumb_fname = get_thumb_path(rel_path, thumbs_path)
-        if not thumb_fname.exists():
-            samp = max(1, int(probe_info.duration/10))
+        if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
+            #samp = max(1, int(probe_info.duration/10))
             try:
                 mediatools.ffmpeg.make_animated_thumb(
                     input_fname=vf.fpath,
                     output_fname=thumb_fname,
-                    fps=2,
-                    sample_period=samp if samp > 0 else 1,
+                    fps=3,
+                    #sample_period=samp if samp > 0 else 1,
+                    target_period = 10 + random.choice([-2,-1,0,1,2]),
                     width=400,
                     height=-1,
-                    overwrite=False,
+                    overwrite=True,
                 )
                 print(f'\nCreated thumbnail for {vf.fpath}')
             except mediatools.ffmpeg.FFMPEGExecutionError as e:
