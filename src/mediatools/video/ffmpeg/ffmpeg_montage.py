@@ -5,7 +5,7 @@ Create a video montage from a directory of video files using the high-level FFMP
 This script re-implements the montage creation functionality using the mediatools.video
 interface instead of direct subprocess calls to ffmpeg.
 """
-
+from __future__ import annotations
 import typing
 import os
 import sys
@@ -14,6 +14,8 @@ from pathlib import Path
 import tempfile
 import tqdm
 import multiprocessing
+import dataclasses
+
 
 from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, stream_filter)
 from .probe import probe
@@ -28,11 +30,11 @@ def create_montage(
     width: int = 1920, 
     height: int = 1080, 
     fps: int = 30, 
-    num_cores: int = 16,
+    num_cores: int|None = None,
     verbose: bool = False,
 ) -> FFMPEGResult:
     """
-    Creates a video montage from a list of video files using the high-level FFMPEG interface.
+    Creates a video montage by randomly sampling clips from videos according to clip_ratio.
 
     This function takes a list of video file paths, extracts clips from each video 
     proportional to its length, and then concatenates them into a single montage file. 
@@ -57,12 +59,23 @@ def create_montage(
         random_seed=random_seed,
         clip_ratio=clip_ratio
     )
+
+    return create_compilation(
+        clip_infos = clip_infos,
+        output_filename = output_filename,
+        width = width,
+        height= height,
+        fps = fps,
+        num_cores = num_cores,
+        verbose = verbose,
+    )
+
+
     if verbose: print(f'identified {len(clip_infos)} clips. now processing')
     with tempfile.TemporaryDirectory() as tmp_dir:
-        #for clip_info in tqdm.tqdm(clip_infos):
         clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
         with multiprocessing.Pool(num_cores) as p:
-            clip_iter = p.imap_unordered(extract_clip, clip_packaged_data)
+            clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
             if verbose:
                 clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
             
@@ -83,65 +96,7 @@ def create_montage(
     return result
 
 
-#def extract_clip(
-#    clip_info: dict[str,typing.Any], 
-#    tmp_dir: Path|str, 
-#    clip_duration: float, 
-#    width: int, 
-#    height: int, 
-#    fps: int,
-#    verbose: bool = False,
-#) -> str|None:
-def extract_clip(args) -> str|None:
-    clip_info: dict[str,typing.Any] = args[0]
-    tmp_dir: Path|str = args[1]
-    clip_duration: float = args[2]
-    width: int = args[3]
-    height: int = args[4]
-    fps: int = args[5]
-    verbose: bool = args[6]
 
-    processed_clip_path = os.path.join(tmp_dir, f"clip_{clip_info['index']}.mp4")
-    #ffmpeg_cmd = FFMPEG(
-    #    input_files=[clip_info['fpath']],
-    #    output_file=processed_clip_path,
-    #    overwrite_output=True,
-    #    ss=str(clip_info['start_time']),
-    #    duration=str(clip_duration),
-    #    framerate=fps,
-    #    vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-    #    #vcodec="h264_nvenc",
-    #    acodec="aac",  # Ensure audio codec is included
-    #    audio_bitrate="192k",  # Set audio bitrate
-    #    loglevel="error",
-    #    input_args=[
-    #        ('hwaccel', 'cuda'),
-    #    ],
-    #    command_flags=['nostdin'],
-    #    output_args=[
-    #        ('map', "0:v:0"),
-    #        ('map', "0:a:0"),
-    #    ],
-    #)
-    vf = f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1'
-    cmd = FFMPEG(
-        inputs = [FFInput(clip_info['fpath'], ss=str(clip_info['start_time']), t=str(clip_duration))],#, hwaccel='cuda'
-        outputs = [FFOutput(processed_clip_path, maps=['0:v:0', '0:a:0'], overwrite=True, vf=vf, framerate=fps, vcodec='h264', acodec='aac', audio_bitrate='192k')],#vcodec='h264_nvenc', 
-        loglevel = 'error',
-        other_flags=['nostdin'],
-    )
-    try:
-        cmd.run()
-        probe(processed_clip_path)  # Ensure the clip was processed correctly
-    except FFMPEGExecutionError as e:
-        if verbose: print(f"\nFailed to extract '{clip_info['fpath']}' clip {clip_info['index']} due to processing error.")
-        if verbose: print(f"{e}")
-        return None
-    else:
-        if verbose: print('\nfinished', processed_clip_path)
-
-    return processed_clip_path
-        
 
 
 def get_random_clips(
@@ -149,7 +104,7 @@ def get_random_clips(
     clip_duration: float, 
     random_seed: int = 0, 
     clip_ratio: float = 30 # one clip for every 30 seconds (10x shorter)
-) -> bool:
+) -> list[ClipInfo]:
     '''Extract random clips from the given video files.'''
 
     random.seed(random_seed)
@@ -162,7 +117,7 @@ def get_random_clips(
         raise ValueError("Error: Clip duration must be a positive number.")
     
     clip_infos: list[dict[str,typing.Any]] = []
-    clip_index = 0
+    #clip_index = 0
     for video_path in sorted(video_paths):
 
         try:
@@ -196,48 +151,284 @@ def get_random_clips(
                 else:
                     start_time = random.uniform(min_start, max_start)
             
-            clip_infos.append({
-                'index': clip_index,
-                'fpath': str(video_path),
-                'start_time': start_time,
-                'duration': clip_duration,
-            })
+            #clip_infos.append({
+            #    'index': clip_index,
+            #    'fpath': str(video_path),
+            #    'start_time': start_time,
+            #    'duration': clip_duration,
+            #})
+            clip_infos.append(ClipInfo(
+                #index = clip_index,
+                start_time = start_time,
+                duration = clip_duration,
+                fpath = str(video_path),
+            ))
 
-            clip_index += 1
+            #clip_index += 1
     return clip_infos
 
 
 
-def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str) -> FFMPEGResult:
-    '''Concatenate video clips using demuxing (fast and lossless).'''
+
+
+def create_compilation(
+    clip_infos: typing.List[ClipInfo|tuple[Path, float, float]],
+    output_filename: str, 
+    width: int = 1920, 
+    height: int = 1080, 
+    fps: int = 30, 
+    num_cores: int|None = None,
+    verbose: bool = False,
+    fail_on_error: bool = False,
+) -> FFMPEGResult:
+    """
+    Creates a video montage from a list of video files using the high-level FFMPEG interface.
+
+    This function takes a list of video file paths, extracts clips from each video 
+    proportional to its length, and then concatenates them into a single montage file. 
+    The video and audio are standardized to ensure compatibility.
+
+    Args:
+        video_files (typing.List[Path]): List of pathlib Path objects pointing to video files.
+        clip_duration (float): The duration (in seconds) of each clip to extract from each video.
+        output_filename (str): The path and name of the output montage file.
+        random_seed (int, optional): The seed for the random number generator to ensure reproducibility. Defaults to 0.
+        width (int, optional): The width of the output video. Defaults to 1920.
+        height (int, optional): The height of the output video. Defaults to 1080.
+        fps (int, optional): The frames per second of the output video. Defaults to 30.
+        clip_ratio (float, optional): Ratio of video time to number of clips (seconds per clip, default: 30).
+
+    Returns:
+        FFMPEGResult: The result of the concatenate FFMPEG command.
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        clips = extract_clips(
+            clip_infos = [ci if isinstance(ci, ClipInfo) else ClipInfo(fpath=ci[0], start_time=ci[1], duration=ci[2]) for ci in clip_infos],
+            clip_dir = tmp_dir,
+            width = width,
+            height= height,
+            fps = fps,
+            num_cores = num_cores,
+            fail_on_error = fail_on_error,
+            verbose = verbose,
+        )
+
+        result = concatenate_clips_demux(
+            list(sorted([cp for fp,cp in clips if cp is not None])), 
+            output_filename, 
+            tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
+        )
+
+        return result
+
+
+        #for clip_info in tqdm.tqdm(clip_infos):
+        clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
+        with multiprocessing.Pool(num_cores) as p:
+            clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
+            if verbose:
+                clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
+            
+            clip_filenames = []
+            for result in clip_iter:
+                if result is not None:
+                    clip_filenames.append(result)
+
+        clip_filenames = [f for f in clip_filenames if f is not None]
+
+        if verbose: print(f'merging {len(clip_filenames)} clips')
+        result = concatenate_clips_demux(
+            list(sorted(clip_filenames)), 
+            output_filename, 
+            tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
+        )
+
+    return result
+
+
+
+def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str = '_concat_demux_list.txt') -> FFMPEGResult:
+    '''Concatenate video clips using demuxing (fast and lossless), assuming they are of compatible types.
+    
+    '''
     if not clips:
         raise ValueError("No clips to concatenate.")
 
-    # Create a temporary file list for ffmpeg
-    with tmp_file_path.open('w') as f:
-        f.write("\n".join([f"file '{c}'" for c in clips]))
+    tmp_file_path = Path(tmp_file_path)
+    output_filename = Path(output_filename)
 
-    # Build the ffmpeg command
+    # Create a temporary file list for ffmpeg
+    if tmp_file_path.exists():
+        raise FileExistsError(f"Temporary file {tmp_file_path} already exists - it's just a temporary name.")
+
+
+    with tempfile.TemporaryFile(mode='w+t') as tmp_file:
+        with tmp_file_path.open('w') as f:
+            f.write("\n".join([f"file '{c}'" for c in clips]))
+
+        # Build the ffmpeg command
+        #ffmpeg_cmd = FFMPEG(
+        #    input_files=[str(tmp_file_path)],
+        #    output_file=output_filename,
+        #    overwrite_output=True,
+        #    loglevel="error",
+        #    input_args=[
+        #        ('hwaccel', 'cuda'),
+        #        ('f', 'concat'),
+        #        ('safe', '0'),
+        #    ],
+        #    output_args=[
+        #        ('c', 'copy'),  # Copy both video and audio streams
+        #        ('f', 'mp4'),  # Ensure output format is MP4
+        #    ],
+        #)
+        cmd = FFMPEG(
+            inputs = [FFInput(str(tmp_file_path), f='concat', safe='0')],
+            outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
+            loglevel = 'error',
+        )
+
+        result = cmd.run()
+
+    # this should be done automatically
+    #tmp_file_path.unlink(missing_ok=True)
+
+    return result
+
+
+@dataclasses.dataclass
+class ClipInfo:
+    fpath: Path
+    start_time: float
+    duration: float
+
+    def __post_init__(self):
+        self.fpath = Path(self.fpath)
+
+    def check_valid(self) -> bool:
+        return self.fpath.exists() and probe(self.fpath).duration >= self.start_time + self.duration
+
+
+def extract_clips(
+    clip_infos: typing.List[ClipInfo], 
+    clip_dir: Path|str, 
+    #clip_duration: float, 
+    width: int, 
+    height: int, 
+    fps: int,
+    num_cores: int|None = None,
+    fail_on_error: bool = False,
+    verbose: bool = False,
+) -> list[tuple[Path,Path]]:
+    '''Extract clips from the given video files, returning a tuple of (video_path, clip_path).
+    Args:
+        clip_infos (typing.List[ClipInfo]): List of ClipInfo objects specifying clips to extract.
+        clip_dir (Path|str): Directory to save extracted clips.
+        clip_duration (float): Duration of each clip in seconds.
+        width (int): Width of the output clips.
+        height (int): Height of the output clips.
+        fps (int): Frames per second of the output clips.
+        num_cores (int|None, optional): Number of CPU cores to use for parallel processing. Defaults to None (uses all available cores).
+        fail_on_error (bool, optional): Whether to raise an error if a clip extraction fails. Defaults to False.
+        verbose (bool, optional): Whether to print verbose output. Defaults to False.
+    '''
+    clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i}.mp4", width, height, fps, verbose) for i, ci in enumerate(clip_infos)]
+    with multiprocessing.Pool(num_cores) as p:
+        clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
+        if verbose:
+            clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
+        
+        clip_filenames = []
+        for fp, cp in clip_iter:
+            if cp is not None or not fail_on_error:
+                clip_filenames.append((fp,cp))
+            else:
+                raise RuntimeError(f"Clip extraction from {fp} failed.")
+        
+    return list(sorted(clip_filenames, key=lambda x: x[1]))
+
+
+def extract_clip_wrap(args) -> str|None:
+    '''Accept packaged arguments from imap_unordered and pass to extract_clip.'''
+    clip_info: ClipInfo = args[0]
+    clip_path: Path|str = args[1]
+    width: int = args[2]
+    height: int = args[3]
+    fps: int = args[4]
+    verbose: bool = args[5]
+    return extract_clip_process(
+        clip_info=clip_info,
+        clip_path = clip_path,
+        width = width,
+        height = height,
+        fps = fps,
+        verbose = verbose,
+    )
+
+def extract_clip_process(
+    clip_info: ClipInfo, 
+    clip_path: Path|str, 
+    width: int, 
+    height: int, 
+    fps: int,
+    verbose: bool = False,
+) -> tuple[Path,Path|None]:
+    '''Extract a single clip from a video file, returning the path to the processed clip.'''
+    processed_clip_path = clip_path#os.path.join(clip_dir, f"clip_{clip_info.index}.mp4")
     #ffmpeg_cmd = FFMPEG(
-    #    input_files=[str(tmp_file_path)],
-    #    output_file=output_filename,
+    #    input_files=[clip_info['fpath']],
+    #    output_file=processed_clip_path,
     #    overwrite_output=True,
+    #    ss=str(clip_info['start_time']),
+    #    duration=str(clip_duration),
+    #    framerate=fps,
+    #    vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+    #    #vcodec="h264_nvenc",
+    #    acodec="aac",  # Ensure audio codec is included
+    #    audio_bitrate="192k",  # Set audio bitrate
     #    loglevel="error",
     #    input_args=[
     #        ('hwaccel', 'cuda'),
-    #        ('f', 'concat'),
-    #        ('safe', '0'),
     #    ],
+    #    command_flags=['nostdin'],
     #    output_args=[
-    #        ('c', 'copy'),  # Copy both video and audio streams
-    #        ('f', 'mp4'),  # Ensure output format is MP4
+    #        ('map', "0:v:0"),
+    #        ('map', "0:a:0"),
     #    ],
     #)
     cmd = FFMPEG(
+        inputs = [
+            FFInput(
+                clip_info.fpath, 
+                ss=str(clip_info.start_time), 
+                t=str(clip_info.duration)
+            )
+        ],
+        outputs = [
+            FFOutput(
+                file = processed_clip_path, 
+                maps=['0:v:0', '0:a:0'], 
+                overwrite=True, 
+                vf=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
+                framerate=fps, 
+                vcodec='h264', 
+                acodec='aac', 
+                audio_bitrate='192k', 
+                ar=48000
+            )
+        ],
         loglevel = 'error',
-        inputs = [FFInput(str(tmp_file_path), f='concat', safe='0')],
-        outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
+        other_flags=['nostdin'],
     )
+    try:
+        cmd.run()
+        probe(processed_clip_path)  # Ensure the clip was processed correctly
+    except FFMPEGExecutionError as e:
+        if verbose: print(f"\nFailed to extract '{clip_info.fpath}' clip {clip_path} due to processing error.")
+        if verbose: print(f"{e}")
+        processed_clip_path = None
+    else:
+        if verbose: print('\nfinished', processed_clip_path)
 
-    return cmd.run()
-
+    return clip_info.fpath, processed_clip_path
+    
