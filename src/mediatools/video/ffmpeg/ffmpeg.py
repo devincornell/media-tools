@@ -18,35 +18,6 @@ Time: typing.TypeAlias = str
 LOGLEVEL_OPTIONS = typing.Literal['error', 'warning', 'info', 'quiet', 'panic']
 
 
-class CmdArgs(list[str]):
-    '''Class to build command line arguments for FFMPEG.'''
-    @classmethod
-    def from_dict(cls, args: dict[str, str], flags: dict[str, bool]) -> CmdArgs:
-        '''Create CmdArgs from a dictionary of name-value pairs.'''
-        cmd_args = cls()
-        cmd_args.add_args(args)
-        cmd_args.add_flags(flags)
-        return cmd_args
-    
-    def add_args(self, name_values: dict[str, str|int|None]):
-        '''Add multiple arguments to the command.'''
-        for name, value in name_values.items():
-            if value is not None:
-                self.extend([f'-{name}', str(value)])
-    def add_arg(self, name: str, value: str|int|None):
-        '''Add an argument to the command.'''
-        if value is not None:
-            self.extend([f'-{name}', str(value)])
-    def add_flags(self, name_flags: dict[str, bool]):
-        '''Add multiple flags to the command.'''
-        for name, enabled in name_flags.items():
-            if bool(enabled):
-                self.append(f'-{name}')
-    def add_flag(self, name: str, enabled: bool):
-        '''Add a flag to the command.'''
-        if bool(enabled):
-            self.append(f'-{name}')
-
 
 
 
@@ -77,34 +48,154 @@ def ffmpeg(
     input_args: list[tuple[str,str]]|None = None,
     command_flags: list[str]|None = None,
 ) -> FFMPEGResult:
-    '''Execute an ffmpeg command.'''
+    '''Execute an ffmpeg command (legacy interface - creates simple FFInput/FFOutput internally).'''
+    
+    # Create FFInput objects for each input file
+    inputs = []
+    for input_file in input_files:
+        # Extract input-specific args if provided
+        input_spec = FFInput(file=input_file, hwaccel=hwaccel)
+        if input_args:
+            input_spec.other = [f"-{name}" if not str(name).startswith('-') else str(name) for name, value in input_args for item in [str(name), str(value)]]
+        inputs.append(input_spec)
+    
+    # Create FFOutput object
+    output_spec = FFOutput(
+        file=output_file,
+        overwrite=overwrite_output,
+        ss=ss,
+        duration=duration,
+        vf=vf,
+        af=af,
+        vcodec=vcodec,
+        acodec=acodec,
+        video_bitrate=video_bitrate,
+        audio_bitrate=audio_bitrate,
+        framerate=framerate,
+        format=format,
+        filter_complex=filter_complex,
+        disable_audio=disable_audio,
+        disable_video=disable_video,
+        crf=crf,
+        preset=preset,
+        output_args=output_args,
+        command_flags=command_flags,
+    )
+    
     return FFMPEG(
-        input_files = input_files,
-        output_file = output_file,
-        overwrite_output = overwrite_output,
-        ss = ss,
-        duration = duration,
-        vf = vf,
-        af = af,
-        vcodec = vcodec,
-        acodec = acodec,
-        video_bitrate = video_bitrate,
-        audio_bitrate = audio_bitrate,
-        framerate = framerate,
-        format = format,
-        filter_complex = filter_complex,
-        disable_audio = disable_audio,
-        disable_video = disable_video,
-        crf = crf,
-        preset = preset,
-        hwaccel = hwaccel,
-        loglevel = loglevel,
-        hide_banner = hide_banner,
-        nostats = nostats,
-        output_args = output_args,
-        input_args = input_args,
-        command_flags = command_flags,
+        inputs=inputs,
+        outputs=[output_spec],
+        loglevel=loglevel,
+        hide_banner=hide_banner,
+        nostats=nostats,
     ).run()
+
+
+
+
+@dataclasses.dataclass
+class FFMPEG:
+    '''Dataclass used to build an FFMPEG command using FFInput and FFOutput specifications.'''
+    inputs: list[FFInput]
+    outputs: list[FFOutput]
+
+    # Global command options
+    loglevel: LOGLEVEL_OPTIONS|None = None
+    hide_banner: bool = True
+    nostats: bool = True
+    progress: str|None = None
+    
+    # Generic extensibility
+    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
+    other_flags: list[str]|None = None  # Additional command flags
+
+    def __post_init__(self):
+        if isinstance(self.inputs, FFInput):
+            self.inputs = [self.inputs]
+        if isinstance(self.outputs, FFOutput):
+            self.outputs = [self.outputs]
+
+    def run(
+        self,
+        timeout: float|None = None,
+        cwd: str|Path|None = None,
+        env: str|Path|None = None,
+    ) -> FFMPEGResult:
+        '''Run the FFMPEG command with the provided parameters.'''
+        # Check if any output files exist when overwrite is disabled
+        for output in self.outputs:
+            if not output.overwrite and Path(output.file).exists():
+                raise FileExistsError(f'The output file {output.file} exists and overwrite=False.')
+        
+        return FFMPEGResult(
+            command=self, 
+            result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
+        )
+    
+
+    def get_command(self) -> str:
+        '''Return the FFMPEG command as a string.'''
+        cmd = self.build_command()
+        return ' '.join(shlex.quote(arg) for arg in cmd)
+
+
+    def build_command(self) -> list[str]:
+        '''Build the FFMPEG command as a list of strings using FFInput and FFOutput specifications.'''
+        cmd_args = CmdArgs.from_dict(
+            args={
+                'loglevel': self.loglevel,
+                'progress': self.progress,
+            },
+            flags={
+                'hide_banner': self.hide_banner,
+                'nostats': self.nostats,
+            }
+        )
+        if self.other_args:
+            for arg_name, arg_value in self.other_args:
+                cmd_args.add_arg(arg_name, arg_value)
+        if self.other_flags:
+            for flag in self.other_flags:
+                cmd_args.add_flag(flag, True)
+        
+        
+        cmd = CmdArgs(["ffmpeg"]).extend(cmd_args)
+        
+        
+        
+        # Add input specifications
+        for input_spec in self.inputs:
+            cmd.extend(input_spec.to_args())
+        
+        # Add output specifications
+        for output_spec in self.outputs:
+            cmd.extend(output_spec.to_args())
+        
+        return cmd
+
+
+    def get_global_flags(self) -> list[str]:
+        '''Get the global command flags for the FFMPEG command.'''
+        flags = list(self.global_flags) if self.global_flags is not None else []
+        
+        # Add built-in global flags
+        if self.hide_banner:
+            flags.append('hide_banner')
+        if self.nostats:
+            flags.append('nostats')
+        
+        return flags
+
+    def get_global_args(self) -> list[tuple[str,str]]:
+        '''Get the global command arguments for the FFMPEG command.'''
+        args = list(self.global_args) if self.global_args is not None else []
+        
+        # Add built-in global args
+        if self.loglevel is not None:
+            args.append(('loglevel', self.loglevel))
+        
+        return args
+
 
 
 @dataclasses.dataclass
@@ -156,7 +247,9 @@ class FFInput:
     accurate_seek: bool|None = None  # Enable accurate seeking
     seek_timestamp: bool|None = None  # Seek by timestamp instead of frame
 
-    other: list[str]|None = None  # Other arbitrary input options
+    # Generic extensibility
+    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
+    other_flags: list[str]|None = None  # Additional command flags
 
     def to_args(self) -> list[str]:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
@@ -209,8 +302,12 @@ class FFInput:
             }
         )
 
-        if self.other:
-            args.extend(self.other)
+        if self.other_args:
+            args.add_args(self.other_args)
+
+        if self.other_flags:
+            for flag in self.other_flags:
+                args.append(flag)
 
         return args
 
@@ -219,7 +316,7 @@ class FFInput:
 class FFOutput:
     '''Dataclass used to build an FFMPEG output specification.'''
     file: str|Path
-    overwrite_output: bool = False
+    overwrite: bool = False
     
     # Stream Selection & Mapping
     maps: list[Stream]|None = None  # Stream mapping specifications
@@ -296,17 +393,10 @@ class FFOutput:
     
     # Threading & Performance
     threads: int|None = None  # Number of threads
-    
-    # Logging & Output Control
-    loglevel: LOGLEVEL_OPTIONS|None = None  # Log level
-    hide_banner: bool = True  # Hide banner
-    nostats: bool = True  # No stats output
-    progress: str|None = None  # Progress output URL
-    
+        
     # Generic extensibility
-    output_args: list[tuple[str,str]]|None = None  # Additional output arguments
-    command_flags: list[str]|None = None  # Additional command flags
-    other: list[str]|None = None  # Other arbitrary output options
+    other_args: list[tuple[str,str]]|None = None  # Additional output arguments
+    other_flags: list[str]|None = None  # Additional command flags
 
     def to_args(self) -> list[str]:
         '''Convert the FFOutput to arguments for FFMPEG command.'''
@@ -374,10 +464,6 @@ class FFOutput:
                 
                 # Threading & Performance
                 'threads': self.threads,
-                
-                # Logging & Output Control
-                'loglevel': self.loglevel,
-                'progress': self.progress,
             },
             flags={
                 # Stream Control
@@ -385,10 +471,8 @@ class FFOutput:
                 'vn': self.disable_video,
                 'sn': self.disable_subtitles,
                 'dn': self.disable_data,
+                'y': self.overwrite,
                 
-                # Logging & Output Control
-                'hide_banner': self.hide_banner,
-                'nostats': self.nostats,
             }
         )
         
@@ -403,17 +487,14 @@ class FFOutput:
                 args.add_arg('metadata', f'{key}={value}')
         
         # Generic extensibility
-        if self.output_args:
-            for arg_name, arg_value in self.output_args:
+        if self.other_args:
+            for arg_name, arg_value in self.other_args:
                 args.add_arg(arg_name, arg_value)
-        
-        if self.command_flags:
-            for flag in self.command_flags:
+
+        if self.other_flags:
+            for flag in self.other_flags:
                 args.add_flag(flag, True)
-        
-        if self.other:
-            args.extend(self.other)
-        
+                
         # Output file
         args.append(str(self.file))
         
@@ -444,137 +525,6 @@ def stream_filter(
 
 
 
-@dataclasses.dataclass
-class FFMPEG:
-    '''Dataclass used to build an FFMPEG command.'''
-    input_files: list[str|Path]
-    output_file: str|Path
-    overwrite_output: bool = False
-    ss: str|None = None
-    duration: str|None = None
-    vf: str|None = None
-    af: str|None = None
-    vcodec: str|None = None
-    acodec: str|None = None
-    video_bitrate: str|None = None
-    audio_bitrate: str|None = None
-    framerate: int|None = None
-    format: str|None = None
-    filter_complex: str|None = None
-    disable_audio: bool = False
-    disable_video: bool = False
-    crf: int|None = None
-    preset: str|None = None
-    hwaccel: str|None = None
-    loglevel: LOGLEVEL_OPTIONS|None = None
-    hide_banner: bool = True
-    nostats: bool = True
-    output_args: list[tuple[str,str]]|None = None
-    input_args: list[tuple[str,str]]|None = None
-    command_flags: list[str]|None = None
-
-    def __post_init__(self):
-        self.input_files = [Path(f) for f in self.input_files]
-        self.output_file = Path(self.output_file)
-
-    def run(
-        self,
-        timeout: float|None = None,
-        cwd: str|Path|None = None,
-        env: str|Path|None = None,
-    ) -> list[str]:
-        '''Run the FFMPEG command with the provided parameters.'''
-        if not self.overwrite_output and self.output_file.exists():
-            raise FileExistsError(f'The output file {self.output_file} exists and overwrite_output=False.')
-        return FFMPEGResult(
-            command=self, 
-            result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
-        )
-    
-
-    def get_command(self) -> str:
-        '''Return the FFMPEG command as a string.'''
-        cmd = self.build_command()
-        return ' '.join(shlex.quote(arg) for arg in cmd)
-
-
-    def build_command(self) -> list[str]:
-        '''Build the FFMPEG command as a list of strings.'''
-
-        cmd = ["ffmpeg"]
-        
-        cmd.extend([f'-{cf}' for cf in self.get_flags()] or [])
-
-        for an,av in self.get_args():
-            cmd.extend([str(an) if str(an).startswith('-') else f'-{an}', str(av)])
-
-        cmd.append(str(self.output_file))
-
-        return cmd
-
-
-    def get_flags(self) -> list[str]:
-        '''Get the command flags for the FFMPEG command.'''
-        command_flags = list(self.command_flags) if self.command_flags is not None else []
-        
-        if self.overwrite_output:
-            command_flags.append('y')
-        if self.disable_audio:
-            command_flags.append('an')
-        if self.disable_video:
-            command_flags.append('vn')
-        if self.hide_banner:
-            command_flags.append('hide_banner')
-        if self.nostats:
-            command_flags.append('nostats')
-        
-        return command_flags
-
-    def get_args(self) -> list[tuple[str,str]]:
-        '''Get the command arguments for the FFMPEG command.'''
-        command_args = list()# if self.command_args is not None else dict()
-
-        if self.hwaccel is not None:
-            command_args.append(('hwaccel', self.hwaccel))
-
-        if self.input_args is not None:
-            for an,av in self.input_args:
-                command_args.append((an,av))
-
-        for input_file in self.input_files:
-            command_args.append(('i', str(input_file)))
-
-        arg_map = [
-            ("vf", self.vf),
-            ("af", self.af),
-            ("ss", self.ss),
-            ("t", self.duration),
-            ('r', self.framerate),
-            ("b:v", self.video_bitrate),
-            ("b:a", self.audio_bitrate),
-            ("c:v", self.vcodec),
-            ("c:a", self.acodec),
-            ('crf', self.crf),
-            ('f', self.format),
-            ('filter_complex', self.filter_complex),
-            ('preset', self.preset),
-            #('hwaccel', self.hwaccel),
-            ('loglevel', self.loglevel),
-        ]
-        
-        # Add non-None arguments to command_args
-        #for an,av in arg_map:
-        #    if av is not None:
-        #        command_args.append((an, av))
-        command_args.extend([(an,av) for an,av in arg_map if av is not None])
-        if self.output_args is not None:
-        #    command_args = {**command_args, **self.command_args}
-            for an,av in self.output_args:
-                command_args.append((an,av))
-        return command_args
-
-
-
 @dataclasses.dataclass(repr=False)
 class FFMPEGResult:
     '''A class to represent the result of an FFMPEG command.
@@ -590,20 +540,27 @@ class FFMPEGResult:
         '''Return progress and diagnostic output of the FFMPEG command (note: ffmpeg sends it to stdout).'''
         return self.result.stderr.strip()
 
-    #@property
-    #def stderr(self) -> str:
-    #    '''Return progress and diagnostic output of the FFMPEG command (ffmpeg sends it to stdout).'''
-    #    return self.result.stderr.strip()
-
-    #@property
-    #def stdout(self) -> str:
-    #    '''Return stdout of the FFMPEG command. This is unliklely to be useful.'''
-    #    return self.result.stdout.strip()
+    @property
+    def stderr(self) -> str:
+        '''Return progress and diagnostic output of the FFMPEG command (ffmpeg sends it to stdout).'''
+        return self.result.stderr.strip()
 
     @property
+    def stdout(self) -> str:
+        '''Return stdout of the FFMPEG command. This is unliklely to be useful.'''
+        return self.result.stdout.strip()
+
+    @property
+    def output_files(self) -> list[Path]:
+        '''Return the output file paths of the FFMPEG command.'''
+        return [Path(output.file) for output in self.command.outputs]
+    
+    @property
     def output_file(self) -> Path:
-        '''Return the output file path of the FFMPEG command.'''
-        return Path(self.command.output_file)
+        '''Return the first output file path of the FFMPEG command (for backward compatibility).'''
+        if self.command.outputs:
+            return Path(self.command.outputs[0].file)
+        raise ValueError("No output files specified in command.")
 
     @property
     def returncode(self) -> int:
@@ -653,6 +610,42 @@ def run_ffmpeg_subprocess(
 
 
 
+class CmdArgs(list[str]):
+    '''Class to build command line arguments for FFMPEG.'''
+    @classmethod
+    def from_dict(cls, args: dict[str, str], flags: dict[str, bool]) -> typing.Self:
+        '''Create CmdArgs from a dictionary of name-value pairs.'''
+        cmd_args = cls()
+        cmd_args.add_args(args)
+        cmd_args.add_flags(flags)
+        return cmd_args
+
+    def add_args(self, name_values: list[tuple[str, str|int|None]]):
+        '''Add multiple arguments to the command.'''
+        for name, value in name_values:
+            if value is not None:
+                self.extend([CmdArgs.add_dash(name), str(value)])
+
+    def add_arg(self, name: str, value: str|int|None):
+        '''Add an argument to the command.'''
+        if value is not None:
+            self.extend([CmdArgs.add_dash(name), str(value)])
+
+    def add_flags(self, name_flags: list[tuple[str, bool]]):
+        '''Add multiple flags to the command.'''
+        for name, enabled in name_flags:
+            if bool(enabled):
+                self.append(CmdArgs.add_dash(name))
+
+    def add_flag(self, name: str, enabled: bool):
+        '''Add a flag to the command.'''
+        if bool(enabled):
+            self.append(CmdArgs.add_dash(name))
+
+    @classmethod
+    def add_dash(cls, name: str) -> str:
+        '''Ensure the argument name starts with a dash.'''
+        return name if name.startswith('-') else f'-{name}'
 
 
 
