@@ -71,32 +71,6 @@ def create_montage(
     )
 
 
-    if verbose: print(f'identified {len(clip_infos)} clips. now processing')
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
-        with multiprocessing.Pool(num_cores) as p:
-            clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
-            if verbose:
-                clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
-            
-            clip_filenames = []
-            for result in clip_iter:
-                if result is not None:
-                    clip_filenames.append(result)
-
-        clip_filenames = [f for f in clip_filenames if f is not None]
-
-        if verbose: print(f'merging {len(clip_filenames)} clips')
-        result = concatenate_clips_demux(
-            list(sorted(clip_filenames)), 
-            output_filename, 
-            tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
-        )
-
-    return result
-
-
-
 
 
 def get_random_clips(
@@ -117,7 +91,6 @@ def get_random_clips(
         raise ValueError("Error: Clip duration must be a positive number.")
     
     clip_infos: list[dict[str,typing.Any]] = []
-    #clip_index = 0
     for video_path in sorted(video_paths):
 
         try:
@@ -151,20 +124,12 @@ def get_random_clips(
                 else:
                     start_time = random.uniform(min_start, max_start)
             
-            #clip_infos.append({
-            #    'index': clip_index,
-            #    'fpath': str(video_path),
-            #    'start_time': start_time,
-            #    'duration': clip_duration,
-            #})
             clip_infos.append(ClipInfo(
-                #index = clip_index,
                 start_time = start_time,
                 duration = clip_duration,
                 fpath = str(video_path),
             ))
 
-            #clip_index += 1
     return clip_infos
 
 
@@ -222,29 +187,6 @@ def create_compilation(
         return result
 
 
-        #for clip_info in tqdm.tqdm(clip_infos):
-        clip_packaged_data = [(clip_info, tmp_dir, clip_duration, width, height, fps, verbose) for clip_info in clip_infos]
-        with multiprocessing.Pool(num_cores) as p:
-            clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
-            if verbose:
-                clip_iter = tqdm.tqdm(clip_iter, total=len(clip_packaged_data))
-            
-            clip_filenames = []
-            for result in clip_iter:
-                if result is not None:
-                    clip_filenames.append(result)
-
-        clip_filenames = [f for f in clip_filenames if f is not None]
-
-        if verbose: print(f'merging {len(clip_filenames)} clips')
-        result = concatenate_clips_demux(
-            list(sorted(clip_filenames)), 
-            output_filename, 
-            tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
-        )
-
-    return result
-
 
 
 def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str = '_concat_demux_list.txt') -> FFMPEGResult:
@@ -266,22 +208,6 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
         with tmp_file_path.open('w') as f:
             f.write("\n".join([f"file '{c}'" for c in clips]))
 
-        # Build the ffmpeg command
-        #ffmpeg_cmd = FFMPEG(
-        #    input_files=[str(tmp_file_path)],
-        #    output_file=output_filename,
-        #    overwrite_output=True,
-        #    loglevel="error",
-        #    input_args=[
-        #        ('hwaccel', 'cuda'),
-        #        ('f', 'concat'),
-        #        ('safe', '0'),
-        #    ],
-        #    output_args=[
-        #        ('c', 'copy'),  # Copy both video and audio streams
-        #        ('f', 'mp4'),  # Ensure output format is MP4
-        #    ],
-        #)
         cmd = FFMPEG(
             inputs = [FFInput(str(tmp_file_path), f='concat', safe='0')],
             outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
@@ -289,9 +215,6 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
         )
 
         result = cmd.run()
-
-    # this should be done automatically
-    #tmp_file_path.unlink(missing_ok=True)
 
     return result
 
@@ -312,7 +235,6 @@ class ClipInfo:
 def extract_clips(
     clip_infos: typing.List[ClipInfo], 
     clip_dir: Path|str, 
-    #clip_duration: float, 
     width: int, 
     height: int, 
     fps: int,
@@ -374,28 +296,7 @@ def extract_clip_process(
     verbose: bool = False,
 ) -> tuple[Path,Path|None]:
     '''Extract a single clip from a video file, returning the path to the processed clip.'''
-    processed_clip_path = clip_path#os.path.join(clip_dir, f"clip_{clip_info.index}.mp4")
-    #ffmpeg_cmd = FFMPEG(
-    #    input_files=[clip_info['fpath']],
-    #    output_file=processed_clip_path,
-    #    overwrite_output=True,
-    #    ss=str(clip_info['start_time']),
-    #    duration=str(clip_duration),
-    #    framerate=fps,
-    #    vf=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-    #    #vcodec="h264_nvenc",
-    #    acodec="aac",  # Ensure audio codec is included
-    #    audio_bitrate="192k",  # Set audio bitrate
-    #    loglevel="error",
-    #    input_args=[
-    #        ('hwaccel', 'cuda'),
-    #    ],
-    #    command_flags=['nostdin'],
-    #    output_args=[
-    #        ('map', "0:v:0"),
-    #        ('map', "0:a:0"),
-    #    ],
-    #)
+    processed_clip_path = clip_path
     cmd = FFMPEG(
         inputs = [
             FFInput(
