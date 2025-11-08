@@ -31,6 +31,7 @@ def create_montage(
     height: int = 1080, 
     fps: int = 30, 
     num_cores: int|None = None,
+    use_cuda: bool = True,
     verbose: bool = False,
 ) -> FFMPEGResult:
     """
@@ -57,7 +58,7 @@ def create_montage(
         video_paths=video_files,
         clip_duration=clip_duration,
         random_seed=random_seed,
-        clip_ratio=clip_ratio
+        clip_ratio=clip_ratio,
     )
 
     return create_compilation(
@@ -67,6 +68,7 @@ def create_montage(
         height= height,
         fps = fps,
         num_cores = num_cores,
+        use_cuda = use_cuda,
         verbose = verbose,
     )
 
@@ -143,6 +145,7 @@ def create_compilation(
     height: int = 1080, 
     fps: int = 30, 
     num_cores: int|None = None,
+    use_cuda: bool = True,
     verbose: bool = False,
     fail_on_error: bool = False,
 ) -> FFMPEGResult:
@@ -174,12 +177,13 @@ def create_compilation(
             height= height,
             fps = fps,
             num_cores = num_cores,
+            use_cuda = use_cuda,
             fail_on_error = fail_on_error,
             verbose = verbose,
         )
 
         result = concatenate_clips_demux(
-            list(sorted([cp for fp,cp in clips if cp is not None])), 
+            list([cp for fp,cp in clips if cp is not None]), 
             output_filename, 
             tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
         )
@@ -189,7 +193,12 @@ def create_compilation(
 
 
 
-def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tmp_file_path: Path|str = '_concat_demux_list.txt') -> FFMPEGResult:
+def concatenate_clips_demux(
+    clips: list[Path|str], 
+    output_filename: Path|str, 
+    tmp_file_path: Path|str = '_concat_demux_list.txt',
+    use_cuda: bool = True,
+) -> FFMPEGResult:
     '''Concatenate video clips using demuxing (fast and lossless), assuming they are of compatible types.
     
     '''
@@ -209,7 +218,7 @@ def concatenate_clips_demux(clips: list[Path|str], output_filename: Path|str, tm
             f.write("\n".join([f"file '{c}'" for c in clips]))
 
         cmd = FFMPEG(
-            inputs = [FFInput(str(tmp_file_path), f='concat', safe='0')],
+            inputs = [FFInput(str(tmp_file_path), f='concat', safe='0', hwaccel='cuda' if use_cuda else None)],
             outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
             loglevel = 'error',
         )
@@ -241,6 +250,7 @@ def extract_clips(
     num_cores: int|None = None,
     fail_on_error: bool = False,
     verbose: bool = False,
+    use_cuda: bool = True,
 ) -> list[tuple[Path,Path]]:
     '''Extract clips from the given video files, returning a tuple of (video_path, clip_path).
     Args:
@@ -254,7 +264,7 @@ def extract_clips(
         fail_on_error (bool, optional): Whether to raise an error if a clip extraction fails. Defaults to False.
         verbose (bool, optional): Whether to print verbose output. Defaults to False.
     '''
-    clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i}.mp4", width, height, fps, verbose) for i, ci in enumerate(clip_infos)]
+    clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i}.mp4", width, height, fps, verbose, use_cuda) for i, ci in enumerate(clip_infos)]
     with multiprocessing.Pool(num_cores) as p:
         clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
         if verbose:
@@ -278,6 +288,7 @@ def extract_clip_wrap(args) -> str|None:
     height: int = args[3]
     fps: int = args[4]
     verbose: bool = args[5]
+    use_cuda: bool = args[6]
     return extract_clip_process(
         clip_info=clip_info,
         clip_path = clip_path,
@@ -285,6 +296,7 @@ def extract_clip_wrap(args) -> str|None:
         height = height,
         fps = fps,
         verbose = verbose,
+        use_cuda = use_cuda,
     )
 
 def extract_clip_process(
@@ -293,6 +305,7 @@ def extract_clip_process(
     width: int, 
     height: int, 
     fps: int,
+    use_cuda: bool = True,
     verbose: bool = False,
 ) -> tuple[Path,Path|None]:
     '''Extract a single clip from a video file, returning the path to the processed clip.'''
@@ -302,7 +315,8 @@ def extract_clip_process(
             FFInput(
                 clip_info.fpath, 
                 ss=str(clip_info.start_time), 
-                t=str(clip_info.duration)
+                t=str(clip_info.duration),
+                hwaccel = 'cuda' if use_cuda else None,
             )
         ],
         outputs = [
@@ -312,7 +326,7 @@ def extract_clip_process(
                 overwrite=True, 
                 vf=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
                 framerate=fps, 
-                vcodec='h264', 
+                vcodec='h264_nvenc' if use_cuda else 'h264', 
                 acodec='aac', 
                 audio_bitrate='192k', 
                 ar=48000
@@ -321,6 +335,7 @@ def extract_clip_process(
         loglevel = 'error',
         other_flags=['nostdin'],
     )
+    verbose = True
     try:
         cmd.run()
         probe(processed_clip_path)  # Ensure the clip was processed correctly
