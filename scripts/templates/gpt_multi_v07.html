@@ -614,6 +614,99 @@
             font-size: 0.9rem;
         }
 
+        .autoplay-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .autoplay-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .autoplay-label:hover {
+            color: var(--accent-primary);
+        }
+
+        .autoplay-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .autoplay-text {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            white-space: nowrap;
+        }
+
+        .autoplay-countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border: 2px solid var(--accent-primary);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            font-weight: 600;
+            z-index: 100;
+            display: none;
+        }
+
+        .countdown-number {
+            font-size: 3rem;
+            color: var(--accent-primary);
+            margin: 1rem 0;
+            animation: pulse 1s infinite;
+        }
+
+        .countdown-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .countdown-btn {
+            padding: 0.5rem 1rem;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .countdown-btn.secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .countdown-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
         .player-info {
             text-align: center;
             margin-bottom: 1rem;
@@ -941,6 +1034,16 @@
                 <i class="fas fa-times"></i>
             </button>
             
+            <!-- Auto-play Countdown Overlay -->
+            <div class="autoplay-countdown" id="autoplayCountdown">
+                <div>Next video starting in</div>
+                <div class="countdown-number" id="countdownNumber">3</div>
+                <div class="countdown-actions">
+                    <button class="countdown-btn" onclick="proceedToNextVideo()">Play Now</button>
+                    <button class="countdown-btn secondary" onclick="cancelAutoplay()">Cancel</button>
+                </div>
+            </div>
+            
             <div class="player-info">
                 <h2 class="player-title" id="videoTitle"></h2>
                 <p class="player-details" id="videoInfo"></p>
@@ -982,6 +1085,15 @@
                     <option value="3">3×</option>
                     <option value="4">4×</option>
                 </select>
+                
+                <div class="autoplay-control">
+                    <label class="autoplay-label">
+                        <input type="checkbox" id="autoplayCheckbox" class="autoplay-checkbox">
+                        <span class="autoplay-text">
+                            <i class="fas fa-play-circle"></i> Auto-play next
+                        </span>
+                    </label>
+                </div>
                 
                 <button class="nav-btn" onclick="navigateVideo(1)" title="Next Video">
                     <i class="fas fa-chevron-right"></i>
@@ -1158,11 +1270,90 @@
             // Populate and show playlist
             populatePlaylist();
             updateActivePlaylistItem(thumbnailElement);
+            
+            // Set up auto-play event listener
+            setupAutoPlayListener();
+        }
+
+        function setupAutoPlayListener() {
+            const video = document.getElementById('videoElement');
+            const autoplayCheckbox = document.getElementById('autoplayCheckbox');
+            
+            // Remove existing event listener to avoid duplicates
+            video.removeEventListener('ended', handleVideoEnd);
+            
+            // Add new event listener
+            video.addEventListener('ended', handleVideoEnd);
+        }
+
+        function handleVideoEnd() {
+            const autoplayCheckbox = document.getElementById('autoplayCheckbox');
+            
+            if (autoplayCheckbox.checked) {
+                // Check if there's a next video
+                const allVideoThumbnails = Array.from(document.querySelectorAll('.thumbnail[data-video-src]'));
+                const currentIndex = allVideoThumbnails.indexOf(currentThumbnail);
+                
+                if (currentIndex < allVideoThumbnails.length - 1) {
+                    // There is a next video, show countdown
+                    showAutoplayCountdown();
+                } else {
+                    // No more videos, just finish
+                    console.log('Reached end of playlist');
+                }
+            }
+        }
+
+        let autoplayCountdownInterval;
+        let autoplayCountdownTimeLeft;
+
+        function showAutoplayCountdown() {
+            const countdownOverlay = document.getElementById('autoplayCountdown');
+            const countdownNumber = document.getElementById('countdownNumber');
+            
+            autoplayCountdownTimeLeft = 5; // 5 second countdown
+            countdownNumber.textContent = autoplayCountdownTimeLeft;
+            countdownOverlay.style.display = 'block';
+            
+            autoplayCountdownInterval = setInterval(() => {
+                autoplayCountdownTimeLeft--;
+                countdownNumber.textContent = autoplayCountdownTimeLeft;
+                
+                if (autoplayCountdownTimeLeft <= 0) {
+                    clearInterval(autoplayCountdownInterval);
+                    proceedToNextVideo();
+                }
+            }, 1000);
+        }
+
+        function proceedToNextVideo() {
+            const countdownOverlay = document.getElementById('autoplayCountdown');
+            countdownOverlay.style.display = 'none';
+            
+            if (autoplayCountdownInterval) {
+                clearInterval(autoplayCountdownInterval);
+            }
+            
+            navigateVideo(1);
+        }
+
+        function cancelAutoplay() {
+            const countdownOverlay = document.getElementById('autoplayCountdown');
+            countdownOverlay.style.display = 'none';
+            
+            if (autoplayCountdownInterval) {
+                clearInterval(autoplayCountdownInterval);
+            }
         }
 
         function closePlayer() {
             document.getElementById('videoPlayer').style.display = 'none';
-            document.getElementById('videoElement').pause();
+            const video = document.getElementById('videoElement');
+            video.pause();
+            // Remove auto-play event listener
+            video.removeEventListener('ended', handleVideoEnd);
+            // Clean up countdown
+            cancelAutoplay();
             document.body.style.overflow = 'auto';
             currentThumbnail = null;
         }
@@ -1301,6 +1492,13 @@
         // Enhanced Keyboard Controls
         document.body.addEventListener('keydown', function(e) {
             if (e.key === "Escape") {
+                // Cancel autoplay countdown if active
+                const countdownOverlay = document.getElementById('autoplayCountdown');
+                if (countdownOverlay.style.display === 'block') {
+                    cancelAutoplay();
+                    return;
+                }
+                
                 closePlayer();
                 closeImageLightbox();
                 return;
@@ -1427,6 +1625,18 @@
             
             // Randomize subfolder thumbnails on page load
             randomizeSubfolderThumbnails();
+            
+            // Restore autoplay checkbox state
+            const autoplayCheckbox = document.getElementById('autoplayCheckbox');
+            const savedAutoplayState = localStorage.getItem('videoAutoplay');
+            if (savedAutoplayState === 'true') {
+                autoplayCheckbox.checked = true;
+            }
+            
+            // Save autoplay state when changed
+            autoplayCheckbox.addEventListener('change', function() {
+                localStorage.setItem('videoAutoplay', this.checked);
+            });
         });
 
         // Lazy loading for images
