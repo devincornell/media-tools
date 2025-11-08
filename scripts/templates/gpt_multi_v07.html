@@ -1016,9 +1016,6 @@
                         <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}">
                             <a href="/file/{{img.img_path_rel}}" onclick="openImageLightbox(event, this)">
                                 <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
-                                <div class="thumbnail-content">
-                                    <div class="thumbnail-title">{{img.title if img.title else 'Image'}}</div>
-                                </div>
                             </a>
                         </div>
                     {% endfor %}
