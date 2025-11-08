@@ -110,7 +110,7 @@ def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
 
 def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool, max_clip_duration: float) -> dict:
     '''Create the index page for the site.'''
-    mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ingore_folder_names=(thumbs_path,))
+    mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ingore_folder_names=(Path(thumbs_path).name,))
     index, _ = create_page_index(mdir, root, thumbs_path=Path(thumbs_path), sort_by_name=sort_by_name, max_clip_duration=max_clip_duration)
     return index
 
