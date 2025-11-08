@@ -6,7 +6,13 @@ import typing
 import shlex
 from pathlib import Path
 
-from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
+from .errors import (
+    FFMPEGError, 
+    FFMPEGCommandTimeoutError, 
+    FFMPEGExecutionError, 
+    FFMPEGNotFoundError, 
+    OutputFileIsEmptyError,
+)
 
 VideoStream: typing.TypeAlias = str
 AudioStream: typing.TypeAlias = str
@@ -155,10 +161,16 @@ class FFMPEG:
             if not output.overwrite and Path(output.file).exists():
                 raise FileExistsError(f'The output file {output.file} exists and overwrite=False.')
         
-        return FFMPEGResult(
+        result = FFMPEGResult(
             command=self, 
             result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
         )
+
+        for opath in result.output_files:
+            if Path(opath).exists() and Path(opath).stat().st_size == 0: #if file does not exist, the output may not have been a path
+                raise OutputFileIsEmptyError(f"FFMPEG command completed but output file is empty: {opath}")
+            
+        return result
     
     def get_command(self) -> str:
         '''Return the FFMPEG command as a string.'''

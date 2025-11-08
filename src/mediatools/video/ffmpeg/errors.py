@@ -47,6 +47,8 @@ class FFMPEGExecutionError(FFMPEGError):
 class FFMPEGNotFoundError(FFMPEGError):
     pass
 
+class OutputFileIsEmptyError(FFMPEGError):
+    pass
 
 class FFMPEGCommandTimeoutError(FFMPEGError):
     pass
