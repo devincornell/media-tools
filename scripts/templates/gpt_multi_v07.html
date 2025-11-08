@@ -284,6 +284,13 @@
             object-fit: cover;
         }
 
+        /* Images in list view preserve aspect ratio */
+        .gallery.list-view #imagesGallery .thumbnail img {
+            height: auto;
+            max-height: 80px;
+            object-fit: contain;
+        }
+
         /* Thumbnail Cards */
         .thumbnail {
             background: linear-gradient(135deg, var(--glass-bg), rgba(0, 0, 0, 0.3));
@@ -308,6 +315,12 @@
             height: 200px;
             object-fit: cover;
             transition: all 0.3s ease;
+        }
+
+        /* Images preserve their aspect ratio */
+        #imagesGallery .thumbnail img {
+            height: auto;
+            object-fit: contain;
         }
 
         .thumbnail:hover img,
