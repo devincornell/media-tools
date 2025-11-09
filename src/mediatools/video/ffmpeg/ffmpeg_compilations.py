@@ -33,6 +33,7 @@ def create_montage(
     num_cores: int|None = None,
     use_cuda: bool = True,
     verbose: bool = False,
+    max_clips_per_video: int = 10,
 ) -> FFMPEGResult:
     """
     Creates a video montage by randomly sampling clips from videos according to clip_ratio.
@@ -59,6 +60,7 @@ def create_montage(
         clip_duration=clip_duration,
         random_seed=random_seed,
         clip_ratio=clip_ratio,
+        max_clips_per_video=max_clips_per_video,
     )
 
     return create_compilation(
@@ -79,7 +81,8 @@ def get_random_clips(
     video_paths: typing.List[Path], 
     clip_duration: float, 
     random_seed: int = 0, 
-    clip_ratio: float = 30 # one clip for every 30 seconds (10x shorter)
+    clip_ratio: float = 30, # one clip for every 30 seconds (10x shorter)
+    max_clips_per_video: int = 10,
 ) -> list[ClipInfo]:
     '''Extract random clips from the given video files.'''
 
@@ -107,8 +110,9 @@ def get_random_clips(
             num_clips = 1
         else:
             num_clips = max(1, int(duration / clip_ratio))
-            
-        
+            num_clips = min(num_clips, max_clips_per_video)
+
+
         for n in range(num_clips):
             if duration <= clip_duration:
                 start_time = 0

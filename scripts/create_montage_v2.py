@@ -38,13 +38,15 @@ if __name__ == '__main__':
     parser.add_argument("-v", "--verbose", action='store_true', help="Enable verbose output.")
     parser.add_argument("--width", type=int, default=1920, help="Width of the output video (default: 1920).")
     parser.add_argument("--height", type=int, default=1080, help="Height of the output video (default: 1080).")
+    parser.add_argument("--usecuda", action='store_true', help="Use CUDA acceleration if available.")
+    parser.add_argument("--max_clips_per_video", type=int, default=10, help="Maximum number of clips to extract from each video (default: 10).")
     args = parser.parse_args()
     
     # Find video files in the specified directory
     try:
         video_paths = mediatools.VideoFiles.from_glob(
             root=args.video_directory,
-            extensions=("mp4", "mov", "avi", "mkv", "flv", "webm")
+            extensions=("mp4", "mov", "avi", "mkv", "flv", "webm", "m4v")
         )
         if not video_paths:
             print(f"No video files found in '{args.video_directory}'.", file=sys.stderr)
@@ -66,6 +68,8 @@ if __name__ == '__main__':
         verbose=args.verbose,
         height=args.height,
         width=args.width,
+        use_cuda=args.usecuda,
+        max_clips_per_video=args.max_clips_per_video,
     )
     
 
