@@ -15,6 +15,8 @@ montage:
 	cp $(SCRIPTS_PATH)/test_montage_09-05.mp4 /mnt/MoStorage/gopro/
 	cp $(SCRIPTS_PATH)/test_montage_10-05.mp4 /mnt/MoStorage/gopro/
 
+	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07.html --port 8000 -s -w
+
 #copymontage:
 
 
