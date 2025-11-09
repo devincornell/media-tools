@@ -205,7 +205,7 @@ def create_page_index(
             #if best_thumb is None or info.aspect_ratio() > best_aspect:
             #    best_aspect = info.aspect_ratio()
             #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
-            if img_path_rel.exists() and img_path_rel.stat().st_size > 0:
+            if img_path_abs.exists() and img_path_abs.stat().st_size > 0:
                 best_image_thumb.update(
                     new_path=img_path_rel,
                     new_aspect=info.aspect_ratio(),
