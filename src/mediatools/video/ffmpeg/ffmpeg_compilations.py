@@ -322,14 +322,17 @@ def extract_clip_process(
         outputs = [
             FFOutput(
                 file = processed_clip_path, 
-                maps=['0:v:0', '0:a:0'], 
+                #maps=['0:v:0', '0:a:0'], 
                 overwrite=True, 
                 vf=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
                 framerate=fps, 
                 vcodec='h264_nvenc' if use_cuda else 'h264', 
                 acodec='aac', 
                 audio_bitrate='192k', 
-                ar=48000
+                ar=48000,
+                pix_fmt='yuv420p',
+                preset='veryfast',
+                crf=23,
             )
         ],
         loglevel = 'error',
