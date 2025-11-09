@@ -1,9 +1,9 @@
+scripts/Makefile
 
 *.jpg
 *.mp4
 *.mkv
 *.mdc
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
