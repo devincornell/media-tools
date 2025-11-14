@@ -28,7 +28,6 @@ LOGLEVEL_OPTIONS = typing.Literal['error', 'warning', 'info', 'quiet', 'panic']
 
 
 
-
 @dataclasses.dataclass
 class FFMPEG:
     """A dataclass for building and executing FFmpeg commands with type safety and structured configuration.
@@ -52,7 +51,7 @@ class FFMPEG:
         Basic video compression:
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("output.mp4", c_v="libx264", crf=23, overwrite=True)]
+            ...     outputs=[FFOutput("output.mp4", vcodec="libx264", crf=23, overwrite=True)]
             ... )
             >>> result = cmd.run()
         
@@ -73,7 +72,7 @@ class FFMPEG:
         Resize video with aspect ratio preservation:
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("resized.mp4", v_f="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
+            ...     outputs=[FFOutput("resized.mp4", vf="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
@@ -85,7 +84,7 @@ class FFMPEG:
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("video.mp4")],
             ...     outputs=[FFOutput("animation.gif", 
-            ...                      v_f=f"setpts=PTS/{pts_factor},fps=10,scale=500:-1:flags=lanczos",
+            ...                      vf=f"setpts=PTS/{pts_factor},fps=10,scale=500:-1:flags=lanczos",
             ...                      overwrite=True)]
             ... )
             >>> result = cmd.run()
@@ -93,14 +92,14 @@ class FFMPEG:
         Crop video to specific region:
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("cropped.mp4", v_f="crop=640:480:100:50", overwrite=True)]
+            ...     outputs=[FFOutput("cropped.mp4", vf="crop=640:480:100:50", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Extract audio track:
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("video.mp4")],
-            ...     outputs=[FFOutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)]
+            ...     outputs=[FFOutput("audio.mp3", disable_video=True, acodec="libmp3lame", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
@@ -117,7 +116,7 @@ class FFMPEG:
         Apply hardware acceleration (NVIDIA):
             >>> cmd = FFMPEG(
             ...     inputs=[FFInput("input.mp4", hwaccel="cuda")],
-            ...     outputs=[FFOutput("output.mp4", c_v="h264_nvenc", preset="fast", overwrite=True)]
+            ...     outputs=[FFOutput("output.mp4", vcodec="h264_nvenc", preset="fast", overwrite=True)]
             ... )
             >>> result = cmd.run()
     
@@ -139,8 +138,6 @@ class FFMPEG:
     hide_banner: bool = dataclasses.field(default=True, metadata={"flag": "hide_banner", 'desc': 'Hide banner'})
     nostats: bool = dataclasses.field(default=True, metadata={"flag": "nostats", 'desc': 'Disable stats'})
     progress: str|None = dataclasses.field(default=None, metadata={"arg": "progress", 'desc': 'Write progress report to file'})
-    passlogfile: str|None = dataclasses.field(default=None, metadata={"arg": "passlogfile", 'desc': 'Logfile for two-pass encoding'})
-    pass_num: int|None = dataclasses.field(default=None, metadata={"arg": "pass", 'desc': 'Encoding pass number'})
 
     # Generic extensibility
     other_args: list[tuple[str,str]] = dataclasses.field(default_factory=list, metadata={'desc': 'Additional output arguments'})
@@ -204,7 +201,6 @@ class FFMPEG:
         return CmdArgs(["ffmpeg"] + args)
 
 
-
 @dataclasses.dataclass
 class FFInput:
     """Dataclass representing FFmpeg input specifications with comprehensive options.
@@ -220,8 +216,8 @@ class FFInput:
         ss: Input start time/seek position (FFmpeg: `-ss`).
         to: Input end time (FFmpeg: `-to`).
         itsoffset: Input timestamp offset in seconds (FFmpeg: `-itsoffset`).
-        c_v: Video codec for input decoding (FFmpeg: `-c:v`).
-        c_a: Audio codec for input decoding (FFmpeg: `-c:a`).
+        cv: Video codec for input decoding (FFmpeg: `-c:v`).
+        ca: Audio codec for input decoding (FFmpeg: `-c:a`).
         
         # Video Input Options
         r: Input frame rate override (FFmpeg: `-r`).
@@ -285,8 +281,8 @@ class FFInput:
     ss: str|None = dataclasses.field(default=None, metadata={"arg": "ss", 'desc': 'Input start time'})
     to: str|None = dataclasses.field(default=None, metadata={"arg": "to", 'desc': 'Input end time'})
     itsoffset: str|None = dataclasses.field(default=None, metadata={"arg": "itsoffset", 'desc': 'Input timestamp offset'})
-    c_v: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", 'desc': 'Video codec'})
-    c_a: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", 'desc': 'Audio codec'})
+    cv: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", 'desc': 'Video codec'})
+    ca: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", 'desc': 'Audio codec'})
 
     # Video Input Options
     r: Time|None = dataclasses.field(default=None, metadata={"arg": "r", 'desc': 'Input frame rate'})
@@ -363,8 +359,8 @@ class FFOutput:
         to: End time for output (FFmpeg: `-to`).
         
         # Video Output Options
-        c_v: Video codec like 'libx264', 'libx265' (FFmpeg: `-c:v`).
-        b_v: Video bitrate like '1000k', '2M' (FFmpeg: `-b:v`).
+        vcodec: Video codec like 'libx264', 'libx265' (FFmpeg: `-c:v`).
+        video_bitrate: Video bitrate like '1000k', '2M' (FFmpeg: `-b:v`).
         crf: Constant rate factor for quality-based encoding 0-51 (FFmpeg: `-crf`).
         qscale_v: Video quality scale, lower is better (FFmpeg: `-q:v`).
         maxrate: Maximum bitrate for rate control (FFmpeg: `-maxrate`).
@@ -383,8 +379,8 @@ class FFOutput:
         tune: Encoding tune like 'film', 'animation' (FFmpeg: `-tune`).
         
         # Audio Output Options
-        c_a: Audio codec like 'aac', 'libmp3lame' (FFmpeg: `-c:a`).
-        b_a: Audio bitrate like '128k', '320k' (FFmpeg: `-b:a`).
+        acodec: Audio codec like 'aac', 'libmp3lame' (FFmpeg: `-c:a`).
+        audio_bitrate: Audio bitrate like '128k', '320k' (FFmpeg: `-b:a`).
         ar: Audio sample rate in Hz (FFmpeg: `-ar`).
         ac: Number of audio channels (FFmpeg: `-ac`).
         vol: Audio volume adjustment (FFmpeg: `-vol`).
@@ -393,8 +389,8 @@ class FFOutput:
         qscale_a: Audio quality scale (FFmpeg: `-q:a`).
         
         # Filters
-        v_f: Video filter chain like 'scale=1280:720' (FFmpeg: `-vf`).
-        a_f: Audio filter chain like 'volume=0.5' (FFmpeg: `-af`).
+        vf: Video filter chain like 'scale=1280:720' (FFmpeg: `-vf`).
+        af: Audio filter chain like 'volume=0.5' (FFmpeg: `-af`).
         filter_complex: Complex filter graph for multi-input operations (FFmpeg: `-filter_complex`).
         
         # Format & Container Options
@@ -413,10 +409,10 @@ class FFOutput:
         x265_params: x265-specific parameters (FFmpeg: `-x265_params`).
         
         # Stream Control
-        an: Disable audio streams (FFmpeg: `-an`).
-        vn: Disable video streams (FFmpeg: `-vn`).
-        sn: Disable subtitle streams (FFmpeg: `-sn`).
-        dn: Disable data streams (FFmpeg: `-dn`).
+        disable_audio: Disable audio streams (FFmpeg: `-an`).
+        disable_video: Disable video streams (FFmpeg: `-vn`).
+        disable_subtitles: Disable subtitle streams (FFmpeg: `-sn`).
+        disable_data: Disable data streams (FFmpeg: `-dn`).
         
         # Metadata
         metadata: Metadata key-value pairs for output file (FFmpeg: `-metadata`).
@@ -433,24 +429,24 @@ class FFOutput:
     
     Examples:
         Basic video compression:
-            >>> output = FFOutput("compressed.mp4", c_v="libx264", crf=23, overwrite=True)
+            >>> output = FFOutput("compressed.mp4", vcodec="libx264", crf=23, overwrite=True)
         
         High quality with specific bitrate:
-            >>> output = FFOutput("output.mp4", c_v="libx264", b_v="5M", 
-            ...                   c_a="aac", b_a="128k", overwrite=True)
+            >>> output = FFOutput("output.mp4", vcodec="libx264", video_bitrate="5M", 
+            ...                   acodec="aac", audio_bitrate="128k", overwrite=True)
         
         Resize and convert to GIF:
-            >>> output = FFOutput("animation.gif", v_f="scale=500:-1,fps=10", overwrite=True)
+            >>> output = FFOutput("animation.gif", vf="scale=500:-1,fps=10", overwrite=True)
         
         Extract audio only:
-            >>> output = FFOutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)
+            >>> output = FFOutput("audio.mp3", disable_video=True, acodec="libmp3lame", overwrite=True)
         
         Hardware accelerated encoding:
-            >>> output = FFOutput("output.mp4", c_v="h264_nvenc", preset="fast", 
+            >>> output = FFOutput("output.mp4", vcodec="h264_nvenc", preset="fast", 
             ...                   crf=20, overwrite=True)
         
         Custom metadata:
-            >>> output = FFOutput("video.mp4", c_v="libx264", 
+            >>> output = FFOutput("video.mp4", vcodec="libx264", 
             ...                   metadata={"title": "My Video", "artist": "Author"}, overwrite=True)
     """
     file: str|Path
@@ -468,10 +464,10 @@ class FFOutput:
     to: Time|None = dataclasses.field(default=None, metadata={"arg": "to", "desc": "End time"})
 
     # Video Output Options
-    c_v: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", "desc": "Video codec (c:v)"})
-    b_v: str|None = dataclasses.field(default=None, metadata={"arg": "b:v", "desc": "Video bitrate (b:v)"})
+    vcodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", "desc": "Video codec (c:v)"})
+    video_bitrate: str|None = dataclasses.field(default=None, metadata={"arg": "b:v", "desc": "Video bitrate (b:v)"})
     crf: int|None = dataclasses.field(default=None, metadata={"arg": "crf", "desc": "Constant rate factor"})
-    q_v: int|None = dataclasses.field(default=None, metadata={"arg": "q:v", "desc": "Video quality scale (q:v)"})
+    qscale_v: int|None = dataclasses.field(default=None, metadata={"arg": "q:v", "desc": "Video quality scale (q:v)"})
     maxrate: str|None = dataclasses.field(default=None, metadata={"arg": "maxrate", "desc": "Maximum bitrate"})
     bufsize: str|None = dataclasses.field(default=None, metadata={"arg": "bufsize", "desc": "Buffer size"})
     framerate: int|None = dataclasses.field(default=None, metadata={"arg": "r", "desc": "Output frame rate (r)"})
@@ -488,22 +484,22 @@ class FFOutput:
     tune: str|None = dataclasses.field(default=None, metadata={"arg": "tune", "desc": "Encoding tune (film, animation, etc.)"})
 
     # Audio Output Options
-    c_a: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", "desc": "Audio codec (c:a)"})
-    b_a: str|None = dataclasses.field(default=None, metadata={"arg": "b:a", "desc": "Audio bitrate (b:a)"})
+    acodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", "desc": "Audio codec (c:a)"})
+    audio_bitrate: str|None = dataclasses.field(default=None, metadata={"arg": "b:a", "desc": "Audio bitrate (b:a)"})
     ar: str|None = dataclasses.field(default=None, metadata={"arg": "ar", "desc": "Audio sample rate"})
     ac: int|None = dataclasses.field(default=None, metadata={"arg": "ac", "desc": "Audio channels"})
     vol: str|None = dataclasses.field(default=None, metadata={"arg": "vol", "desc": "Audio volume"})
     aframes: int|None = dataclasses.field(default=None, metadata={"arg": "aframes", "desc": "Number of audio frames to output"})
     profile_a: str|None = dataclasses.field(default=None, metadata={"arg": "profile:a", "desc": "Audio profile"})
-    q_a: int|None = dataclasses.field(default=None, metadata={"arg": "q:a", "desc": "Audio quality scale (q:a)"})
+    qscale_a: int|None = dataclasses.field(default=None, metadata={"arg": "q:a", "desc": "Audio quality scale (q:a)"})
 
     # Filters
-    v_f: str|None = dataclasses.field(default=None, metadata={"arg": "vf", "desc": "Video filter chain"})
-    a_f: str|None = dataclasses.field(default=None, metadata={"arg": "af", "desc": "Audio filter chain"})
+    vf: str|None = dataclasses.field(default=None, metadata={"arg": "vf", "desc": "Video filter chain"})
+    af: str|None = dataclasses.field(default=None, metadata={"arg": "af", "desc": "Audio filter chain"})
     filter_complex: str|None = dataclasses.field(default=None, metadata={"arg": "filter_complex", "desc": "Complex filter graph"})
 
     # Format & Container Options
-    f: str|None = dataclasses.field(default=None, metadata={"arg": "f", "desc": "Output format (f)"})
+    format: str|None = dataclasses.field(default=None, metadata={"arg": "f", "desc": "Output format (f)"})
     movflags: str|None = dataclasses.field(default=None, metadata={"arg": "movflags", "desc": "MOV/MP4 specific flags"})
     brand: str|None = dataclasses.field(default=None, metadata={"arg": "brand", "desc": "Brand for MP4"})
 
@@ -518,16 +514,16 @@ class FFOutput:
     x265_params: str|None = dataclasses.field(default=None, metadata={"arg": "x265_params", "desc": "x265 specific parameters"})
 
     # Stream Control
-    an: bool = dataclasses.field(default=False, metadata={"flag": "an", "desc": "Disable audio streams (an)"})
-    vn: bool = dataclasses.field(default=False, metadata={"flag": "vn", "desc": "Disable video streams (vn)"})
-    sn: bool = dataclasses.field(default=False, metadata={"flag": "sn", "desc": "Disable subtitle streams (sn)"})
-    dn: bool = dataclasses.field(default=False, metadata={"flag": "dn", "desc": "Disable data streams (dn)"})
+    disable_audio: bool = dataclasses.field(default=False, metadata={"flag": "an", "desc": "Disable audio streams (an)"})
+    disable_video: bool = dataclasses.field(default=False, metadata={"flag": "vn", "desc": "Disable video streams (vn)"})
+    disable_subtitles: bool = dataclasses.field(default=False, metadata={"flag": "sn", "desc": "Disable subtitle streams (sn)"})
+    disable_data: bool = dataclasses.field(default=False, metadata={"flag": "dn", "desc": "Disable data streams (dn)"})
 
     # Metadata
     metadata: dict[str, str] = dataclasses.field(default_factory=dict, metadata={"desc": "Metadata key-value pairs"})
     
     # Subtitles
-    c_s: str|None = dataclasses.field(default=None, metadata={"arg": "c:s", "desc": "Subtitle codec (c:s)"})
+    scodec: str|None = dataclasses.field(default=None, metadata={"arg": "c:s", "desc": "Subtitle codec (c:s)"})
 
     # Threading & Performance
     threads: int|None = dataclasses.field(default=None, metadata={"arg": "threads", "desc": "Number of threads"})
@@ -666,7 +662,7 @@ def run_ffmpeg_subprocess(
 
 
 class CmdArgs(list[str]):
-    '''Class to build command line arguments for any terminal command.'''
+    '''Class to build command line arguments for FFMPEG.'''
     @classmethod
     def from_dict(cls, args: dict[str, str], flags: dict[str, bool]) -> typing.Self:
         '''Create CmdArgs from a dictionary of name-value pairs.'''
