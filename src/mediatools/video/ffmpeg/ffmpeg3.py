@@ -340,7 +340,7 @@ class FFInput:
 
     def to_args(self) -> list[str]:
         cmd = self.args.to_args()
-        cmd.add_arg('i', str(self.fpath))
+        cmd.add_arg('i', str(self.path))
         return cmd
 
 
@@ -353,9 +353,122 @@ def ffinput(
     itsoffset: str|None = None,
     c_v: str|None = None,
     c_a: str|None = None,
+    # Video Input Options
     r: Time|None = None,
+    s: str|None = None,
+    pix_fmt: str|None = None,
+    aspect: str|None = None,
+    vframes: int|None = None,
+    top: int|None = None,
+    # Audio Input Options
+    ar: str|None = None,
+    ac: int|None = None,
+    aframes: int|None = None,
+    vol: str|None = None,
+    # Hardware Acceleration (Input)
+    hwaccel: str|None = None,
+    hwaccel_device: str|None = None,
+    # Stream Selection
+    map_metadata: str|None = None,
+    map_chapters: str|None = None,
+    # Input Format Specific
+    probesize: int|None = None,
+    analyzeduration: int|None = None,
+    fpsprobesize: int|None = None,
+    safe: int|None = None,
+    # Loop & Repeat
+    loop: int|None = None,
+    stream_loop: int|None = None,
+    # Seeking & Timing
+    accurate_seek: bool|None = None,
+    seek_timestamp: bool|None = None,
+    # Generic extensibility
+    other_args: list[tuple[str,str]]|None = None,
+    other_flags: list[str]|None = None,
 ) -> FFInput:
-    '''Create an FFInput object from the given parameters.'''
+    """Create an FFInput object with comprehensive FFmpeg input options.
+    
+    This function provides a convenient interface for creating FFInput objects with all
+    available FFmpeg input parameters. It wraps the FFInputArgs dataclass and provides
+    a cleaner API for specifying input file configurations.
+    
+    Args:
+        path: Input file path or URL.
+        
+        # Basic Input Options
+        f: Input format override (e.g., 'mp4', 'avi', 'image2').
+        t: Input duration limit in seconds or time format (e.g., '10', '00:00:10').
+        ss: Input start time/seek position (e.g., '00:01:30', '90').
+        to: Input end time (e.g., '00:02:00', '120').
+        itsoffset: Input timestamp offset in seconds.
+        c_v: Video codec for input decoding (e.g., 'libx264', 'h264').
+        c_a: Audio codec for input decoding (e.g., 'aac', 'mp3').
+        
+        # Video Input Options
+        r: Input frame rate override (e.g., '25', '30', '59.94').
+        s: Input frame size as 'WxH' format (e.g., '1920x1080', '640x480').
+        pix_fmt: Input pixel format (e.g., 'yuv420p', 'rgb24').
+        aspect: Input aspect ratio override (e.g., '16:9', '4:3').
+        vframes: Maximum number of video frames to read.
+        top: Top field first flag for interlaced content (1 for top-field-first).
+        
+        # Audio Input Options
+        ar: Audio sample rate in Hz (e.g., '48000', '44100').
+        ac: Number of audio channels (e.g., 2 for stereo, 1 for mono).
+        aframes: Maximum number of audio frames to read.
+        vol: Audio volume adjustment (deprecated, use audio filters instead).
+        
+        # Hardware Acceleration
+        hwaccel: Hardware acceleration method ('cuda', 'vaapi', 'qsv', 'videotoolbox').
+        hwaccel_device: Specific hardware device to use (e.g., '0', '/dev/dri/renderD128').
+        
+        # Stream Selection
+        map_metadata: Metadata mapping specification (e.g., '0', '-1').
+        map_chapters: Chapter mapping specification (e.g., '0', '-1').
+        
+        # Input Format Specific
+        probesize: Buffer size for format detection in bytes (e.g., 5000000).
+        analyzeduration: Analysis duration in microseconds (e.g., 5000000).
+        fpsprobesize: Number of frames to probe for fps detection.
+        safe: Enable safe file access for concat demuxer (0 or 1).
+        
+        # Loop & Repeat
+        loop: Loop input file, useful for images (1 to enable, -1 for infinite).
+        stream_loop: Loop input streams specified number of times.
+        
+        # Seeking & Timing
+        accurate_seek: Enable accurate seeking at cost of speed.
+        seek_timestamp: Seek by timestamp instead of frame number.
+        
+        # Extensibility
+        other_args: Additional input arguments as (name, value) tuples.
+        other_flags: Additional input flags as strings.
+    
+    Returns:
+        FFInput: Configured input specification for FFmpeg commands.
+    
+    Examples:
+        Basic input file:
+            >>> inp = ffinput("video.mp4")
+        
+        Seek to specific time and duration:
+            >>> inp = ffinput("movie.mp4", ss="00:01:30", t="00:00:10")
+        
+        Hardware accelerated input:
+            >>> inp = ffinput("video.mp4", hwaccel="cuda")
+        
+        Image sequence with frame rate:
+            >>> inp = ffinput("frame_%03d.jpg", r="25", f="image2")
+        
+        Loop image input for 10 seconds:
+            >>> inp = ffinput("background.jpg", loop=1, t="10")
+        
+        High-quality probing:
+            >>> inp = ffinput("video.mkv", probesize=10000000, analyzeduration=10000000)
+        
+        Audio-only input with specific codec:
+            >>> inp = ffinput("audio.flac", c_a="flac", ar="48000")
+    """
     return FFInput(
         path=path,
         args=FFInputArgs(
@@ -364,6 +477,32 @@ def ffinput(
             ss=ss,
             to=to,
             itsoffset=itsoffset,
+            c_v=c_v,
+            c_a=c_a,
+            r=r,
+            s=s,
+            pix_fmt=pix_fmt,
+            aspect=aspect,
+            vframes=vframes,
+            top=top,
+            ar=ar,
+            ac=ac,
+            aframes=aframes,
+            vol=vol,
+            hwaccel=hwaccel,
+            hwaccel_device=hwaccel_device,
+            map_metadata=map_metadata,
+            map_chapters=map_chapters,
+            probesize=probesize,
+            analyzeduration=analyzeduration,
+            fpsprobesize=fpsprobesize,
+            safe=safe,
+            loop=loop,
+            stream_loop=stream_loop,
+            accurate_seek=accurate_seek,
+            seek_timestamp=seek_timestamp,
+            other_args=other_args,
+            other_flags=other_flags,
         )
     )
 
@@ -596,6 +735,263 @@ class FFOutput:
         return cmd
 
 
+def ffoutput(
+    path: str|Path,
+    # Overwrite
+    overwrite: bool = False,
+    # Stream Selection & Mapping
+    maps: list[Stream]|None = None,
+    map_metadata: str|None = None,
+    map_chapters: str|None = None,
+    # Timing & Seeking
+    ss: Time|None = None,
+    t: Time|None = None,
+    duration: Duration|None = None,
+    to: Time|None = None,
+    # Video Output Options
+    c_v: str|None = None,
+    b_v: str|None = None,
+    crf: int|None = None,
+    q_v: int|None = None,
+    maxrate: str|None = None,
+    bufsize: str|None = None,
+    framerate: int|None = None,
+    fps: str|None = None,
+    s: str|None = None,
+    aspect: str|None = None,
+    pix_fmt: str|None = None,
+    vframes: int|None = None,
+    keyint_min: int|None = None,
+    g: int|None = None,
+    bf: int|None = None,
+    profile_v: str|None = None,
+    level: str|None = None,
+    tune: str|None = None,
+    # Audio Output Options
+    c_a: str|None = None,
+    b_a: str|None = None,
+    ar: str|None = None,
+    ac: int|None = None,
+    vol: str|None = None,
+    aframes: int|None = None,
+    profile_a: str|None = None,
+    q_a: int|None = None,
+    # Filters
+    v_f: str|None = None,
+    a_f: str|None = None,
+    filter_complex: str|None = None,
+    # Format & Container Options
+    f: str|None = None,
+    movflags: str|None = None,
+    brand: str|None = None,
+    # Hardware Acceleration (Output)
+    hwaccel: str|None = None,
+    hwaccel_output_format: str|None = None,
+    vaapi_device: str|None = None,
+    # Encoding Presets & Quality
+    preset: str|None = None,
+    x264_params: str|None = None,
+    x265_params: str|None = None,
+    # Stream Control
+    an: bool = False,
+    vn: bool = False,
+    sn: bool = False,
+    dn: bool = False,
+    # Metadata
+    metadata: dict[str, str]|None = None,
+    # Subtitles
+    c_s: str|None = None,
+    # Threading & Performance
+    threads: int|None = None,
+    # Generic extensibility
+    other_args: list[tuple[str,str]]|None = None,
+    other_flags: list[str]|None = None,
+) -> FFOutput:
+    """Create an FFOutput object with comprehensive FFmpeg output options.
+    
+    This function provides a convenient interface for creating FFOutput objects with all
+    available FFmpeg output parameters. It wraps the FFOutputArgs dataclass and provides
+    a cleaner API for specifying output file configurations and encoding settings.
+    
+    Args:
+        path: Output file path.
+        
+        # File Handling
+        overwrite: Overwrite output file if it exists (maps to -y flag).
+        
+        # Stream Selection & Mapping
+        maps: List of stream mapping specifications (e.g., ['0:v:0', '1:a:0']).
+        map_metadata: Metadata mapping from input (e.g., '0', '-1').
+        map_chapters: Chapter mapping from input (e.g., '0', '-1').
+        
+        # Timing & Seeking
+        ss: Start time offset for output (e.g., '00:00:10', '10').
+        t: Output duration (e.g., '00:01:30', '90').
+        duration: Alternative duration specification.
+        to: End time for output (e.g., '00:02:00', '120').
+        
+        # Video Output Options
+        c_v: Video codec ('libx264', 'libx265', 'libvpx-vp9', 'copy').
+        b_v: Video bitrate ('1000k', '2M', '500k').
+        crf: Constant rate factor for quality-based encoding (0-51, lower = better).
+        q_v: Video quality scale (lower = better, codec dependent).
+        maxrate: Maximum bitrate for rate control ('2M', '1000k').
+        bufsize: Buffer size for rate control ('2M', '1000k').
+        framerate: Output frame rate (25, 30, 60).
+        fps: Alternative frame rate specification.
+        s: Output frame size as 'WxH' ('1920x1080', '1280x720').
+        aspect: Output aspect ratio ('16:9', '4:3', '1.78').
+        pix_fmt: Output pixel format ('yuv420p', 'yuv444p', 'rgb24').
+        vframes: Number of video frames to output.
+        keyint_min: Minimum GOP size (keyframe interval).
+        g: GOP size (keyframe interval, e.g., 30, 60).
+        bf: Number of B-frames (0-16).
+        profile_v: Video profile ('baseline', 'main', 'high').
+        level: Video level ('3.0', '4.0', '5.1').
+        tune: Encoding tune ('film', 'animation', 'stillimage', 'fastdecode').
+        
+        # Audio Output Options
+        c_a: Audio codec ('aac', 'libmp3lame', 'libopus', 'copy').
+        b_a: Audio bitrate ('128k', '192k', '320k').
+        ar: Audio sample rate in Hz ('48000', '44100').
+        ac: Number of audio channels (1 for mono, 2 for stereo).
+        vol: Audio volume adjustment ('0.5', '2.0').
+        aframes: Number of audio frames to output.
+        profile_a: Audio profile ('aac_low', 'aac_he').
+        q_a: Audio quality scale (codec dependent).
+        
+        # Filters
+        v_f: Video filter chain ('scale=1280:720', 'fps=30').
+        a_f: Audio filter chain ('volume=0.5', 'highpass=f=200').
+        filter_complex: Complex filter graph for multi-input operations.
+        
+        # Format & Container Options
+        f: Output format ('mp4', 'avi', 'mkv', 'gif').
+        movflags: MOV/MP4 specific flags ('faststart', '+faststart').
+        brand: Brand for MP4 container ('mp42', 'isom').
+        
+        # Hardware Acceleration
+        hwaccel: Hardware acceleration method ('cuda', 'vaapi', 'qsv').
+        hwaccel_output_format: Hardware accelerated output format.
+        vaapi_device: VAAPI device specification ('/dev/dri/renderD128').
+        
+        # Encoding Presets & Quality
+        preset: Encoding preset ('ultrafast', 'fast', 'medium', 'slow', 'veryslow').
+        x264_params: x264-specific parameters as string.
+        x265_params: x265-specific parameters as string.
+        
+        # Stream Control
+        an: Disable audio streams.
+        vn: Disable video streams (audio-only output).
+        sn: Disable subtitle streams.
+        dn: Disable data streams.
+        
+        # Metadata
+        metadata: Metadata key-value pairs ({'title': 'My Video', 'artist': 'Author'}).
+        
+        # Subtitles
+        c_s: Subtitle codec ('srt', 'ass', 'copy').
+        
+        # Performance
+        threads: Number of encoding threads (0 for auto, or specific number).
+        
+        # Extensibility
+        other_args: Additional output arguments as (name, value) tuples.
+        other_flags: Additional output flags as strings.
+    
+    Returns:
+        FFOutput: Configured output specification for FFmpeg commands.
+    
+    Examples:
+        Basic video compression:
+            >>> out = ffoutput("compressed.mp4", c_v="libx264", crf=23, overwrite=True)
+        
+        High quality with specific bitrate:
+            >>> out = ffoutput("output.mp4", c_v="libx264", b_v="5M", 
+            ...                c_a="aac", b_a="128k", overwrite=True)
+        
+        Resize and convert to GIF:
+            >>> out = ffoutput("animation.gif", v_f="scale=500:-1,fps=10", overwrite=True)
+        
+        Extract audio only:
+            >>> out = ffoutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)
+        
+        Hardware accelerated encoding:
+            >>> out = ffoutput("output.mp4", c_v="h264_nvenc", preset="fast", 
+            ...                crf=20, overwrite=True)
+        
+        Custom metadata and fast start:
+            >>> out = ffoutput("video.mp4", c_v="libx264", movflags="faststart",
+            ...                metadata={"title": "My Video", "artist": "Author"}, 
+            ...                overwrite=True)
+        
+        Thumbnail generation:
+            >>> out = ffoutput("thumb.jpg", vframes=1, s="320x240", overwrite=True)
+        
+        Two-pass encoding:
+            >>> out = ffoutput("output.mp4", c_v="libx264", b_v="1000k", 
+            ...                preset="slow", overwrite=True)
+    """
+    return FFOutput(
+        path=path,
+        args=FFOutputArgs(
+            y=overwrite,
+            maps=maps or [],
+            map_metadata=map_metadata,
+            map_chapters=map_chapters,
+            ss=ss,
+            t=t,
+            duration=duration,
+            to=to,
+            c_v=c_v,
+            b_v=b_v,
+            crf=crf,
+            q_v=q_v,
+            maxrate=maxrate,
+            bufsize=bufsize,
+            framerate=framerate,
+            fps=fps,
+            s=s,
+            aspect=aspect,
+            pix_fmt=pix_fmt,
+            vframes=vframes,
+            keyint_min=keyint_min,
+            g=g,
+            bf=bf,
+            profile_v=profile_v,
+            level=level,
+            tune=tune,
+            c_a=c_a,
+            b_a=b_a,
+            ar=ar,
+            ac=ac,
+            vol=vol,
+            aframes=aframes,
+            profile_a=profile_a,
+            q_a=q_a,
+            v_f=v_f,
+            a_f=a_f,
+            filter_complex=filter_complex,
+            f=f,
+            movflags=movflags,
+            brand=brand,
+            hwaccel=hwaccel,
+            hwaccel_output_format=hwaccel_output_format,
+            vaapi_device=vaapi_device,
+            preset=preset,
+            x264_params=x264_params,
+            x265_params=x265_params,
+            an=an,
+            vn=vn,
+            sn=sn,
+            dn=dn,
+            metadata=metadata,
+            c_s=c_s,
+            threads=threads,
+            other_args=other_args,
+            other_flags=other_flags,
+        )
+    )
 
 
 def stream_filter(
