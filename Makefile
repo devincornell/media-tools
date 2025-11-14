@@ -2,18 +2,16 @@ PACKAGE_NAME = mediatools
 PACKAGE_SRC = src/$(PACKAGE_NAME)
 
 SCRIPTS_PATH = ~/code/media-tools/scripts
+GOPRO_DIR = /mnt/MoStorage/gopro
+COMPILATIONS_DIR = /mnt/MoStorage/gopro/compilations
 
 gopro:
 	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07.html --port 8000 -s -w
 
 montage:
-	python3 $(SCRIPTS_PATH)/create_montage_v2.py "/mnt/MoStorage/gopro/GoPro 2024-05-31" 30 1 $(SCRIPTS_PATH)/test_montage_05-31.mp4 -s 1 -c 1 -v --width 3840 --height 2160
-	python3 $(SCRIPTS_PATH)/create_montage_v2.py "/mnt/MoStorage/gopro/GoPro 2024-09-05" 30 1 $(SCRIPTS_PATH)/test_montage_09-05.mp4 -s 1 -c 1 -v --width 3840 --height 2160
-	python3 $(SCRIPTS_PATH)/create_montage_v2.py "/mnt/MoStorage/gopro/GoPro 2024-10-05" 30 1 $(SCRIPTS_PATH)/test_montage_10-05.mp4 -s 1 -c 1 -v --width 3840 --height 2160
-
-	cp $(SCRIPTS_PATH)/test_montage_05-31.mp4 /mnt/MoStorage/gopro/
-	cp $(SCRIPTS_PATH)/test_montage_09-05.mp4 /mnt/MoStorage/gopro/
-	cp $(SCRIPTS_PATH)/test_montage_10-05.mp4 /mnt/MoStorage/gopro/
+	python3 $(SCRIPTS_PATH)/create_montage_v2.py $(GOPRO_DIR)/GoPro\ 2024-05-31/GX*.MP4 30 1 "$(COMPILATIONS_DIR)/montage_ashville_with_rachel.mp4" -s 1 -c 1 -v --width 3840 --height 2160
+	#python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(GOPRO_DIR)/GoPro 2024-09-03/GX*.mp4" 30 1 $(COMPILATIONS_DIR)/montage_grand_bazaar.mp4 -s 1 -c 1 -v --width 3840 --height 2160
+	#python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(GOPRO_DIR)/GoPro 2024-05-31/GX*.mp4" 30 1 $(COMPILATIONS_DIR)/montage_ashville_with_rachel.mp4 -s 1 -c 1 -v --width 3840 --height 2160
 
 	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07.html --port 8000 -s -w
 
