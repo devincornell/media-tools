@@ -51,29 +51,29 @@ class FFMPEG:
     Examples:
         Basic video compression:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("output.mp4", c_v="libx264", crf=23, overwrite=True)]
+            ...     inputs=[ffinput("input.mp4")],
+            ...     outputs=[ffoutput("output.mp4", c_v="libx264", crf=23, overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Extract a video clip:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("movie.mp4", ss="00:01:30", t="00:00:10")],
-            ...     outputs=[FFOutput("clip.mp4", overwrite=True)]
+            ...     inputs=[ffinput("movie.mp4", ss="00:01:30", t="00:00:10")],
+            ...     outputs=[ffoutput("clip.mp4", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Create a thumbnail at specific time:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("video.mp4")],
-            ...     outputs=[FFOutput("thumb.jpg", ss="00:00:05", vframes=1, overwrite=True)]
+            ...     inputs=[ffinput("video.mp4")],
+            ...     outputs=[ffoutput("thumb.jpg", ss="00:00:05", vframes=1, overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Resize video with aspect ratio preservation:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("resized.mp4", v_f="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
+            ...     inputs=[ffinput("input.mp4")],
+            ...     outputs=[ffoutput("resized.mp4", v_f="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
@@ -83,8 +83,8 @@ class FFMPEG:
             >>> target_duration = 10  # seconds
             >>> pts_factor = duration / target_duration
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("video.mp4")],
-            ...     outputs=[FFOutput("animation.gif", 
+            ...     inputs=[ffinput("video.mp4")],
+            ...     outputs=[ffoutput("animation.gif", 
             ...                      v_f=f"setpts=PTS/{pts_factor},fps=10,scale=500:-1:flags=lanczos",
             ...                      overwrite=True)]
             ... )
@@ -92,32 +92,32 @@ class FFMPEG:
         
         Crop video to specific region:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("input.mp4")],
-            ...     outputs=[FFOutput("cropped.mp4", v_f="crop=640:480:100:50", overwrite=True)]
+            ...     inputs=[ffinput("input.mp4")],
+            ...     outputs=[ffoutput("cropped.mp4", v_f="crop=640:480:100:50", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Extract audio track:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("video.mp4")],
-            ...     outputs=[FFOutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)]
+            ...     inputs=[ffinput("video.mp4")],
+            ...     outputs=[ffoutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)]
             ... )
             >>> result = cmd.run()
         
         Concatenate multiple videos:
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("video1.mp4"), FFInput("video2.mp4"), FFInput("video3.mp4")],
-            ...     outputs=[FFOutput("combined.mp4", overwrite=True)],
+            ...     inputs=[ffinput("video1.mp4"), ffinput("video2.mp4"), ffinput("video3.mp4")],
+            ...     outputs=[ffoutput("combined.mp4", overwrite=True)],
             ...     filter_complex="[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]",
             ... )
             >>> # Note: outputs should map the filter outputs
-            >>> cmd.outputs[0].maps = ["[outv]", "[outa]"]
+            >>> cmd.outputs[0].args.maps = ["[outv]", "[outa]"]
             >>> result = cmd.run()
         
         Apply hardware acceleration (NVIDIA):
             >>> cmd = FFMPEG(
-            ...     inputs=[FFInput("input.mp4", hwaccel="cuda")],
-            ...     outputs=[FFOutput("output.mp4", c_v="h264_nvenc", preset="fast", overwrite=True)]
+            ...     inputs=[ffinput("input.mp4", hwaccel="cuda")],
+            ...     outputs=[ffoutput("output.mp4", c_v="h264_nvenc", preset="fast", overwrite=True)]
             ... )
             >>> result = cmd.run()
     
