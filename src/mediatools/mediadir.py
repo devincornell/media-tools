@@ -11,12 +11,13 @@ import dataclasses
 from .video import VideoFile, VideoFiles
 from .images import ImageFile, ImageFiles
 from .util import build_file_tree, hash_file
+from .constants import VIDEO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS
 
 def scan_directory(
         root_path: pathlib.Path | str,
         use_absolute: bool = True,
-        video_ext: typing.Iterable[str] = ('.mp4', '.mov', '.avi', '.mkv', '.webm'),
-        image_ext: typing.Iterable[str] = ('.jpg', '.jpeg', '.png', '.gif'),
+        video_ext: typing.Iterable[str] = VIDEO_FILE_EXTENSIONS,
+        image_ext: typing.Iterable[str] = IMAGE_FILE_EXTENSIONS,
         ingore_folder_names: set[str] | None = None,
     ) -> MediaDir:
     '''Recursively scan a directory and return a MediaDir instance.'''
