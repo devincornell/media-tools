@@ -161,7 +161,7 @@ class FFMPEG:
         '''Run the FFMPEG command with the provided parameters.'''
         # Check if any output files exist when overwrite is disabled
         for output in self.outputs:
-            if not output.args.y and Path(output.path).exists():
+            if output.args.y is not None and not output.args.y and Path(output.path).exists():
                 raise FileExistsError(f'The output file {output.path} exists and y=False.')
         
         result = FFMPEGResult(
@@ -625,7 +625,7 @@ class FFOutputArgs:
             >>> output = FFOutput("video.mp4", c_v="libx264", 
             ...                   metadata={"title": "My Video", "artist": "Author"}, overwrite=True)
     """
-    y: bool = dataclasses.field(default=False, metadata={"flag": "y", "desc": 'Overwrite output file if it exists'})
+    y: bool|None = dataclasses.field(default=None, metadata={"flag": "y", "desc": 'Overwrite output file if it exists'})
     
     # Stream Selection & Mapping
     maps: list[Stream] = dataclasses.field(default_factory=list, metadata={"desc": 'Stream mapping specifications'})
@@ -743,7 +743,7 @@ class FFOutput:
 def ffoutput(
     path: str|Path,
     # Overwrite
-    y: bool = False,
+    y: bool|None = None,
     # Stream Selection & Mapping
     maps: list[Stream]|None = None,
     map_metadata: str|None = None,
