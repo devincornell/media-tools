@@ -283,8 +283,8 @@ class FFInput:
     ss: str|None = dataclasses.field(default=None, metadata={"arg": "ss", 'desc': 'Input start time'})
     to: str|None = dataclasses.field(default=None, metadata={"arg": "to", 'desc': 'Input end time'})
     itsoffset: str|None = dataclasses.field(default=None, metadata={"arg": "itsoffset", 'desc': 'Input timestamp offset'})
-    cv: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", 'desc': 'Video codec'})
-    ca: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", 'desc': 'Audio codec'})
+    c_v: str|None = dataclasses.field(default=None, metadata={"arg": "c:v", 'desc': 'Video codec'})
+    c_a: str|None = dataclasses.field(default=None, metadata={"arg": "c:a", 'desc': 'Audio codec'})
 
     # Video Input Options
     r: Time|None = dataclasses.field(default=None, metadata={"arg": "r", 'desc': 'Input frame rate'})
