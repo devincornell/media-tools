@@ -10,10 +10,11 @@ import shutil
 import datetime
 import hashlib
 import mediatools.util
+import tempfile
 
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
+from .ffmpeg import FFMPEG, FFInput, FFOutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
 
 
 
@@ -49,6 +50,37 @@ class VideoFile:
     def probe(self) -> ProbeInfo:
         '''Probe the file in question.'''
         return probe(str(self.fpath))
+    
+    def read_metadata(self) -> dict[str, typing.Any]:
+        '''Read metadata from the video file.'''
+        pinfo = self.probe()
+        return pinfo.tags
+    
+    def update_metadata(self, new_metadata: dict[str, str], delete_old: bool = False) -> FFMPEGResult:
+        '''Update metadata for the video file.'''
+
+        exist_meta = self.read_metadata() if not delete_old else {}
+        metadata = {**exist_meta, **new_metadata}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_fp = Path(tmpdir) / self.fpath.name
+            command = FFMPEG(
+                inputs = [FFInput(self.fpath)],
+                outputs = [FFOutput(
+                    temp_fp,
+                    vcodec='copy',
+                    acodec='copy',
+                    metadata=metadata,
+                )],
+            )
+            result = command.run()
+            new_meta = probe(temp_fp).tags
+            if (new_keys := set(new_meta.keys())) != (exp_keys := set(metadata.keys())):
+                missing = exp_keys - new_keys
+                raise RuntimeError(f'Metadata update failed. These fields could not be updated: {missing}')
+            shutil.move(temp_fp, self.fpath)
+            return result
+
+        return command.run()
 
     def hash(filepath: Path|str, hash_func=hashlib.sha256):
         """Calculate file hash with optimal chunk size."""
