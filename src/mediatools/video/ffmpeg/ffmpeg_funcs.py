@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+import pathlib
 import subprocess
+import tempfile
 import typing
 import shlex
 import json
@@ -147,16 +149,55 @@ def make_animated_thumb(
     return command.run()
 
 
-def make_compilation(input_files: list[tuple[str|Path, str|int, str|int]], output_fname: str|Path, overwrite: bool = False, **output_kwargs) -> FFMPEGResult:
-
-    #ffmpeg -i [INPUT_FILE.mov] \
-    #    -c:v libx264 -crf 18 \
-    #    -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1,fps=30" \
-    #    -pix_fmt yuv420p \
-    #    -c:a aac -ar 44100 -ac 2 \
-    #    [OUTPUT_FILE_processed.mp4]
+class VideoFileAlreadyCompressed(Exception):
     pass
 
+def compress_video_by_bitrate(
+    path: Path|str,
+    new_fpath: pathlib.Path,
+    target_av_bitrate: int,
+    vcodec: str = 'libx264',
+    overwrite: bool = True,
+) -> FFMPEGResult:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_dir = pathlib.Path(tmpdir)
+        tmp_log_dir = tmp_dir / 'logs/'
+        
+        # pass 1: ffmpeg -i "your_source_video.mp4" -c:v libx264 -b:v 2000k -pass 1 -an -f mp4 /dev/null
+        # pass 2: ffmpeg -i "your_source_video.mp4" -c:v libx264 -b:v 2000k -pass 2 -c:a copy "output_at_2000k.mp4"
+        
+        result1 = FFMPEG(
+            inputs = [ffinput(path)],
+            outputs = [
+                ffoutput(
+                    '/dev/null',
+                    c_v=vcodec,
+                    b_v=target_av_bitrate,
+                    an=True,
+                    f='mp4',
+                    #y=overwrite,
+                ),
+            ],
+            pass_num=1,
+            passlogfile=str(tmp_log_dir),
+        ).run()
+
+        result2 = FFMPEG(
+            inputs = [ffinput(path)],
+            outputs = [
+                ffoutput(
+                    new_fpath,
+                    c_v=vcodec,
+                    b_v=target_av_bitrate,
+                    c_a='copy',
+                    y=overwrite,
+                )
+            ],
+            passlogfile=str(tmp_log_dir),
+            pass_num=2,
+        ).run()
+        return result2
+    
 
 
 
