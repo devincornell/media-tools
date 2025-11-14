@@ -31,7 +31,7 @@ def create_montage(
     height: int = 1080, 
     fps: int = 30, 
     num_cores: int|None = None,
-    use_cuda: bool = True,
+    use_cuda: bool = False,
     verbose: bool = False,
     max_clips_per_video: int = 10,
 ) -> FFMPEGResult:
