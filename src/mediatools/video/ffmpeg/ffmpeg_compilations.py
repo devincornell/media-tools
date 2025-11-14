@@ -94,8 +94,8 @@ def get_random_clips(
 
     if clip_duration <= 0:
         raise ValueError("Error: Clip duration must be a positive number.")
-    
-    clip_infos: list[dict[str,typing.Any]] = []
+
+    all_clip_infos: list[ClipInfo] = []
     for video_path in sorted(video_paths):
 
         try:
@@ -112,7 +112,7 @@ def get_random_clips(
             num_clips = max(1, int(duration / clip_ratio))
             num_clips = min(num_clips, max_clips_per_video)
 
-
+        vid_clip_infos: list[ClipInfo] = []
         for n in range(num_clips):
             if duration <= clip_duration:
                 start_time = 0
@@ -130,13 +130,15 @@ def get_random_clips(
                 else:
                     start_time = random.uniform(min_start, max_start)
             
-            clip_infos.append(ClipInfo(
+            vid_clip_infos.append(ClipInfo(
                 start_time = start_time,
                 duration = clip_duration,
                 fpath = str(video_path),
             ))
+        
+        all_clip_infos.extend(list(sorted(vid_clip_infos, key=lambda x: x.start_time)))
 
-    return clip_infos
+    return all_clip_infos
 
 
 
@@ -268,7 +270,7 @@ def extract_clips(
         fail_on_error (bool, optional): Whether to raise an error if a clip extraction fails. Defaults to False.
         verbose (bool, optional): Whether to print verbose output. Defaults to False.
     '''
-    clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i}.mp4", width, height, fps, verbose, use_cuda) for i, ci in enumerate(clip_infos)]
+    clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i:05}.mp4", width, height, fps, verbose, use_cuda) for i, ci in enumerate(clip_infos)]
     with multiprocessing.Pool(num_cores) as p:
         clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
         if verbose:
@@ -280,8 +282,8 @@ def extract_clips(
                 clip_filenames.append((fp,cp))
             else:
                 raise RuntimeError(f"Clip extraction from {fp} failed.")
-        
-    return list(sorted(clip_filenames, key=lambda x: x[1]))
+                    
+    return list(sorted(clip_filenames, key=lambda x: str(x[1])))
 
 
 def extract_clip_wrap(args) -> str|None:
@@ -342,7 +344,7 @@ def extract_clip_process(
         loglevel = 'error',
         other_flags=['nostdin'],
     )
-    verbose = True
+    #verbose = True
     try:
         cmd.run()
         probe(processed_clip_path)  # Ensure the clip was processed correctly
@@ -352,6 +354,5 @@ def extract_clip_process(
         processed_clip_path = None
     else:
         if verbose: print('\nfinished', processed_clip_path)
-
     return clip_info.fpath, processed_clip_path
     
