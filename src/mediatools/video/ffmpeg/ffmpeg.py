@@ -1052,7 +1052,7 @@ class FFMPEGResult:
     @property
     def output_files(self) -> list[Path]:
         '''Return the output file paths of the FFMPEG command.'''
-        return [Path(output.file) for output in self.command.outputs]
+        return [Path(output.path) for output in self.command.outputs]
     
     @property
     def output_file(self) -> Path:
