@@ -41,7 +41,7 @@ class ProbeInfo:
             size = from_info('size', int), # type: ignore
             bit_rate = from_info('bit_rate', int), # type: ignore
             probe_score = from_info('probe_score', int), # type: ignore
-            tags = from_info('tags', str), # type: ignore
+            tags = from_info('tags', dict), # type: ignore
             video_streams = [VideoStreamInfo.from_dict(si, check_for_errors=check_for_errors) for si in probe_info['streams'] if si['codec_type']=='video'],
             audio_streams = [AudioStreamInfo.from_dict(si) for si in probe_info['streams'] if si['codec_type']=='audio'],
             other_streams = [si for si in probe_info['streams'] if si['codec_type'] not in ('video','audio')],
