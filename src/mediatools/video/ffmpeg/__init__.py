@@ -17,6 +17,7 @@ from .ffmpeg_funcs import (
     crop,
     make_thumb,
     make_animated_thumb,
+    compress_video_by_bitrate,
     #make_animated_thumb_old,
 )
 from .ffmpeg_compilations import (
