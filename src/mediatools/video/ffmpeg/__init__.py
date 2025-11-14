@@ -3,6 +3,8 @@ from .ffmpeg import (
     FFMPEGResult, 
     FFInput, 
     FFOutput, 
+    ffinput,
+    ffoutput,
     stream_filter,
     LOGLEVEL_OPTIONS
 )

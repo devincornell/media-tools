@@ -10,6 +10,8 @@ from .ffmpeg import (
     FFMPEG, 
     FFInput, 
     FFOutput,
+    ffinput,
+    ffoutput,
     FFMPEGResult, 
     FFMPEGExecutionError,
 )

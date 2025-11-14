@@ -14,7 +14,7 @@ import tempfile
 
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFInput, FFOutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
+from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
 
 
 
@@ -64,11 +64,11 @@ class VideoFile:
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_fp = Path(tmpdir) / self.fpath.name
             command = FFMPEG(
-                inputs = [FFInput(self.fpath)],
-                outputs = [FFOutput(
+                inputs = [ffinput(self.fpath)],
+                outputs = [ffoutput(
                     temp_fp,
-                    vcodec='copy',
-                    acodec='copy',
+                    c_v='copy',
+                    c_a='copy',
                     metadata=metadata,
                 )],
             )
@@ -121,12 +121,12 @@ class VideoFile:
         overwrite_output: bool = False,
         ss: str|None = None,
         duration: str|None = None,
-        vf: str|None = None,
-        af: str|None = None,
-        vcodec: str|None = None,
-        acodec: str|None = None,
-        video_bitrate: str|None = None,
-        audio_bitrate: str|None = None,
+        v_f: str|None = None,
+        a_f: str|None = None,
+        c_v: str|None = None,
+        c_a: str|None = None,
+        b_v: str|None = None,
+        b_a: str|None = None,
         framerate: int|None = None,
         format: str|None = None,
         filter_complex: str|None = None,
@@ -144,31 +144,35 @@ class VideoFile:
     ) -> FFMPEGResult:
         '''Execute an ffmpeg command.'''
         return FFMPEG(
-            input_files = [self.fpath],
-            output_file = output_file,
-            overwrite_output = overwrite_output,
-            ss = ss,
-            duration = duration,
-            vf = vf,
-            af = af,
-            vcodec = vcodec,
-            acodec = acodec,
-            video_bitrate = video_bitrate,
-            audio_bitrate = audio_bitrate,
-            framerate = framerate,
-            format = format,
-            filter_complex = filter_complex,
-            disable_audio = disable_audio,
-            disable_video = disable_video,
-            crf = crf,
-            preset = preset,
-            hwaccel = hwaccel,
-            loglevel = loglevel,
-            hide_banner = hide_banner,
-            nostats = nostats,
-            output_args = output_args,
-            input_args = input_args,
-            command_flags = command_flags,
+            inputs=[ffinput(
+                self.fpath, 
+                ss=ss, 
+                hwaccel=hwaccel,
+                other_args=input_args or [],
+            )],
+            outputs=[ffoutput(
+                output_file,
+                overwrite=overwrite_output,
+                t=duration,
+                v_f=v_f,
+                a_f=a_f,
+                c_v=c_v,
+                c_a=c_a,
+                b_v=b_v,
+                b_a=b_a,
+                framerate=framerate,
+                f=format,
+                filter_complex=filter_complex,
+                an=disable_audio,
+                vn=disable_video,
+                crf=crf,
+                preset=preset,
+                other_args=output_args or [],
+            )],
+            loglevel=loglevel,
+            hide_banner=hide_banner,
+            nostats=nostats,
+            other_flags=command_flags or [],
         ).run()
 
 

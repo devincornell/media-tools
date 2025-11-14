@@ -17,7 +17,7 @@ import multiprocessing
 import dataclasses
 
 
-from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, stream_filter)
+from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, ffinput, ffoutput, stream_filter)
 from .probe import probe
 from .errors import FFMPEGExecutionError
 
@@ -222,8 +222,8 @@ def concatenate_clips_demux(
             f.write("\n".join([f"file '{c}'" for c in clips]))
 
         cmd = FFMPEG(
-            inputs = [FFInput(str(tmp_file_path), f='concat', safe='0', hwaccel='cuda' if use_cuda else None)],
-            outputs = [FFOutput(str(output_filename), vcodec='copy', acodec='copy', overwrite=True)],
+            inputs = [ffinput(str(tmp_file_path), f='concat', safe=0, hwaccel='cuda' if use_cuda else None)],
+            outputs = [ffoutput(str(output_filename), c_v='copy', c_a='copy', overwrite=True)],
             loglevel = 'error',
         )
 
@@ -316,7 +316,7 @@ def extract_clip_process(
     processed_clip_path = clip_path
     cmd = FFMPEG(
         inputs = [
-            FFInput(
+            ffinput(
                 clip_info.fpath, 
                 ss=str(clip_info.start_time), 
                 t=str(clip_info.duration),
@@ -324,16 +324,16 @@ def extract_clip_process(
             )
         ],
         outputs = [
-            FFOutput(
-                file = processed_clip_path, 
+            ffoutput(
+                processed_clip_path, 
                 #maps=['0:v:0', '0:a:0'], 
                 overwrite=True, 
-                vf=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
+                v_f=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
                 framerate=fps, 
-                vcodec='h264_nvenc' if use_cuda else 'h264', 
-                acodec='aac', 
-                audio_bitrate='192k', 
-                ar=48000,
+                c_v='h264_nvenc' if use_cuda else 'h264', 
+                c_a='aac', 
+                b_a='192k', 
+                ar='48000',
                 pix_fmt='yuv420p',
                 preset='veryfast',
                 crf=23,

@@ -8,7 +8,7 @@ import json
 import datetime
 from pathlib import Path
 
-from .ffmpeg import FFMPEG, FFInput, FFOutput, stream_filter, FFMPEGResult, run_ffmpeg_subprocess
+from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, stream_filter, FFMPEGResult, run_ffmpeg_subprocess
 from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .probe_info import ProbeInfo
 from .probe import probe
@@ -35,8 +35,8 @@ def compress(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
     command = FFMPEG(
-        inputs=[FFInput(str(input_fname))],
-        outputs=[FFOutput(str(output_fname), vcodec=vcodec, crf=crf, overwrite=overwrite)],
+        inputs=[ffinput(str(input_fname))],
+        outputs=[ffoutput(str(output_fname), c_v=vcodec, crf=crf, overwrite=overwrite)],
         **output_kwargs
     )
 
@@ -56,8 +56,8 @@ def splice(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
     command = FFMPEG(
-        inputs=[FFInput(str(input_fname), ss=start_time.total_seconds(), to=end_time.total_seconds())],
-        outputs=[FFOutput(str(output_fname), overwrite=overwrite)],
+        inputs=[ffinput(str(input_fname), ss=start_time.total_seconds(), to=end_time.total_seconds())],
+        outputs=[ffoutput(str(output_fname), overwrite=overwrite)],
         **output_kwargs
     )
     return command.run()
@@ -81,8 +81,8 @@ def crop(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
     command = FFMPEG(
-        inputs=[FFInput(str(input_fname))],
-        outputs=[FFOutput(str(output_fname), vf=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}', overwrite=overwrite)],
+        inputs=[ffinput(str(input_fname))],
+        outputs=[ffoutput(str(output_fname), v_f=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}', overwrite=overwrite)],
         **output_kwargs
     )
     return command.run()
@@ -107,9 +107,8 @@ def make_thumb(
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
     command = FFMPEG(
-        inputs=[FFInput(str(input_fname))],
-        outputs=[FFOutput(str(ofp), overwrite=overwrite, vf=f'scale={width}:{height}', vframes=1)],
-        ss=time_point_sec,
+        inputs=[ffinput(str(input_fname), ss=time_point_sec)],
+        outputs=[ffoutput(str(ofp), overwrite=overwrite, v_f=f'scale={width}:{height}', vframes=1)],
         **output_kwargs
     )
     return command.run()
@@ -140,8 +139,8 @@ def make_animated_thumb(
     pts = duration / target_period
 
     command = FFMPEG(
-        inputs=[FFInput(str(input_fname))],
-        outputs=[FFOutput(str(ofp), vf=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", overwrite=overwrite)],
+        inputs=[ffinput(str(input_fname))],
+        outputs=[ffoutput(str(ofp), v_f=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", overwrite=overwrite)],
         **output_kwargs
     )
     

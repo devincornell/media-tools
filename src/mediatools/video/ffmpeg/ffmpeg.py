@@ -329,8 +329,10 @@ class FFInputArgs:
     def to_args(self) -> CmdArgs:
         '''Convert the FFInput to a string representation for FFMPEG command.'''
         cmd = CmdArgs.from_field_metadatas(self)
-        cmd.add_args(self.other_args)
-        cmd.add_flags(self.other_flags)
+        if self.other_args:
+            cmd.add_args(self.other_args)
+        if self.other_flags:
+            cmd.add_flags(self.other_flags)
         return cmd
 
 @dataclasses.dataclass
@@ -714,12 +716,15 @@ class FFOutputArgs:
             args.add_arg('map', map_spec)
         
         # Handle metadata separately since it needs special formatting
-        for key, value in self.metadata.items():
-            args.add_arg('metadata', f'{key}={value}')
+        if self.metadata:
+            for key, value in self.metadata.items():
+                args.add_arg('metadata', f'{key}={value}')
         
         # Generic extensibility
-        args.add_args(self.other_args)
-        args.add_flags(self.other_flags)
+        if self.other_args:
+            args.add_args(self.other_args)
+        if self.other_flags:
+            args.add_flags(self.other_flags)
         
         
         return args
