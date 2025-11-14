@@ -8,6 +8,8 @@ from .errors import *
 from . import ffmpeg
 from .ffmpeg import (
     FFMPEG, 
+    FFInput, 
+    FFOutput,
     FFMPEGResult, 
     FFMPEGExecutionError,
 )
