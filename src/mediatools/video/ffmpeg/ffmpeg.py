@@ -52,28 +52,28 @@ class FFMPEG:
         Basic video compression:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("input.mp4")],
-            ...     outputs=[ffoutput("output.mp4", c_v="libx264", crf=23, overwrite=True)]
+            ...     outputs=[ffoutput("output.mp4", c_v="libx264", crf=23, y=True)]
             ... )
             >>> result = cmd.run()
         
         Extract a video clip:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("movie.mp4", ss="00:01:30", t="00:00:10")],
-            ...     outputs=[ffoutput("clip.mp4", overwrite=True)]
+            ...     outputs=[ffoutput("clip.mp4", y=True)]
             ... )
             >>> result = cmd.run()
         
         Create a thumbnail at specific time:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("video.mp4")],
-            ...     outputs=[ffoutput("thumb.jpg", ss="00:00:05", vframes=1, overwrite=True)]
+            ...     outputs=[ffoutput("thumb.jpg", ss="00:00:05", vframes=1, y=True)]
             ... )
             >>> result = cmd.run()
         
         Resize video with aspect ratio preservation:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("input.mp4")],
-            ...     outputs=[ffoutput("resized.mp4", v_f="scale=1280:720:force_original_aspect_ratio=decrease", overwrite=True)]
+            ...     outputs=[ffoutput("resized.mp4", v_f="scale=1280:720:force_original_aspect_ratio=decrease", y=True)]
             ... )
             >>> result = cmd.run()
         
@@ -86,28 +86,28 @@ class FFMPEG:
             ...     inputs=[ffinput("video.mp4")],
             ...     outputs=[ffoutput("animation.gif", 
             ...                      v_f=f"setpts=PTS/{pts_factor},fps=10,scale=500:-1:flags=lanczos",
-            ...                      overwrite=True)]
+            ...                      y=True)]
             ... )
             >>> result = cmd.run()
         
         Crop video to specific region:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("input.mp4")],
-            ...     outputs=[ffoutput("cropped.mp4", v_f="crop=640:480:100:50", overwrite=True)]
+            ...     outputs=[ffoutput("cropped.mp4", v_f="crop=640:480:100:50", y=True)]
             ... )
             >>> result = cmd.run()
         
         Extract audio track:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("video.mp4")],
-            ...     outputs=[ffoutput("audio.mp3", vn=True, c_a="libmp3lame", overwrite=True)]
+            ...     outputs=[ffoutput("audio.mp3", vn=True, c_a="libmp3lame", y=True)]
             ... )
             >>> result = cmd.run()
         
         Concatenate multiple videos:
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("video1.mp4"), ffinput("video2.mp4"), ffinput("video3.mp4")],
-            ...     outputs=[ffoutput("combined.mp4", overwrite=True)],
+            ...     outputs=[ffoutput("combined.mp4", y=True)],
             ...     filter_complex="[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[outv][outa]",
             ... )
             >>> # Note: outputs should map the filter outputs
@@ -117,7 +117,7 @@ class FFMPEG:
         Apply hardware acceleration (NVIDIA):
             >>> cmd = FFMPEG(
             ...     inputs=[ffinput("input.mp4", hwaccel="cuda")],
-            ...     outputs=[ffoutput("output.mp4", c_v="h264_nvenc", preset="fast", overwrite=True)]
+            ...     outputs=[ffoutput("output.mp4", c_v="h264_nvenc", preset="fast", y=True)]
             ... )
             >>> result = cmd.run()
     
@@ -125,7 +125,7 @@ class FFMPEG:
         FFMPEGResult: Container with the executed command, subprocess result, and convenience properties.
     
     Raises:
-        FileExistsError: When output files exist and overwrite=False.
+        FileExistsError: When output files exist and y=False.
         FFMPEGExecutionError: When FFmpeg command fails during execution.
         FFMPEGCommandTimeoutError: When command exceeds specified timeout.
         FFMPEGNotFoundError: When FFmpeg executable is not found in PATH.
@@ -161,8 +161,8 @@ class FFMPEG:
         '''Run the FFMPEG command with the provided parameters.'''
         # Check if any output files exist when overwrite is disabled
         for output in self.outputs:
-            if not output.overwrite and Path(output.file).exists():
-                raise FileExistsError(f'The output file {output.file} exists and overwrite=False.')
+            if not output.args.y and Path(output.path).exists():
+                raise FileExistsError(f'The output file {output.path} exists and y=False.')
         
         result = FFMPEGResult(
             command=self, 
@@ -521,7 +521,7 @@ class FFOutputArgs:
     to FFmpeg command-line arguments for precise control over output encoding.
     
     Args:
-        overwrite: Overwrite output file if it exists (FFmpeg: `-y`).
+        y: Overwrite output file if it exists (FFmpeg: `-y`).
         
         # Stream Selection & Mapping
         maps: List of stream mapping specifications like '0:v:0' (FFmpeg: `-map`).
@@ -743,7 +743,7 @@ class FFOutput:
 def ffoutput(
     path: str|Path,
     # Overwrite
-    overwrite: bool = False,
+    y: bool = False,
     # Stream Selection & Mapping
     maps: list[Stream]|None = None,
     map_metadata: str|None = None,
@@ -822,7 +822,7 @@ def ffoutput(
         path: Output file path.
         
         # File Handling
-        overwrite: Overwrite output file if it exists (maps to -y flag).
+        y: Overwrite output file if it exists (maps to -y flag).
         
         # Stream Selection & Mapping
         maps: List of stream mapping specifications (e.g., ['0:v:0', '1:a:0']).
@@ -940,7 +940,7 @@ def ffoutput(
     return FFOutput(
         path=path,
         args=FFOutputArgs(
-            y=overwrite,
+            y=y,
             maps=maps or [],
             map_metadata=map_metadata,
             map_chapters=map_chapters,

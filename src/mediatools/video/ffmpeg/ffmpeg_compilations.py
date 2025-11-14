@@ -223,7 +223,7 @@ def concatenate_clips_demux(
 
         cmd = FFMPEG(
             inputs = [ffinput(str(tmp_file_path), f='concat', safe=0, hwaccel='cuda' if use_cuda else None)],
-            outputs = [ffoutput(str(output_filename), c_v='copy', c_a='copy', overwrite=True)],
+            outputs = [ffoutput(str(output_filename), c_v='copy', c_a='copy', y=True)],
             loglevel = 'error',
         )
 
@@ -327,7 +327,7 @@ def extract_clip_process(
             ffoutput(
                 processed_clip_path, 
                 #maps=['0:v:0', '0:a:0'], 
-                overwrite=True, 
+                y=True, 
                 v_f=f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1', 
                 framerate=fps, 
                 c_v='h264_nvenc' if use_cuda else 'h264', 

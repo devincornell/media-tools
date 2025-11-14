@@ -4,7 +4,9 @@ from .ffmpeg import (
     FFInput, 
     FFOutput, 
     ffinput,
+    FFInputArgs,
     ffoutput,
+    FFOutputArgs,
     stream_filter,
     LOGLEVEL_OPTIONS
 )

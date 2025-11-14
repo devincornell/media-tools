@@ -36,7 +36,7 @@ def compress(
     
     command = FFMPEG(
         inputs=[ffinput(str(input_fname))],
-        outputs=[ffoutput(str(output_fname), c_v=vcodec, crf=crf, overwrite=overwrite)],
+        outputs=[ffoutput(str(output_fname), c_v=vcodec, crf=crf, y=overwrite)],
         **output_kwargs
     )
 
@@ -57,7 +57,7 @@ def splice(
 
     command = FFMPEG(
         inputs=[ffinput(str(input_fname), ss=start_time.total_seconds(), to=end_time.total_seconds())],
-        outputs=[ffoutput(str(output_fname), overwrite=overwrite)],
+        outputs=[ffoutput(str(output_fname), y=overwrite)],
         **output_kwargs
     )
     return command.run()
