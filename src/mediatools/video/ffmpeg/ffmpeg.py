@@ -1058,7 +1058,7 @@ class FFMPEGResult:
     def output_file(self) -> Path:
         '''Return the first output file path of the FFMPEG command (for backward compatibility).'''
         if self.command.outputs:
-            return Path(self.command.outputs[0].file)
+            return Path(self.command.outputs[0].path)
         raise ValueError("No output files specified in command.")
 
     @property
