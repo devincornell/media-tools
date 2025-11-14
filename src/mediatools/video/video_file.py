@@ -14,7 +14,7 @@ import tempfile
 
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
+from .ffmpeg import FFMPEG, FFInput, FFOutput, FFInputArgs, ffinput, ffoutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
 
 
 
@@ -117,63 +117,144 @@ class VideoFile:
     ############################# file operations #############################
     def ffmpeg(
         self,
-        output_file: str|Path,
-        overwrite_output: bool = False,
-        ss: str|None = None,
-        duration: str|None = None,
-        v_f: str|None = None,
-        a_f: str|None = None,
-        c_v: str|None = None,
-        c_a: str|None = None,
-        b_v: str|None = None,
-        b_a: str|None = None,
-        framerate: int|None = None,
-        format: str|None = None,
-        filter_complex: str|None = None,
-        disable_audio: bool = False,
-        disable_video: bool = False,
-        crf: int|None = None,
-        preset: str|None = None,
-        hwaccel: str|None = None,
+        outputs: list[FFOutput],
+        input_args: FFInputArgs|None = None,
+        # Global command options (matching FFMPEG class exactly)
+        filter_complex: str|list[str]|None = None,
         loglevel: LOGLEVEL_OPTIONS|None = None,
         hide_banner: bool = True,
         nostats: bool = True,
-        output_args: list[tuple[str,str]]|None = None,
-        input_args: list[tuple[str,str]]|None = None,
-        command_flags: list[str]|None = None,
-    ) -> FFMPEGResult:
-        '''Execute an ffmpeg command.'''
+        progress: str|None = None,
+        passlogfile: str|None = None,
+        pass_num: int|None = None,
+        # Generic extensibility
+        other_args: list[tuple[str,str]]|None = None,
+        other_flags: list[str]|None = None,
+    ) -> FFMPEG:
+        """Execute an FFmpeg command using this video file as input.
+        
+        This method creates and returns an FFMPEG command object configured with this video
+        file as the input and the specified outputs and options. The method provides a
+        convenient interface to all FFmpeg global options while using this VideoFile as
+        the primary input source.
+        
+        Args:
+            outputs: List of FFOutput objects specifying output files and encoding parameters.
+                    Use the ffoutput() convenience function to create these easily.
+            input_args: Optional FFInputArgs to specify input-specific options like seeking,
+                       hardware acceleration, etc. Use ffinput() args or FFInputArgs directly.
+            
+            # Global Command Options (matching FFMPEG class)
+            filter_complex: Complex filter graph for advanced multi-input/output operations.
+                          Can be a string or list of strings that will be joined with semicolons.
+            loglevel: FFmpeg logging level ('error', 'warning', 'info', 'quiet', 'panic').
+            hide_banner: Whether to hide the FFmpeg banner (default: True).
+            nostats: Whether to disable statistics output (default: True).
+            progress: File path for writing progress reports.
+            passlogfile: Logfile for two-pass encoding.
+            pass_num: Encoding pass number for multi-pass encoding.
+            
+            # Generic Extensibility
+            other_args: Additional command arguments as (name, value) tuples.
+            other_flags: Additional command flags as strings.
+        
+        Returns:
+            FFMPEG: Configured FFMPEG command object ready to run.
+        
+        Examples:
+            Basic compression:
+                >>> vf = VideoFile.from_path("input.mp4")
+                >>> cmd = vf.ffmpeg(outputs=[
+                ...     ffoutput("output.mp4", c_v="libx264", crf=23, y=True)
+                ... ])
+                >>> result = cmd.run()
+            
+            Extract audio track:
+                >>> cmd = vf.ffmpeg(outputs=[
+                ...     ffoutput("audio.mp3", vn=True, c_a="libmp3lame", y=True)
+                ... ])
+                >>> result = cmd.run()
+            
+            Create thumbnail at specific time:
+                >>> cmd = vf.ffmpeg(
+                ...     outputs=[ffoutput("thumb.jpg", vframes=1, y=True)],
+                ...     input_args=FFInputArgs(ss="00:01:30")
+                ... )
+                >>> result = cmd.run()
+            
+            Resize with custom filter:
+                >>> cmd = vf.ffmpeg(outputs=[
+                ...     ffoutput("resized.mp4", 
+                ...              v_f="scale=1280:720:force_original_aspect_ratio=decrease",
+                ...              y=True)
+                ... ])
+                >>> result = cmd.run()
+            
+            Hardware accelerated encoding:
+                >>> cmd = vf.ffmpeg(
+                ...     outputs=[ffoutput("output.mp4", c_v="h264_nvenc", preset="fast", y=True)],
+                ...     input_args=FFInputArgs(hwaccel="cuda")
+                ... )
+                >>> result = cmd.run()
+            
+            Two-pass encoding:
+                >>> # Pass 1
+                >>> cmd1 = vf.ffmpeg(
+                ...     outputs=[ffoutput("/dev/null", c_v="libx264", b_v="1000k", f="mp4", an=True)],
+                ...     pass_num=1,
+                ...     passlogfile="logfile"
+                ... )
+                >>> result1 = cmd1.run()
+                >>> 
+                >>> # Pass 2  
+                >>> cmd2 = vf.ffmpeg(
+                ...     outputs=[ffoutput("output.mp4", c_v="libx264", b_v="1000k", y=True)],
+                ...     pass_num=2,
+                ...     passlogfile="logfile"
+                ... )
+                >>> result2 = cmd2.run()
+            
+            Multiple outputs with different settings:
+                >>> cmd = vf.ffmpeg(outputs=[
+                ...     ffoutput("high_quality.mp4", c_v="libx264", crf=18, y=True),
+                ...     ffoutput("low_quality.mp4", c_v="libx264", crf=30, s="854x480", y=True),
+                ...     ffoutput("thumbnail.jpg", vframes=1, ss="00:00:05", y=True)
+                ... ])
+                >>> result = cmd.run()
+            
+            Complex filter example (picture-in-picture):
+                >>> cmd = vf.ffmpeg(
+                ...     outputs=[ffoutput("pip.mp4", y=True)],
+                ...     filter_complex="[0:v]scale=1280:720[main];[1:v]scale=320:240[pip];"
+                ...                    "[main][pip]overlay=W-w-10:H-h-10[out]",
+                ... )
+                >>> # Note: This example assumes additional input handling
+            
+            Quiet operation with custom logging:
+                >>> cmd = vf.ffmpeg(
+                ...     outputs=[ffoutput("output.mp4", c_v="libx264", y=True)],
+                ...     loglevel="quiet",
+                ...     progress="progress.txt",
+                ...     hide_banner=True
+                ... )
+                >>> result = cmd.run()
+        """
         return FFMPEG(
-            inputs=[ffinput(
-                self.fpath, 
-                ss=ss, 
-                hwaccel=hwaccel,
-                other_args=input_args or [],
+            inputs=[FFInput(
+                path = self.fpath,
+                args = input_args or FFInputArgs(),
             )],
-            outputs=[ffoutput(
-                output_file,
-                overwrite=overwrite_output,
-                t=duration,
-                v_f=v_f,
-                a_f=a_f,
-                c_v=c_v,
-                c_a=c_a,
-                b_v=b_v,
-                b_a=b_a,
-                framerate=framerate,
-                f=format,
-                filter_complex=filter_complex,
-                an=disable_audio,
-                vn=disable_video,
-                crf=crf,
-                preset=preset,
-                other_args=output_args or [],
-            )],
+            outputs=outputs,
+            filter_complex=filter_complex,
             loglevel=loglevel,
             hide_banner=hide_banner,
             nostats=nostats,
-            other_flags=command_flags or [],
-        ).run()
+            progress=progress,
+            passlogfile=passlogfile,
+            pass_num=pass_num,
+            other_args=other_args or [],
+            other_flags=other_flags or [],
+        )
 
 
 

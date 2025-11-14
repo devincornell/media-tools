@@ -10,6 +10,7 @@ from .ffmpeg import (
     FFMPEG, 
     FFInput, 
     FFOutput,
+    FFInputArgs,
     ffinput,
     ffoutput,
     FFMPEGResult, 
