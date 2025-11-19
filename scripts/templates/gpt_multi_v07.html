@@ -1321,18 +1321,18 @@
             const countdownOverlay = document.getElementById('autoplayCountdown');
             const countdownNumber = document.getElementById('countdownNumber');
             
-            autoplayCountdownTimeLeft = 1; // 5 second countdown
+            autoplayCountdownTimeLeft = 0; // 5 second countdown
             countdownNumber.textContent = autoplayCountdownTimeLeft;
             countdownOverlay.style.display = 'block';
             
             autoplayCountdownInterval = setInterval(() => {
-                autoplayCountdownTimeLeft--;
-                countdownNumber.textContent = autoplayCountdownTimeLeft;
-                
                 if (autoplayCountdownTimeLeft <= 0) {
                     clearInterval(autoplayCountdownInterval);
                     proceedToNextVideo();
                 }
+                autoplayCountdownTimeLeft--;
+                countdownNumber.textContent = autoplayCountdownTimeLeft;
+                
             }, 1000);
         }
 
