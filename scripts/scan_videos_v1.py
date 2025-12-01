@@ -10,9 +10,11 @@ import tempfile
 import tqdm
 import multiprocessing
 import pathlib
+import multiprocessing
 
 import sys
 sys.path.append('../src/')
+sys.path.append('src/')
 import mediatools
 
 
@@ -44,13 +46,16 @@ def scan_media_folders(
 def make_thumbs(
     mdir: mediatools.MediaDir, 
     thumbs_path: pathlib.Path,
-) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
+    cores: int = 1,
+) -> None:
     thumbs_path = Path(thumbs_path)
     thumbs_path.mkdir(parents=False, exist_ok=True)
 
     vfiles = mdir.all_video_files()
-    print(f'Found {len(vfiles)} video files in {mdir.fpath}')
+    print(f'Found {len(vfiles)} video files in {mdir.fpath}. Scanning for thumbnails...')
 
+
+    thumbs_to_create = []
     for vf in tqdm.tqdm(vfiles, ncols=80):
         try:
             probe_info = vf.probe()
@@ -62,24 +67,83 @@ def make_thumbs(
         thumb_fname = get_thumb_path(rel_path, thumbs_path)
         if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
             #samp = max(1, int(probe_info.duration/10))
-            try:
-                mediatools.ffmpeg.make_animated_thumb(
-                    input_fname=vf.fpath,
-                    output_fname=thumb_fname,
-                    fps=3,
-                    #sample_period=samp if samp > 0 else 1,
-                    target_period = 10 + random.choice([-2,-1,0,1,2]),
-                    width=400,
-                    height=-1,
-                    overwrite=True,
-                )
-                print(f'\nCreated thumbnail for {vf.fpath}')
-            except mediatools.ffmpeg.FFMPEGExecutionError as e:
-                print(f'\nERROR: FFMPEG failed to create thumbnail for {vf.fpath}: {e}')
-                continue
+            thumbs_to_create.append( (vf.fpath, thumb_fname) )
+
+    if cores > 1:
+        with multiprocessing.Pool(processes=cores) as pool:
+            list(tqdm.tqdm(
+                pool.imap_unordered(
+                    lambda args: make_animated_thumb(
+                        input_fname=args[0],
+                        output_fname=args[1],
+                    ),
+                    thumbs_to_create,
+                ),
+                total=len(thumbs_to_create),
+                ncols=80,
+            ))
+    else:
+        for input_fp, output_fp in tqdm.tqdm(thumbs_to_create, ncols=80):
+            output_fp.parent.mkdir(parents=True, exist_ok=True)
+            make_animated_thumb(
+                input_fname=input_fp,
+                output_fname=output_fp,
+            )
+
+
+def make_animated_thumb(
+    input_fname: pathlib.Path|str, 
+    output_fname: pathlib.Path|str, 
+    fps: int = 3, 
+    target_period: int = 10, 
+    width: int = 400, 
+    height: int = -1, 
+    overwrite: bool = True
+) -> None:
+    '''Creates an animated thumbnail (GIF) from a video file.'''
+    try:
+        mediatools.ffmpeg.make_animated_thumb(
+            input_fname=input_fname,
+            output_fname=output_fname,
+            fps=fps,
+            target_period=target_period,
+            width=width,
+            height=height,
+            overwrite=overwrite,
+        )
+    except mediatools.ffmpeg.FFMPEGExecutionError as e:
+        print(f'\nERROR: FFMPEG failed to create thumbnail for {input_fname}: {e}')
+
 
 def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
     return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
+
+
+
+def scan_media_dir(
+    mdir: mediatools.MediaDir, 
+    convert_to_mp4: bool = False,
+) -> None:
+
+    for subdir in mdir.subdirs:
+        scan_media_dir(subdir, convert_to_mp4=convert_to_mp4)
+    
+    for vf in mdir.videos:
+        if convert_to_mp4 and not str(vf.fpath).endswith('.mp4'):
+            try:
+                new_fp = vf.fpath.with_suffix('.mp4')
+                if new_fp.exists():
+                    print(f'Skipping conversion for {vf.fpath}; {new_fp} already exists.')
+                    continue
+                print(f'Converting {vf.fpath} to {new_fp}')
+                mediatools.FFMPEG(
+                    inputs=[mediatools.ffinput(vf.fpath)],
+                    outputs=[mediatools.ffoutput(new_fp,y=True)]
+                ).run()
+            except mediatools.ffmpeg.FFMPEGExecutionError as e:
+                print(f'ERROR: Could not convert {vf.fpath}: {e}')
+
+
 
 
 def compress_videos(
@@ -174,7 +238,10 @@ if __name__ == '__main__':
         epilog="Example: ./create_montage_v2.py ./my_videos 5 my_montage.mp4 --random_seed 42 --clip_ratio 30"
     )
     parser.add_argument("root_directory", help="Directory containing the video files.")
-    parser.add_argument("-t", "--thumbs_path", type=str, default=None, help="Directory to save thumbnails (default: <root_directory>/_thumbs).")
+    parser.add_argument("-t", "--make-thumbs", action='store_true', help="Generate thumbnails for the videos.")
+    parser.add_argument("-p", "--thumbs_path", type=str, default=None, help="Directory to save thumbnails (default: <root_directory>/_thumbs).")
+    parser.add_argument("-c", "--num_cores", type=int, default=1, help="Number of CPU cores to use for thumbnail generation (default: 1).")
+    parser.add_argument("--convert", action='store_true', help="Convert non-MP4 videos to MP4 format.")
     #parser.add_argument("-c", "--num_cores", type=int, default=15, help="Number of CPU cores to use (default: 15).")
     #parser.add_argument("-s", "--random_seed", type=int, default=0, help="Random seed for selecting clips (default: 0).")
     #parser.add_argument("-v", "--verbose", action='store_true', help="Enable verbose output.")
@@ -188,14 +255,18 @@ if __name__ == '__main__':
     print(len(mdir.videos))
     print(len(mdir.subdirs))
     
-    
-    
-    make_thumbs(
-        mdir=mdir,
-        thumbs_path=Path(args.root_directory) / '_thumbs' if args.thumbs_path is None else Path(args.thumbs_path),
-    )
+    print(args)
+    if args.make_thumbs:
+        make_thumbs(
+            mdir=mdir,
+            thumbs_path=Path(args.root_directory) / '_thumbs' if args.thumbs_path is None else Path(args.thumbs_path),
+            cores=args.num_cores,
+        )
+    else:
+        print('--make-thumbs not set; skipping thumbnail generation.')
 
-
+    if args.convert and False:
+        scan_media_dir(mdir, convert_to_mp4=True)
 
 
 
