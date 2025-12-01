@@ -18,6 +18,7 @@ import tempfile
 import tqdm
 import multiprocessing
 import logging
+import glob
 
 import sys
 sys.path.append('../src/')
@@ -47,8 +48,19 @@ if __name__ == '__main__':
     parser.add_argument("-i", "--ignore_invalid_videos", action='store_true', help="Ignore invalid or non-video files instead of exiting with an error.")
     args = parser.parse_args()
     
+
+    provided_files = []
+    for vfs in args.video_files:
+        if '*' in str(vfs) or '?' in str(vfs) or '[' in str(vfs):
+            expanded = list(glob.glob(str(vfs)))
+            if args.verbose:
+                logging.info(f"Expanded glob pattern {vfs} to {len(expanded)} files.")
+            provided_files.extend(expanded)
+        else:
+            provided_files.append(vfs)
+
     video_paths = list()
-    for vps in args.video_files:
+    for vps in provided_files:
         if (vp := Path(vps)).exists():
             try:
                 mediatools.ffmpeg.probe(vp)
@@ -70,6 +82,18 @@ if __name__ == '__main__':
             logging.info(f"Found {len(video_paths)} valid video files for montage creation.")
     else:
         raise FileNotFoundError(f"No valid video files found from the provided arguments.")
+
+    if args.verbose:
+        logging.info(f"Creating montage with the following parameters:\n"
+                     f"  Clip Ratio: {args.clip_ratio}\n"
+                     f"  Clip Duration: {args.clip_duration}\n"
+                     f"  Output Filename: {args.output_filename}\n"
+                     f"  Random Seed: {args.random_seed}\n"
+                     f"  Number of Cores: {args.num_cores}\n"
+                     f"  Width: {args.width}\n"
+                     f"  Height: {args.height}\n"
+                     f"  Use CUDA: {args.usecuda}\n"
+                     f"  Max Clips per Video: {args.max_clips_per_video}\n")
 
     mediatools.ffmpeg.create_montage(
         video_files=video_paths,
