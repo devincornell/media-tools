@@ -160,14 +160,27 @@ class MediaDir:
             images.extend(subdir.all_image_files())
         return images
     
-    def video_paths(self) -> list[pathlib.Path]:
+    def all_video_paths(self) -> list[pathlib.Path]:
         '''Get the fpaths of all video files.'''
         return [vf.fpath for vf in self.all_video_files()]
     
-    def image_paths(self) -> list[pathlib.Path]:
+    def all_image_paths(self) -> list[pathlib.Path]:
         '''Get the fpaths of all image files.'''
         return [ifp.fpath for ifp in self.all_image_files()]
+    
+    def video_paths(self) -> list[pathlib.Path]:
+        '''Get the fpaths of video files in this directory.'''
+        return [vf.fpath for vf in self.videos]
 
+    def image_paths(self) -> list[pathlib.Path]:
+        '''Get the fpaths of image files in this directory.'''
+        return [ifp.fpath for ifp in self.images]
+
+    def __getitem__(self, key: str) -> typing.Self:
+        for subdir in self.subdirs:
+            if subdir.fpath.name == key:
+                return subdir
+        raise KeyError(f'Subdirectory not found: {key}')
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.fpath}")'
