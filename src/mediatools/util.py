@@ -5,7 +5,8 @@ import pathlib
 import hashlib
 from collections import defaultdict
 import urllib.parse
-
+import glob
+import os
 
 Constant = str | int | bool | float
 
@@ -110,7 +111,7 @@ def hash_file(path, hash_algo='sha256') -> str:
 
 
 
-def build_file_tree(root: pathlib.Path, pattern: str = '**/*') -> defaultdict:
+def build_file_tree(root: pathlib.Path, pattern: str = '*') -> defaultdict:
     """Build a tree structure from file paths in a directory.
     
         # Example usage
@@ -122,7 +123,10 @@ def build_file_tree(root: pathlib.Path, pattern: str = '**/*') -> defaultdict:
 
     """
     root = pathlib.Path(root)
-    file_paths = [fp.relative_to(root) for fp in root.rglob(pattern) if fp.is_file()]
+    #glob_result = root.rglob(pattern)
+    #glob_result = [pathlib.Path(fn) for fn in glob.glob(str(root / '**' / pattern), recursive=True)]
+    glob_result = get_all_files(root)
+    file_paths = [fp.relative_to(root) for fp in glob_result if fp.is_file()]
     tree = make_tree()
     for path in file_paths:
         insert_path(tree, path)
@@ -152,8 +156,13 @@ def print_tree(d: dict, indent=0):
         if isinstance(value, dict):
             print_tree(value, indent + 1)
 
-
-
+def get_all_files(root: pathlib.Path|str) -> list[pathlib.Path]:
+    all_files = []
+    for dirpath, dirnames, filenames in os.walk(str(root), followlinks=True):
+        for fn in filenames:
+            fpath = pathlib.Path(dirpath) / fn
+            all_files.append(fpath)
+    return all_files
 
 def fname_to_title(fname: str, max_char: int = 150) -> str:
     replaced = fname.replace('_', ' ').replace('-', ' ')
