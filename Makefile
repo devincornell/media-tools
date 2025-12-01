@@ -2,24 +2,28 @@ PACKAGE_NAME = mediatools
 PACKAGE_SRC = src/$(PACKAGE_NAME)
 
 SCRIPTS_PATH = ~/code/media-tools/scripts
-GOPRO_DIR = /mnt/MoStorage/gopro
-COMPILATIONS_DIR = /mnt/MoStorage/gopro/compilations
+
+MEDIA_DIR = /mnt/MoStorage
+SAFARI_DIR = /mnt/MoStorage/safari/shared_album
+SAFARI_COMPILATIONS_DIR = /mnt/MoStorage/safari/compilations
+
+GOPRO_DIR = /mnt/MoStorage/gopro/raw_gopro
+GOPRO_COMPILATIONS_DIR = /mnt/MoStorage/gopro/compilations
 
 gopro:
-	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07.html --port 8000 -s -w
+	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07_crazy.html --port 8000 -s
 
 montage:
-	python3 $(SCRIPTS_PATH)/create_montage_v2.py $(GOPRO_DIR)/GoPro\ 2024-05-31/GX*.MP4 30 1 "$(COMPILATIONS_DIR)/montage_ashville_with_rachel.mp4" -s 1 -c 1 -v --width 3840 --height 2160
-	#python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(GOPRO_DIR)/GoPro 2024-09-03/GX*.mp4" 30 1 $(COMPILATIONS_DIR)/montage_grand_bazaar.mp4 -s 1 -c 1 -v --width 3840 --height 2160
-	#python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(GOPRO_DIR)/GoPro 2024-05-31/GX*.mp4" 30 1 $(COMPILATIONS_DIR)/montage_ashville_with_rachel.mp4 -s 1 -c 1 -v --width 3840 --height 2160
-
-	python3 $(SCRIPTS_PATH)/server_v2.py /mnt/MoStorage/gopro $(SCRIPTS_PATH)/templates/gpt_multi_v07.html --port 8000 -s -w
-
+	python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(SAFARI_DIR)/*.mp4" 20 5 "$(SAFARI_COMPILATIONS_DIR)/safari_shared_compilation.mp4" -s 0 -c 1 -v --width 1920 --height 1080
+	
+#python3 $(SCRIPTS_PATH)/create_montage_v2.py "$(GOPRO_DIR)/GoPro 2025-10-**/GX*.mp4" 120 3 "$(GOPRO_COMPILATIONS_DIR)/safari_and_kuwait2.mp4" -s 2 -c 1 -v --width 3840 --height 2160
 #copymontage:
+host:
+	python3 $(SCRIPTS_PATH)/server_v2.py $(MEDIA_DIR) $(SCRIPTS_PATH)/templates/gpt_multi_v07_crazy.html --port 8000 -s -w
 
 
 thumbs:
-	python3 $(SCRIPTS_PATH)/scan_videos_v1.py "/mnt/MoStorage/gopro/" -t _thumbs
+	python3 $(SCRIPTS_PATH)/scan_videos_v1.py "$(MEDIA_DIR)" --make-thumbs
 
 
 ################################## building ##################################
