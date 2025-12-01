@@ -142,7 +142,7 @@ def make_animated_thumb(
 
     command = FFMPEG(
         inputs=[ffinput(str(input_fname))],
-        outputs=[ffoutput(str(ofp), v_f=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", overwrite=overwrite)],
+        outputs=[ffoutput(str(ofp), v_f=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", y=overwrite)],
         **output_kwargs
     )
     
