@@ -112,7 +112,17 @@ class TransformCalculator:
     
     def resize(self, resize_shape: typing.Tuple[Height, Width], **kwargs) -> Image:
         '''Resize image.'''
-        return self.image.clone(im=skimage.transform.resize(self.image.im, resize_shape, **kwargs))
+        h,w = resize_shape
+        if h == -1 and w == -1:
+            raise ValueError('At least one of height or width must be positive.')
+        if h == -1:
+            aspect = self.image.size[0] / self.image.size[1]
+            h = int(w * aspect)
+        if w == -1:
+            aspect = self.image.size[1] / self.image.size[0]
+            w = int(h * aspect)
+
+        return self.image.clone(im=skimage.transform.resize(self.image.im, (h, w), **kwargs))
 
 @dataclasses.dataclass
 class FilterCalculator:
