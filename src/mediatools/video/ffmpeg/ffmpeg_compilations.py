@@ -33,7 +33,10 @@ def create_montage(
     num_cores: int|None = None,
     use_cuda: bool = False,
     verbose: bool = False,
-    max_clips_per_video: int = 10,
+    max_clips_per_video: int|None = None,
+    max_total_clips: int|None = None,
+    shuffle_clips: bool = False,
+    overwrite: bool = False,
 ) -> FFMPEGResult:
     """
     Creates a video montage by randomly sampling clips from videos according to clip_ratio.
@@ -63,6 +66,13 @@ def create_montage(
         max_clips_per_video=max_clips_per_video,
     )
 
+    if shuffle_clips:
+        random.seed(random_seed)
+        random.shuffle(clip_infos)
+
+    if max_total_clips is not None and len(clip_infos) > max_total_clips:
+        clip_infos = clip_infos[:max_total_clips]
+
     return create_compilation(
         clip_infos = clip_infos,
         output_filename = output_filename,
@@ -72,6 +82,7 @@ def create_montage(
         num_cores = num_cores,
         use_cuda = use_cuda,
         verbose = verbose,
+        overwrite = overwrite,
     )
 
 
@@ -82,7 +93,7 @@ def get_random_clips(
     clip_duration: float, 
     random_seed: int = 0, 
     clip_ratio: float = 30, # one clip for every 30 seconds (10x shorter)
-    max_clips_per_video: int = 10,
+    max_clips_per_video: int|None = None,
 ) -> list[ClipInfo]:
     '''Extract random clips from the given video files.'''
 
@@ -110,7 +121,8 @@ def get_random_clips(
             num_clips = 1
         else:
             num_clips = max(1, int(duration / clip_ratio))
-            num_clips = min(num_clips, max_clips_per_video)
+            if max_clips_per_video is not None:
+                num_clips = min(num_clips, max_clips_per_video)
 
         vid_clip_infos: list[ClipInfo] = []
         for n in range(num_clips):
@@ -151,7 +163,8 @@ def create_compilation(
     height: int = 1080, 
     fps: int = 30, 
     num_cores: int|None = None,
-    use_cuda: bool = True,
+    use_cuda: bool = False,
+    overwrite: bool = False,
     verbose: bool = False,
     fail_on_error: bool = False,
 ) -> FFMPEGResult:
@@ -192,6 +205,8 @@ def create_compilation(
             list([cp for fp,cp in clips if cp is not None]), 
             output_filename, 
             tmp_file_path=Path(tmp_dir)/'input_file_list.txt',
+            use_cuda=use_cuda,
+            overwrite=overwrite,
         )
 
         return result
@@ -203,7 +218,8 @@ def concatenate_clips_demux(
     clips: list[Path|str], 
     output_filename: Path|str, 
     tmp_file_path: Path|str = '_concat_demux_list.txt',
-    use_cuda: bool = True,
+    use_cuda: bool = False,
+    overwrite: bool = False,
 ) -> FFMPEGResult:
     '''Concatenate video clips using demuxing (fast and lossless), assuming they are of compatible types.
     
@@ -225,7 +241,7 @@ def concatenate_clips_demux(
 
         cmd = FFMPEG(
             inputs = [ffinput(str(tmp_file_path), f='concat', safe=0, hwaccel='cuda' if use_cuda else None)],
-            outputs = [ffoutput(str(output_filename), c_v='copy', c_a='copy', y=True)],
+            outputs = [ffoutput(str(output_filename), c_v='copy', c_a='copy', y=overwrite)],
             loglevel = 'error',
         )
 
@@ -256,7 +272,7 @@ def extract_clips(
     num_cores: int|None = None,
     fail_on_error: bool = False,
     verbose: bool = False,
-    use_cuda: bool = True,
+    use_cuda: bool = False,
 ) -> list[tuple[Path,Path]]:
     '''Extract clips from the given video files, returning a tuple of (video_path, clip_path).
     Args:
@@ -311,7 +327,7 @@ def extract_clip_process(
     width: int, 
     height: int, 
     fps: int,
-    use_cuda: bool = True,
+    use_cuda: bool = False,
     verbose: bool = False,
 ) -> tuple[Path,Path|None]:
     '''Extract a single clip from a video file, returning the path to the processed clip.'''
@@ -353,6 +369,7 @@ def extract_clip_process(
         if verbose: print(f"{e}")
         processed_clip_path = None
     else:
-        if verbose: print('\nfinished', processed_clip_path)
+        #if verbose: print('\nfinished', processed_clip_path)
+        pass
     return clip_info.fpath, processed_clip_path
     
