@@ -34,7 +34,7 @@ def scan_media_folders(
 
     print(f'entering {mdir.fpath}')
     
-    for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             scan_media_folders(
                 mdir=sdir, 
@@ -57,7 +57,7 @@ def make_thumbs(
     print(f'Found {len(vfiles)} video files in {mdir.fpath}. Scanning for thumbnails...')
 
     #for vf in tqdm.tqdm(vfiles, "testing hash speed.", ncols=80):
-    #    get_hash_hex(str(vf.fpath), chunk_size=1024, max_chunks=1)
+    #    get_hash_hex(str(vf.fpath), max_chunks=1000)
     #return
 
     thumbs_to_create = []
@@ -68,9 +68,13 @@ def make_thumbs(
             print(f'\nError: {vf.fpath} could not be probed. Skipping.')
             continue
 
-        rel_path = vf.fpath.relative_to(mdir.fpath)
-        #thumb_fname = get_thumb_path(rel_path, thumbs_path)
+        thumb_fname_old = get_thumb_path(vf.fpath.relative_to(mdir.fpath), thumbs_path)
         thumb_fname = get_thumb_path2(vf.fpath, thumbs_path)
+
+        if thumb_fname_old.exists() and not thumb_fname.exists():
+            shutil.move(thumb_fname_old, thumb_fname)
+            #print(f'\nMoved old thumbnail {thumb_fname_old} to new location {thumb_fname}.')
+
         if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
             #samp = max(1, int(probe_info.duration/10))
             thumbs_to_create.append( (vf.fpath, thumb_fname) )
@@ -125,7 +129,7 @@ def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
     return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
 
 def get_thumb_path2(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
-    return Path(thumbs_path) / Path(get_hash_hex(vid_path_abs, max_chunks=1) + '.gif')
+    return Path(thumbs_path) / Path(get_hash_hex(vid_path_abs, max_chunks=1000) + '.gif')
 
 
 def scan_media_dir(
@@ -133,7 +137,7 @@ def scan_media_dir(
     convert_to_mp4: bool = False,
 ) -> None:
 
-    for subdir in mdir.subdirs:
+    for subdir in mdir.subdirs.values():
         scan_media_dir(subdir, convert_to_mp4=convert_to_mp4)
     
     for vf in mdir.videos:
