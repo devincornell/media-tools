@@ -17,7 +17,7 @@ def make_compilations_recursive(mdir: mediatools.MediaDir, root: pathlib.Path):
     rel_path = mdir.fpath.relative_to(root)
 
     # depth-first traversal
-    for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath.name):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath.name):
         make_compilations_recursive(sdir, root)
 
     out_path = mdir.fpath / f'-montage_{str(rel_path).replace('/','.')}.mp4'

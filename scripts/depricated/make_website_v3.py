@@ -31,7 +31,7 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
     best_subpage_thumb, best_local_thumb = BestThumbTracker(), BestThumbTracker()
     
     child_paths = list()
-    for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             subpage_data = make_pages(root=root, mdir=sdir, template=template, thumbs_path=thumbs_path, page_name=page_name)
             child_paths.append(subpage_data)

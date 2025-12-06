@@ -131,7 +131,7 @@ def create_page_index(
     best_subpage_thumb, best_video_thumb, best_image_thumb = BestThumbTracker(), BestThumbTracker(), BestThumbTracker()
     
     subpages = list()
-    for sdir in sorted(mdir.subdirs, key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             full_subpage_index, subpage_index = create_page_index(mdir=sdir, root=root, thumbs_path=thumbs_path, sort_by_name=sort_by_name, max_clip_duration=max_clip_duration)
 
@@ -246,7 +246,7 @@ def create_page_index(
         'num_vids': len(vids) + len(clips),
         'num_imgs': len(images),
         'num_subpages': len(subpages),
-        'files_size_str': mediatools.format_memory(sum([p.stat().st_size for p in mdir.all_files()])),
+        'files_size_str': mediatools.format_memory(sum([p.stat().st_size for p in mdir.all_file_paths()])),
     }
 
     full_index[str(page_path_rel)] = page_index

@@ -41,9 +41,10 @@ def create_montage_recursive(
     ignore_invalid_videos: bool = False,
     max_videos: int|None = None,
     skip_existing: bool = True,
+    skip_errors: bool = True,
 ) -> mediatools.ffmpeg.FFMPEGResult|None:
     '''Create montages recursively for each subdirectory in the media directory.'''
-    for sd in mdir.subdirs:
+    for sd in mdir.subdirs.values():
         create_montage_recursive(
             mdir = sd,
             clip_ratio=clip_ratio,
@@ -74,21 +75,26 @@ def create_montage_recursive(
 
     print(f"making montage from {len(video_paths)} videos in {mdir.fpath}")
 
-    return mediatools.ffmpeg.create_montage(
-        video_files=video_paths,
-        clip_ratio=clip_ratio,
-        clip_duration=clip_duration,
-        output_filename=output_path,
-        random_seed=random_seed,
-        num_cores=num_cores,
-        verbose=verbose,
-        height=height,
-        width=width,
-        fps=fps,
-        max_total_clips=max_total_clips,
-        shuffle_clips=shuffle_clips,
-        overwrite=True,
-    )
+    try:
+        return mediatools.ffmpeg.create_montage(
+            video_files=video_paths,
+            clip_ratio=clip_ratio,
+            clip_duration=clip_duration,
+            output_filename=output_path,
+            random_seed=random_seed,
+            num_cores=num_cores,
+            verbose=verbose,
+            height=height,
+            width=width,
+            fps=fps,
+            max_total_clips=max_total_clips,
+            shuffle_clips=shuffle_clips,
+            overwrite=True,
+        )
+    except mediatools.ffmpeg.FFMPEGExecutionError as e:
+        print(f"FFMPEGExecutionError while creating montage for {mdir.fpath}: {e}")
+        if not skip_errors:
+            raise e
 
 
 
