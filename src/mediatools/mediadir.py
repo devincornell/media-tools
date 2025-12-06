@@ -39,7 +39,7 @@ class MediaDir:
     videos: VideoFiles
     images: ImageFiles
     other_files: list[pathlib.Path]
-    subdirs: list[typing.Self]
+    subdirs: dict[str, typing.Self]
     parent: MediaDir | None = None
 
     @classmethod
@@ -82,19 +82,19 @@ class MediaDir:
         videos = VideoFiles()
         images = ImageFiles()
         other_files = list()
-        subdirs = list()
+        subdirs = dict()
         for k,v in data.items():
             child_path = fpath / k
             if isinstance(v, dict): # k represents a directory
                 if str(k) not in ingore_folder_names:
-                    subdirs.append(cls.from_dict(
+                    subdirs[k] = cls.from_dict(
                         data=v, 
                         fpath=child_path,
                         video_ext=video_ext,
                         image_ext=image_ext, 
                         check_exists=check_exists,
                         ingore_folder_names=ingore_folder_names,
-                    ))
+                    )
 
             elif v is None: # k is a file
                 ext = child_path.suffix.lower()
@@ -115,7 +115,7 @@ class MediaDir:
             other_files = other_files,
             subdirs = subdirs,
         )
-        for subdir in o.subdirs:
+        for subdir in o.subdirs.values():
             subdir.parent = o
 
         return o
@@ -124,15 +124,22 @@ class MediaDir:
         '''Get a list of all directories in the tree, including subdirectories.
         '''
         dirs = [self]
-        for subdir in self.subdirs:
+        for subdir in self.subdirs.values():
             dirs.extend(subdir.all_dirs())
         return dirs
+    
+    def all_dirs_iter(self) -> typing.Generator[typing.Self]:
+        '''Get a list of all directories in the tree, including subdirectories.
+        '''
+        for subdir in self.subdirs.values():
+            yield from subdir.all_dirs_iter()
+        yield self
     
     def all_files(self) -> list[pathlib.Path]:
         '''Get a list of all files in the directory, including subdirectories.
         '''
         files = self.video_paths() + self.image_paths() + self.other_files
-        for subdir in self.subdirs:
+        for subdir in self.subdirs.values():
             files.extend(subdir.all_files())
         return files
     
@@ -140,7 +147,7 @@ class MediaDir:
         '''Get a list of all media files in the directory, including subdirectories.
         '''
         files = self.video_paths() + self.image_paths()
-        for subdir in self.subdirs:
+        for subdir in self.subdirs.values():
             files.extend(subdir.all_files())
         return files
 
@@ -148,7 +155,7 @@ class MediaDir:
         '''Get a list of all files in the directory, including subdirectories.
         '''
         videos = VideoFiles(self.videos)
-        for subdir in self.subdirs:
+        for subdir in self.subdirs.values():
             videos.extend(subdir.all_video_files())
         return videos
     
@@ -156,7 +163,7 @@ class MediaDir:
         '''Get a list of all image files in the directory, including subdirectories.
         '''
         images = ImageFiles(self.images)
-        for subdir in self.subdirs:
+        for subdir in self.subdirs.values():
             images.extend(subdir.all_image_files())
         return images
     
@@ -176,11 +183,25 @@ class MediaDir:
         '''Get the fpaths of image files in this directory.'''
         return [ifp.fpath for ifp in self.images]
 
-    def __getitem__(self, key: str) -> typing.Self:
-        for subdir in self.subdirs:
-            if subdir.fpath.name == key:
-                return subdir
-        raise KeyError(f'Subdirectory not found: {key}')
+    def __getitem__(self, subdir_path: str|pathlib.Path) -> typing.Self:
+        '''Get a subdirectory by key.'''
+        return self._subdir(subdir_path)
+        
+    def subdir(self, *subdir_paths: str|pathlib.Path) -> typing.Self:
+        '''Get a nested subdirectory by specifying a relative path or sequence of keys.'''
+        return self._subdir(*subdir_paths)
+
+    def _subdir(self, *subdir_paths: str|pathlib.Path) -> typing.Self:
+        '''Get a nested subdirectory by specifying a relative path or sequence of keys.'''
+        current = self
+        for key in subdir_paths:
+            key = pathlib.Path(key)
+            for kp in key.parts:
+                try:
+                    current = current.subdirs[kp]
+                except KeyError as e:
+                    raise KeyError(f'Subdirectory "{kp}" not found in the media directory.') from e
+        return current
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.fpath}")'
