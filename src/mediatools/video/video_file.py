@@ -36,6 +36,18 @@ class VideoFile:
     def get_info(self) -> VideoInfo:
         '''Get the video information for this video file.'''
         return VideoInfo.from_video_file(self, do_check=True)
+    
+    def to_dict(self) -> dict[str, typing.Any]:
+        '''Convert the video file to a dictionary representation.'''
+        return {
+            'fpath': str(self.fpath),
+        }
+    
+    def from_dict(data: dict[str, typing.Any]) -> VideoFile:
+        '''Create a VideoFile instance from a dictionary representation.'''
+        return VideoFile(
+            fpath = Path(data['fpath']),
+        )
 
 
     ######################## dunder Methods ########################

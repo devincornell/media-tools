@@ -34,3 +34,16 @@ class ImageFile:
     def get_info(self) -> ImageInfo:
         '''Get the image information for this image file.'''
         return ImageInfo.from_image_file(self)
+    
+    def to_dict(self) -> dict[str, typing.Any]:
+        '''Convert to dictionary representation.'''
+        return {
+            'fpath': str(self.fpath),
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]) -> typing.Self:
+        '''Create an ImageFile instance from a dictionary representation.'''
+        return cls(
+            fpath=Path(data['fpath']),
+        )
