@@ -11,12 +11,13 @@ import tqdm
 import multiprocessing
 import pathlib
 import multiprocessing
-
+import hashlib
 import sys
+
 sys.path.append('../src/')
 sys.path.append('src/')
 import mediatools
-
+from util import get_hash_hex
 
 
 
@@ -52,8 +53,12 @@ def make_thumbs(
     thumbs_path.mkdir(parents=False, exist_ok=True)
 
     vfiles = mdir.all_video_files()
+    vfiles = random.sample(vfiles, len(vfiles))
     print(f'Found {len(vfiles)} video files in {mdir.fpath}. Scanning for thumbnails...')
 
+    #for vf in tqdm.tqdm(vfiles, "testing hash speed.", ncols=80):
+    #    get_hash_hex(str(vf.fpath), chunk_size=1024, max_chunks=1)
+    #return
 
     thumbs_to_create = []
     for vf in tqdm.tqdm(vfiles, ncols=80):
@@ -64,7 +69,8 @@ def make_thumbs(
             continue
 
         rel_path = vf.fpath.relative_to(mdir.fpath)
-        thumb_fname = get_thumb_path(rel_path, thumbs_path)
+        #thumb_fname = get_thumb_path(rel_path, thumbs_path)
+        thumb_fname = get_thumb_path2(vf.fpath, thumbs_path)
         if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
             #samp = max(1, int(probe_info.duration/10))
             thumbs_to_create.append( (vf.fpath, thumb_fname) )
@@ -118,6 +124,8 @@ def make_animated_thumb(
 def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
     return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
 
+def get_thumb_path2(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
+    return Path(thumbs_path) / Path(get_hash_hex(vid_path_abs, max_chunks=1) + '.gif')
 
 
 def scan_media_dir(
@@ -227,7 +235,6 @@ def compress_single_video(
             print(f'\n\tdeleting {str(vf.fpath)}')
         #raise e from e
     return True
-
 
 
 if __name__ == '__main__':
