@@ -195,13 +195,6 @@ class MediaDir:
         diff = this_fps.symmetric_difference(other_fps)
         return [self._subdir(d) for d in diff if d in this_fps]
 
-        changed_dirs = []
-        for this_dir, other_dir in zip(self.all_dirs_iter(), other.all_dirs_iter()):
-            this_fps, other_fps = set(this_dir.all_file_paths()), set(other_dir.all_file_paths())
-            if this_fps != other_fps:
-                changed_dirs.append(this_dir)
-        return changed_dirs
-
     def file_diff(self,
         other: typing.Self,
     ) -> tuple[set[pathlib.Path],set[pathlib.Path]]:
@@ -368,19 +361,19 @@ class MediaDir:
         return f'{self.__class__.__name__}("{self.path}")'
 
 
-class ImageNotFoundError:
+class ImageNotFoundError(Exception):
     '''Raised when an image file is not found in a MediaDir.'''
     pass
 
-class NonMediaFileNotFoundError:
+class NonMediaFileNotFoundError(Exception):
     '''Raised when a non-media file is not found in a MediaDir.'''
     pass
 
-class VideoNotFoundError:
+class VideoNotFoundError(Exception):
     '''Raised when a video file is not found in a MediaDir.'''
     pass
 
-class DirectoryNotFoundError:
+class DirectoryNotFoundError(Exception):
     '''Raised when a directory is not found in a MediaDir.'''
     pass
 

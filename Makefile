@@ -21,10 +21,11 @@ montage:
 host:
 	python3 $(SCRIPTS_PATH)/server_v2.py $(MEDIA_DIR) $(SCRIPTS_PATH)/templates/gpt_multi_v07_crazy.html --port 8000 -s -w
 
+host_v3:
+	python3 $(SCRIPTS_PATH)/server_v3.py $(MEDIA_DIR)/ $(SCRIPTS_PATH)/templates/gpt_multi_v07_crazy.html --port 8000 -s -w
 
 thumbs:
 	python3 $(SCRIPTS_PATH)/scan_videos_v1.py "$(MEDIA_DIR)" --make-thumbs
-
 
 ################################## building ##################################
 install:

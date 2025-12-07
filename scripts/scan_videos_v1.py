@@ -17,7 +17,7 @@ import sys
 sys.path.append('../src/')
 sys.path.append('src/')
 import mediatools
-from util import get_hash_hex
+from util import get_hash_hex, get_hash_hex_THUMB
 
 
 
@@ -129,7 +129,7 @@ def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
     return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
 
 def get_thumb_path2(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
-    return Path(thumbs_path) / Path(get_hash_hex(vid_path_abs, max_chunks=1000) + '.gif')
+    return Path(thumbs_path) / Path(get_hash_hex_THUMB(vid_path_abs) + '.gif')
 
 
 def scan_media_dir(
