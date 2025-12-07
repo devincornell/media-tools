@@ -65,11 +65,11 @@ if __name__ == '__main__':
         return False
     
     use_vid_paths = list()
-    for vf in sorted(mdir.all_video_files(), key=lambda x: x.fpath):
-        if check_include(vf.fpath, args.start_vid, args.end_vid):
-            use_vid_paths.append(vf.fpath)
+    for vf in sorted(mdir.all_video_files(), key=lambda x: x.path):
+        if check_include(vf.path, args.start_vid, args.end_vid):
+            use_vid_paths.append(vf.path)
     if args.verbose: print(f'found {len(use_vid_paths)} video files in range {args.start_vid} to {args.end_vid}')
-    #use_vids = [vf.fpath for vf in mdir.all_video_files() if check_include(vf.fpath, args.start_vid, args.end_vid)]
+    #use_vids = [vf.path for vf in mdir.all_video_files() if check_include(vf.path, args.start_vid, args.end_vid)]
 
     mediatools.ffmpeg.create_montage(
         video_files=use_vid_paths,

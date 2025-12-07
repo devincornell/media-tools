@@ -62,7 +62,7 @@ def create_montage_recursive(
             ignore_invalid_videos=ignore_invalid_videos,
         )
 
-    output_path = mdir.fpath / output_filename
+    output_path = mdir.path / output_filename
     if output_path.exists() and skip_existing:
         print(f"Skipping existing montage at {output_path}")
         return None
@@ -73,7 +73,7 @@ def create_montage_recursive(
     if max_videos is not None and len(video_paths) > max_videos:
         video_paths = list(random.sample(video_paths, k=max_videos))
 
-    print(f"making montage from {len(video_paths)} videos in {mdir.fpath}")
+    print(f"making montage from {len(video_paths)} videos in {mdir.path}")
 
     try:
         return mediatools.ffmpeg.create_montage(
@@ -92,7 +92,7 @@ def create_montage_recursive(
             overwrite=True,
         )
     except mediatools.ffmpeg.FFMPEGExecutionError as e:
-        print(f"FFMPEGExecutionError while creating montage for {mdir.fpath}: {e}")
+        print(f"FFMPEGExecutionError while creating montage for {mdir.path}: {e}")
         if not skip_errors:
             raise e
 

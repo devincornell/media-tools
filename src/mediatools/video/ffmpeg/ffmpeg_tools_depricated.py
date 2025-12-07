@@ -38,7 +38,7 @@ class FFMPEGTools:
         result = self.run(
             ffmpeg_command = (
                 ffmpeg
-                .input(str(self.vf.fpath))
+                .input(str(self.vf.path))
                 .output(str(output_fname), vcodec=vcodec, crf=crf, **output_kwargs)
             ),
             overwrite_output=overwrite,
@@ -62,7 +62,7 @@ class FFMPEGTools:
         stdout = self.run(
             ffmpeg_command = (
                 ffmpeg
-                .input(self.vf.fpath, ss=start_time.total_seconds())
+                .input(self.vf.path, ss=start_time.total_seconds())
                 .output(str(output_fname), t=(end_time-start_time).total_seconds(), **output_kwargs)
             ),
             overwrite_output=overwrite,
@@ -88,7 +88,7 @@ class FFMPEGTools:
         stdout = self.run(
             ffmpeg_command = (
                 ffmpeg
-                .input(str(self.vf.fpath))
+                .input(str(self.vf.path))
                 .crop(*topleft_point, *size)
                 .output(str(output_fname), **output_kwargs)
             ),
@@ -124,7 +124,7 @@ class FFMPEGTools:
         stdout = self.run(
             ffmpeg_command = (
                 ffmpeg
-                .input(self.vf.fpath, ss=ss)
+                .input(self.vf.path, ss=ss)
                 .filter('scale', width, height)
                 .output(str(ofp), vframes=1, **output_kwargs)
             ),

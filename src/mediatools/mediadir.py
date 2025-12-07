@@ -35,7 +35,7 @@ class MediaDir:
     Note: this type can represent either absolute or relative paths. When using absolute paths,
         the tree only spans a part of the full path.
     '''
-    fpath: pathlib.Path
+    path: pathlib.Path
     videos: VideoFiles
     images: ImageFiles
     other_files: list[NonMediaFile]
@@ -62,7 +62,7 @@ class MediaDir:
         file_tree = build_file_tree(root_path)
         return cls.from_file_tree(
             data=file_tree,
-            fpath=root_path if use_absolute else pathlib.Path('.'),
+            path=root_path if use_absolute else pathlib.Path('.'),
             video_ext=set([ext.lower() for ext in video_ext]),
             image_ext=set([ext.lower() for ext in image_ext]),
             check_exists=False,
@@ -74,7 +74,7 @@ class MediaDir:
     def from_file_tree(
         cls, 
         data: dict[str, dict|None],
-        fpath: pathlib.Path | None,
+        path: pathlib.Path | None,
         video_ext: typing.Iterable[str],
         image_ext: typing.Iterable[str],
         check_exists: bool = False,
@@ -88,12 +88,12 @@ class MediaDir:
         other_files = list()
         subdirs = dict()
         for k,v in data.items():
-            child_path = fpath / k
+            child_path = path / k
             if isinstance(v, dict): # k represents a directory
                 if str(k) not in ingore_folder_names:
                     subdirs[k] = cls.from_file_tree(
                         data=v, 
-                        fpath=child_path,
+                        path=child_path,
                         video_ext=video_ext,
                         image_ext=image_ext, 
                         check_exists=check_exists,
@@ -113,7 +113,7 @@ class MediaDir:
                 raise ValueError(f'Unexpected value type in data: {v}')
         
         o = cls(
-            fpath = fpath,
+            path = path,
             videos = videos,
             images = images,
             other_files = other_files,
@@ -132,9 +132,9 @@ class MediaDir:
         for subdir_name, subdir in self.subdirs.items():
             tree[subdir_name] = subdir.to_file_tree()
         for vf in self.videos:
-            tree[vf.fpath.name] = None
+            tree[vf.path.name] = None
         for imf in self.images:
-            tree[imf.fpath.name] = None
+            tree[imf.path.name] = None
         for of in self.other_files:
             tree[of.name] = None
         return tree
@@ -150,7 +150,7 @@ class MediaDir:
         meta = data['meta']
 
         o = cls(
-            fpath = pathlib.Path(data['fpath']),
+            path = pathlib.Path(data.get('path', data.get('fpath'))),  # support both for backward compatibility
             videos = videos,
             images = images,
             other_files = other_files,
@@ -166,7 +166,7 @@ class MediaDir:
         '''Convert the MediaDir instance to a dictionary representation.
         '''
         return {
-            'fpath': str(self.fpath),
+            'path': str(self.path),
             'videos': [vf.to_dict() for vf in self.videos],
             'images': [imf.to_dict() for imf in self.images],
             'other_files': [str(of) for of in self.other_files],
@@ -180,8 +180,8 @@ class MediaDir:
         '''Compare this MediaDir to another and return a list of MediaDir instances that have changes.
         Changes include added or removed files in the directory or any of its subdirectories.
         '''
-        this_fps = {fp.relative_to(self.fpath).parent for fp in self.all_file_paths()}
-        other_fps = {fp.relative_to(other.fpath).parent for fp in other.all_file_paths()}
+        this_fps = {fp.relative_to(self.path).parent for fp in self.all_file_paths()}
+        other_fps = {fp.relative_to(other.path).parent for fp in other.all_file_paths()}
         diff = this_fps.symmetric_difference(other_fps)
         return [self._subdir(d) for d in diff if d in this_fps]
 
@@ -254,20 +254,20 @@ class MediaDir:
         return images
     
     def all_video_paths(self) -> list[pathlib.Path]:
-        '''Get the fpaths of all video files.'''
-        return [vf.fpath for vf in self.all_video_files()]
+        '''Get the paths of all video files.'''
+        return [vf.path for vf in self.all_video_files()]
     
     def all_image_paths(self) -> list[pathlib.Path]:
-        '''Get the fpaths of all image files.'''
-        return [ifp.fpath for ifp in self.all_image_files()]
+        '''Get the paths of all image files.'''
+        return [ifp.path for ifp in self.all_image_files()]
     
     def video_paths(self) -> list[pathlib.Path]:
-        '''Get the fpaths of video files in this directory.'''
-        return [vf.fpath for vf in self.videos]
+        '''Get the paths of video files in this directory.'''
+        return [vf.path for vf in self.videos]
 
     def image_paths(self) -> list[pathlib.Path]:
-        '''Get the fpaths of image files in this directory.'''
-        return [ifp.fpath for ifp in self.images]
+        '''Get the paths of image files in this directory.'''
+        return [ifp.path for ifp in self.images]
 
     def __getitem__(self, subdir_path: str|pathlib.Path) -> typing.Self:
         '''Get a subdirectory by key.'''
@@ -299,9 +299,9 @@ class MediaDir:
         return parents
     
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}("{self.fpath}")'
+        return f'{self.__class__.__name__}("{self.path}")'
 
 
 @dataclasses.dataclass(frozen=True)
 class NonMediaFile:
-    fpath: pathlib.Path
+    path: pathlib.Path

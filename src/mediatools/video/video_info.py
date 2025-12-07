@@ -26,7 +26,7 @@ class VideoInfo:
     @classmethod
     def from_video_file(cls, vfile: VideoFile, do_check: bool = True) -> typing.Self:
         '''Get video information by probing video file.'''
-        stat = vfile.fpath.stat()
+        stat = vfile.path.stat()
         probe = vfile.probe()
         
         if do_check:
@@ -56,11 +56,11 @@ class VideoInfo:
     
     def title(self) -> str:
         '''Get the title of the video file.'''
-        return fname_to_title(self.vfile.fpath.stem)
+        return fname_to_title(self.vfile.path.stem)
 
     def id(self) -> str:
         '''Get the ID of the video file.'''
-        return fname_to_id(self.vfile.fpath.stem)
+        return fname_to_id(self.vfile.path.stem)
     
     @property
     def size(self) -> int:
@@ -68,6 +68,6 @@ class VideoInfo:
         return self.stat.st_size
     
     @property
-    def fpath(self) -> pathlib.Path:
+    def path(self) -> pathlib.Path:
         '''Get the file path of the video file.'''
-        return self.vfile.fpath
+        return self.vfile.path

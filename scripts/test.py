@@ -24,7 +24,7 @@ print(cmd.run())
 
 
 #for vf in mdir.all_video_files():
-#    print(f'Probing {vf.fpath}')
+#    print(f'Probing {vf.path}')
 #    vfp = vf.probe()
 
 #print('audio streams:')

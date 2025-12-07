@@ -26,12 +26,12 @@ def make_site(root: pathlib.Path, template_path: pathlib.Path, thumb_folder: str
 
 def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.Template, thumbs_path: pathlib.Path, page_name: str):
     '''Make pages for the media directory and its subdirectories.'''
-    rel_path = mdir.fpath.relative_to(root)
+    rel_path = mdir.path.relative_to(root)
 
     best_subpage_thumb, best_local_thumb = BestThumbTracker(), BestThumbTracker()
     
     child_paths = list()
-    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.path):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             subpage_data = make_pages(root=root, mdir=sdir, template=template, thumbs_path=thumbs_path, page_name=page_name)
             child_paths.append(subpage_data)
@@ -44,18 +44,18 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
     clips = list()
     vids = list()
     for vfile in mdir.videos:
-        rp = vfile.fpath.relative_to(root)
+        rp = vfile.path.relative_to(root)
         thumb_fp = thumbs_path / str(rp.with_suffix('.gif')).replace('/', '.')
         rel_thumb_fp = thumb_fp.relative_to(root)
 
         try:
             info = vfile.get_info()
         except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
-            print(f'Error: {vfile.fpath} could not be probed. Skipping.')
+            print(f'Error: {vfile.path} could not be probed. Skipping.')
             continue
         else:
             info_dict = {
-                'vid_web': mediatools.parse_url(vfile.fpath.name),
+                'vid_web': mediatools.parse_url(vfile.path.name),
                 'vid_title': info.title(),
                 'thumb_web': mediatools.parse_url('/'+str(rel_thumb_fp)),
                 'vid_size': info.size,
@@ -83,12 +83,12 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
 
             if not thumb_fp.is_file():
                 try:
-                    #mediatools.ffmpeg.make_thumb(vfile.fpath, thumb_fp, width=400)
+                    #mediatools.ffmpeg.make_thumb(vfile.path, thumb_fp, width=400)
                     import random
                     random.seed(0)
                     rnum = random.uniform(-0.2, 0.2)
                     print(f'Creating thumb {thumb_fp}')
-                    mediatools.ffmpeg.make_animated_thumb_v2(vfile.fpath, thumb_fp, framerate=2+rnum, sample_period=120, width=400)
+                    mediatools.ffmpeg.make_animated_thumb_v2(vfile.path, thumb_fp, framerate=2+rnum, sample_period=120, width=400)
                     #vfile.ffmpeg.make_thumb(str(thumb_fp), width=400)
                 except mediatools.ffmpeg.FFMPEGExecutionError as e:
                     print(f'FFMPEG ERROR: \n{e.stderr}\n\n')
@@ -96,11 +96,11 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
 
     images = list()
     for ifile in mdir.images:
-        rp = ifile.fpath.relative_to(root)
+        rp = ifile.path.relative_to(root)
         try:
             info = ifile.get_info()
         except PIL.UnidentifiedImageError:
-            print(f'Error: {ifile.fpath} is not a valid image file.')
+            print(f'Error: {ifile.path} is not a valid image file.')
             continue
         else:
             images.append({
@@ -110,7 +110,7 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
             })
             #if best_thumb is None or info.aspect_ratio() > best_aspect:
             #    best_aspect = info.aspect_ratio()
-            #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
+            #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.path.with_suffix('.gif')
             best_local_thumb.update(
                 new_path=f'/{mediatools.parse_url(str(rp))}',
                 new_aspect=info.aspect_ratio(),
@@ -127,9 +127,9 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
         page_name = page_name,
     )
 
-    with (mdir.fpath / page_name).open('w') as f:
+    with (mdir.path / page_name).open('w') as f:
         f.write(html_str)
-    print('wrote', mdir.fpath / page_name)
+    print('wrote', mdir.path / page_name)
 
     best_local_thumb.update_from_other(best_subpage_thumb)
     
@@ -143,7 +143,7 @@ def make_pages(root: pathlib.Path, mdir: mediatools.MediaDir, template: jinja2.T
         'num_imgs': len(images),
         'num_subfolders': len(child_paths),
         'files_size_str': mediatools.format_memory(sum([p.stat().st_size for p in mdir.all_files()])),
-        'idx': mediatools.fname_to_id(mdir.fpath.name),
+        'idx': mediatools.fname_to_id(mdir.path.name),
     }
 
 @dataclasses.dataclass

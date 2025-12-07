@@ -15,23 +15,23 @@ DEFAULT_IMAGE_FILE_EXTENSIONS = ('jpg', 'JPG', 'jpeg', 'JPEG', 'png', 'PNG', 'bm
 @dataclasses.dataclass(frozen=True)
 class ImageFile:
     '''Represents an image file.'''
-    fpath: Path
+    path: Path
     meta: dict[str, dict|str|int|float|bool|list|None] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_path(cls, 
-        fpath: Path,
+        path: Path,
         check_exists: bool = True,
         meta: dict[typing.Hashable, typing.Any] = None,
     ) -> typing.Self:
-        fp = Path(fpath)
+        fp = Path(path)
         if check_exists and not fp.exists():
             raise FileNotFoundError(f'The image file "{fp}" was not found.')
-        return cls(fpath=fp, meta=meta or {})
+        return cls(path=fp, meta=meta or {})
 
     def read(self) -> Image:
         '''Read the image into memory.'''
-        return Image.from_file(self.fpath)
+        return Image.from_file(self.path)
 
     def get_info(self) -> ImageInfo:
         '''Get the image information for this image file.'''
@@ -40,7 +40,7 @@ class ImageFile:
     def to_dict(self) -> dict[str, typing.Any]:
         '''Convert to dictionary representation.'''
         return {
-            'fpath': str(self.fpath),
+            'path': str(self.path),
             'meta': self.meta,
         }
     
@@ -48,6 +48,6 @@ class ImageFile:
     def from_dict(cls, data: dict[str, typing.Any]) -> typing.Self:
         '''Create an ImageFile instance from a dictionary representation.'''
         return cls(
-            fpath=Path(data['fpath']),
+            path=Path(data.get('path', data.get('fpath'))),  # support both for backward compatibility
             meta=data.get('meta', {}),
         )

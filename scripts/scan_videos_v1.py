@@ -32,9 +32,9 @@ def scan_media_folders(
 
 
 
-    print(f'entering {mdir.fpath}')
+    print(f'entering {mdir.path}')
     
-    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.path):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             scan_media_folders(
                 mdir=sdir, 
@@ -54,10 +54,10 @@ def make_thumbs(
 
     vfiles = mdir.all_video_files()
     vfiles = random.sample(vfiles, len(vfiles))
-    print(f'Found {len(vfiles)} video files in {mdir.fpath}. Scanning for thumbnails...')
+    print(f'Found {len(vfiles)} video files in {mdir.path}. Scanning for thumbnails...')
 
     #for vf in tqdm.tqdm(vfiles, "testing hash speed.", ncols=80):
-    #    get_hash_hex(str(vf.fpath), max_chunks=1000)
+    #    get_hash_hex(str(vf.path), max_chunks=1000)
     #return
 
     thumbs_to_create = []
@@ -65,11 +65,11 @@ def make_thumbs(
         try:
             probe_info = vf.probe()
         except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
-            print(f'\nError: {vf.fpath} could not be probed. Skipping.')
+            print(f'\nError: {vf.path} could not be probed. Skipping.')
             continue
 
-        thumb_fname_old = get_thumb_path(vf.fpath.relative_to(mdir.fpath), thumbs_path)
-        thumb_fname = get_thumb_path2(vf.fpath, thumbs_path)
+        thumb_fname_old = get_thumb_path(vf.path.relative_to(mdir.path), thumbs_path)
+        thumb_fname = get_thumb_path2(vf.path, thumbs_path)
 
         if thumb_fname_old.exists() and not thumb_fname.exists():
             shutil.move(thumb_fname_old, thumb_fname)
@@ -77,7 +77,7 @@ def make_thumbs(
 
         if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
             #samp = max(1, int(probe_info.duration/10))
-            thumbs_to_create.append( (vf.fpath, thumb_fname) )
+            thumbs_to_create.append( (vf.path, thumb_fname) )
 
     if cores > 1:
         with multiprocessing.Pool(processes=cores) as pool:
@@ -141,19 +141,19 @@ def scan_media_dir(
         scan_media_dir(subdir, convert_to_mp4=convert_to_mp4)
     
     for vf in mdir.videos:
-        if convert_to_mp4 and not str(vf.fpath).endswith('.mp4'):
+        if convert_to_mp4 and not str(vf.path).endswith('.mp4'):
             try:
-                new_fp = vf.fpath.with_suffix('.mp4')
+                new_fp = vf.path.with_suffix('.mp4')
                 if new_fp.exists():
-                    print(f'Skipping conversion for {vf.fpath}; {new_fp} already exists.')
+                    print(f'Skipping conversion for {vf.path}; {new_fp} already exists.')
                     continue
-                print(f'Converting {vf.fpath} to {new_fp}')
+                print(f'Converting {vf.path} to {new_fp}')
                 mediatools.FFMPEG(
-                    inputs=[mediatools.ffinput(vf.fpath)],
+                    inputs=[mediatools.ffinput(vf.path)],
                     outputs=[mediatools.ffoutput(new_fp,y=True)]
                 ).run()
             except mediatools.ffmpeg.FFMPEGExecutionError as e:
-                print(f'ERROR: Could not convert {vf.fpath}: {e}')
+                print(f'ERROR: Could not convert {vf.path}: {e}')
 
 
 
@@ -165,25 +165,25 @@ def compress_videos(
 ) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
 
     vfiles = mdir.all_video_files()
-    print(f'Found {len(vfiles)} video files in {mdir.fpath}')
+    print(f'Found {len(vfiles)} video files in {mdir.path}')
 
     for vf in tqdm.tqdm(vfiles, ncols=80):
-        rel_path = vf.fpath.relative_to(root)
+        rel_path = vf.path.relative_to(root)
         thumb_fname = thumbs_path / rel_path.with_suffix('.jpg')
         if not thumb_fname.exists():
             thumb_fname.parent.mkdir(parents=True, exist_ok=True)
             try:
                 mediatools.FFMPEG(
-                    input_files=[vf.fpath],
+                    input_files=[vf.path],
                     output_fname=thumb_fname,
                     time_point_sec=min(0.5, vf.duration.total_seconds()/2),
                     overwrite=False,
                     vframes=1,
                     q=2
                 )
-                print(f'Created thumbnail for {vf.fpath} at {thumb_fname}')
+                print(f'Created thumbnail for {vf.path} at {thumb_fname}')
             except Exception as e:
-                print(f'ERROR: Failed to create thumbnail for {vf.fpath}: {e}')
+                print(f'ERROR: Failed to create thumbnail for {vf.path}: {e}')
                 continue
 
 
@@ -235,8 +235,8 @@ def compress_single_video(
         if verbose:
             print(f'\n\terror encountered. {str(new_fpath)}')
         if delete_errored_files:
-            vf.fpath.unlink(missing_ok=True)
-            print(f'\n\tdeleting {str(vf.fpath)}')
+            vf.path.unlink(missing_ok=True)
+            print(f'\n\tdeleting {str(vf.path)}')
         #raise e from e
     return True
 

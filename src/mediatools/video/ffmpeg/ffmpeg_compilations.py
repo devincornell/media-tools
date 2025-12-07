@@ -145,7 +145,7 @@ def get_random_clips(
             vid_clip_infos.append(ClipInfo(
                 start_time = start_time,
                 duration = clip_duration,
-                fpath = str(video_path),
+                path = str(video_path),
             ))
         
         all_clip_infos.extend(list(sorted(vid_clip_infos, key=lambda x: x.start_time)))
@@ -190,7 +190,7 @@ def create_compilation(
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         clips = extract_clips(
-            clip_infos = [ci if isinstance(ci, ClipInfo) else ClipInfo(fpath=ci[0], start_time=ci[1], duration=ci[2]) for ci in clip_infos],
+            clip_infos = [ci if isinstance(ci, ClipInfo) else ClipInfo(path=ci[0], start_time=ci[1], duration=ci[2]) for ci in clip_infos],
             clip_dir = tmp_dir,
             width = width,
             height= height,
@@ -252,15 +252,15 @@ def concatenate_clips_demux(
 
 @dataclasses.dataclass
 class ClipInfo:
-    fpath: Path
+    path: Path
     start_time: float
     duration: float
 
     def __post_init__(self):
-        self.fpath = Path(self.fpath)
+        self.path = Path(self.path)
 
     def check_valid(self) -> bool:
-        return self.fpath.exists() and probe(self.fpath).duration >= self.start_time + self.duration
+        return self.path.exists() and probe(self.path).duration >= self.start_time + self.duration
 
 
 def extract_clips(
@@ -335,7 +335,7 @@ def extract_clip_process(
     cmd = FFMPEG(
         inputs = [
             ffinput(
-                clip_info.fpath, 
+                clip_info.path, 
                 ss=str(clip_info.start_time), 
                 t=str(clip_info.duration),
                 hwaccel = 'cuda' if use_cuda else None,
@@ -365,11 +365,11 @@ def extract_clip_process(
         cmd.run()
         probe(processed_clip_path)  # Ensure the clip was processed correctly
     except FFMPEGExecutionError as e:
-        if verbose: print(f"\nFailed to extract '{clip_info.fpath}' clip {clip_path} due to processing error.")
+        if verbose: print(f"\nFailed to extract '{clip_info.path}' clip {clip_path} due to processing error.")
         if verbose: print(f"{e}")
         processed_clip_path = None
     else:
         #if verbose: print('\nfinished', processed_clip_path)
         pass
-    return clip_info.fpath, processed_clip_path
+    return clip_info.path, processed_clip_path
     

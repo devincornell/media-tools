@@ -150,8 +150,8 @@ def create_page_index(
 
 def get_page_info(mdir: mediatools.MediaDir, root: pathlib.Path) -> dict[str,typing.Any]:
     '''Get page info dictionary. Assume image and video infos have already been populated.'''
-    page_path_abs = mdir.fpath
-    page_path_rel = mdir.fpath.relative_to(root)
+    page_path_abs = mdir.path
+    page_path_rel = mdir.path.relative_to(root)
 
 
     all_subdir_videos = mdir.all_video_files()
@@ -193,11 +193,11 @@ def get_video_info(
     try:
         info = vfile.get_info()
     except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
-        #print(f'Error: {vfile.fpath} could not be probed. Skipping.')
+        #print(f'Error: {vfile.path} could not be probed. Skipping.')
         return None
     else:
-        vid_path_abs = vfile.fpath
-        vid_path_rel = vfile.fpath.relative_to(root)
+        vid_path_abs = vfile.path
+        vid_path_rel = vfile.path.relative_to(root)
         hash_str = util.get_hash_hex_THUMB(vid_path_abs)
         thumb_path = thumbs_path / (hash_str + '.gif')
         thumb_path_rel = thumb_path.relative_to(root)
@@ -208,7 +208,7 @@ def get_video_info(
             'thumb_path_abs': str(thumb_path),
             'thumb_path_rel': str(thumb_path_rel),
             'thumb_exists': thumb_path.exists() and thumb_path.stat().st_size > 0,
-            #'vid_web': mediatools.parse_url(vfile.fpath.name),
+            #'vid_web': mediatools.parse_url(vfile.path.name),
             #'thumb_web': mediatools.parse_url('/'+str(rel_thumb_fp)),
             'idx': info.id(),
             'vid_title': info.title(),
@@ -230,12 +230,12 @@ def get_thumb_path2(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
 
 def get_image_info(ifile: mediatools.ImageFile, root: pathlib.Path) -> dict[str,typing.Any]|None:
     '''Get image info dictionary. To be used in a map function.'''
-    img_path_abs = ifile.fpath
-    img_path_rel = ifile.fpath.relative_to(root)
+    img_path_abs = ifile.path
+    img_path_rel = ifile.path.relative_to(root)
     try:
         info = ifile.get_info()
     except PIL.UnidentifiedImageError:
-        #print(f'Error: {ifile.fpath} is not a valid image file.')
+        #print(f'Error: {ifile.path} is not a valid image file.')
         return None
     else:
         return {
@@ -256,16 +256,16 @@ def create_page_index_old(
     max_clip_duration: float,
 ) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
 
-    print(f'entering {mdir.fpath}')
+    print(f'entering {mdir.path}')
     full_index = dict() # this bubbles up
 
-    page_path_abs = mdir.fpath
-    page_path_rel = mdir.fpath.relative_to(root)
+    page_path_abs = mdir.path
+    page_path_rel = mdir.path.relative_to(root)
 
     best_subpage_thumb, best_video_thumb, best_image_thumb = BestThumbTracker(), BestThumbTracker(), BestThumbTracker()
     
     subpages = list()
-    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.fpath):
+    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.path):
         if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
             full_subpage_index, subpage_index = create_page_index_old(mdir=sdir, root=root, thumbs_path=thumbs_path, sort_by_name=sort_by_name, max_clip_duration=max_clip_duration)
 
@@ -280,15 +280,15 @@ def create_page_index_old(
     clips = list()
     vids = list()
     for vfile in mdir.videos:
-        vid_path_abs = vfile.fpath
-        vid_path_rel = vfile.fpath.relative_to(root)
+        vid_path_abs = vfile.path
+        vid_path_rel = vfile.path.relative_to(root)
         thumb_path = thumbs_path / str(vid_path_rel.with_suffix('.gif')).replace('/', '.')
         thumb_path_rel = thumb_path.relative_to(root)
 
         try:
             info = vfile.get_info()
         except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
-            print(f'Error: {vfile.fpath} could not be probed. Skipping.')
+            print(f'Error: {vfile.path} could not be probed. Skipping.')
             continue
         else:
             info_dict = {
@@ -296,7 +296,7 @@ def create_page_index_old(
                 'vid_path_rel': str(vid_path_rel),
                 'thumb_path_abs': str(thumb_path),
                 'thumb_path_rel': str(thumb_path_rel),
-                #'vid_web': mediatools.parse_url(vfile.fpath.name),
+                #'vid_web': mediatools.parse_url(vfile.path.name),
                 #'thumb_web': mediatools.parse_url('/'+str(rel_thumb_fp)),
                 'idx': info.id(),
                 'vid_title': info.title(),
@@ -320,13 +320,13 @@ def create_page_index_old(
     
     images = list()
     for ifile in mdir.images:
-        #rp = ifile.fpath.relative_to(root)
-        img_path_abs = ifile.fpath
-        img_path_rel = ifile.fpath.relative_to(root)
+        #rp = ifile.path.relative_to(root)
+        img_path_abs = ifile.path
+        img_path_rel = ifile.path.relative_to(root)
         try:
             info = ifile.get_info()
         except PIL.UnidentifiedImageError:
-            print(f'Error: {ifile.fpath} is not a valid image file.')
+            print(f'Error: {ifile.path} is not a valid image file.')
             continue
         else:
             images.append({
@@ -338,7 +338,7 @@ def create_page_index_old(
             })
             #if best_thumb is None or info.aspect_ratio() > best_aspect:
             #    best_aspect = info.aspect_ratio()
-            #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.fpath.with_suffix('.gif')
+            #    best_thumb = f'/{mediatools.parse_url(str(rp))}'#ifile.path.with_suffix('.gif')
             if img_path_abs.exists() and img_path_abs.stat().st_size > 0:
                 best_image_thumb.update(
                     new_path=img_path_rel,

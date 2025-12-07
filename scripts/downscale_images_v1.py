@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     image_files = mdir.all_image_files()
     for imgf in tqdm.tqdm(image_files, ncols=100):
-        rel_path = imgf.fpath.relative_to(source)
+        rel_path = imgf.path.relative_to(source)
         dest_path = dest / rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         

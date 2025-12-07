@@ -30,8 +30,8 @@ class ImageInfo:
     @classmethod
     def from_image_file(cls, ifile: ImageFile) -> typing.Self:
         '''Get video information by probing video file.'''
-        stat = ifile.fpath.stat()   
-        im = Image.open(str(ifile.fpath))
+        stat = ifile.path.stat()   
+        im = Image.open(str(ifile.path))
         width, height = im.size
      
         return cls(
@@ -48,12 +48,12 @@ class ImageInfo:
         return self.res[0]/self.res[1]
 
     def title(self) -> str:
-        '''Get the title of the video file.'''
-        return fname_to_title(self.ifile.fpath.stem)
+        '''Get the title of the image file.'''
+        return fname_to_title(self.ifile.path.stem)
     
     def id(self) -> str:
-        '''Get the ID of the video file.'''
-        return fname_to_id(self.ifile.fpath.stem)
+        '''Get the ID of the image file.'''
+        return fname_to_id(self.ifile.path.stem)
     
     @property
     def size(self) -> int:
@@ -61,7 +61,7 @@ class ImageInfo:
         return self.stat.st_size
     
     @property
-    def fpath(self) -> pathlib.Path:
-        '''Get the file path of the video file.'''
-        return self.ifile.fpath
+    def path(self) -> pathlib.Path:
+        '''Get the file path of the image file.'''
+        return self.ifile.path
     

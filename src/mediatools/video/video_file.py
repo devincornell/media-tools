@@ -21,16 +21,16 @@ from .ffmpeg import FFMPEG, FFInput, FFOutput, FFInputArgs, ffinput, ffoutput, F
 @dataclasses.dataclass(repr=False)
 class VideoFile:
     '''Represents a video file.'''
-    fpath: Path
+    path: Path
     meta: dict[str, dict|str|int|float|bool|list|None] = dataclasses.field(default_factory=dict)
     
     @classmethod
     def from_path(cls,
-        fpath: str | Path,
+        path: str | Path,
         check_exists: bool = True,
         meta: dict[str, dict|str|int|float|bool|list|None] = None,
     ) -> typing.Self:
-        fp = Path(fpath)
+        fp = Path(path)
         if check_exists and (not fp.exists() or not fp.is_file()):
             raise VideoFileDoesNotExistError(f'This video file does not exist: {fp}')
         return cls(fp, meta=meta or {})
@@ -42,7 +42,7 @@ class VideoFile:
     def to_dict(self) -> dict[str, typing.Any]:
         '''Convert the video file to a dictionary representation.'''
         return {
-            'fpath': str(self.fpath),
+            'path': str(self.path),
             'meta': self.meta,
         }
     
@@ -50,23 +50,23 @@ class VideoFile:
     def from_dict(cls, data: dict[str, typing.Any]) -> VideoFile:
         '''Create a VideoFile instance from a dictionary representation.'''
         return VideoFile(
-            fpath = Path(data['fpath']),
+            path = Path(data.get('path', data.get('fpath'))),  # support both for backward compatibility
             meta = data.get('meta', {}),
         )
 
 
     ######################## dunder Methods ########################
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}("{self.fpath}")'
+        return f'{self.__class__.__name__}("{self.path}")'
     
     ######################## File Methods ########################
     def exists(self) -> bool:
-        return self.fpath.exists()
+        return self.path.exists()
 
     ############################# Utility #############################
     def probe(self) -> ProbeInfo:
         '''Probe the file in question.'''
-        return probe(str(self.fpath))
+        return probe(str(self.path))
     
     def read_metadata(self) -> dict[str, typing.Any]:
         '''Read metadata from the video file.'''
@@ -79,9 +79,9 @@ class VideoFile:
         exist_meta = self.read_metadata() if not delete_old else {}
         metadata = {**exist_meta, **new_metadata}
         with tempfile.TemporaryDirectory() as tmpdir:
-            temp_fp = Path(tmpdir) / self.fpath.name
+            temp_fp = Path(tmpdir) / self.path.name
             command = FFMPEG(
-                inputs = [ffinput(self.fpath)],
+                inputs = [ffinput(self.path)],
                 outputs = [ffoutput(
                     temp_fp,
                     c_v='copy',
@@ -94,7 +94,7 @@ class VideoFile:
             if (new_keys := set(new_meta.keys())) != (exp_keys := set(metadata.keys())):
                 missing = exp_keys - new_keys
                 raise RuntimeError(f'Metadata update failed. These fields could not be updated: {missing}')
-            shutil.move(temp_fp, self.fpath)
+            shutil.move(temp_fp, self.path)
             return result
 
         return command.run()
@@ -111,24 +111,24 @@ class VideoFile:
     
     def size(self) -> int:
         '''Get the size of the video file in bytes.'''
-        return self.fpath.stat().st_size
+        return self.path.stat().st_size
 
     ############################# file operations #############################
-    def copy(self, new_fpath: Path, overwrite: bool = False) -> VideoFile:
+    def copy(self, new_path: Path, overwrite: bool = False) -> VideoFile:
         '''Copy the file to a new location.'''
-        new_fpath = Path(new_fpath)
-        if new_fpath.exists() and not overwrite:
-            raise FileExistsError(f'The file "{new_fpath}" already exists. ')
-        shutil.copy2(self.fpath, new_fpath)
-        return VideoFile.from_path(new_fpath)
+        new_path = Path(new_path)
+        if new_path.exists() and not overwrite:
+            raise FileExistsError(f'The file "{new_path}" already exists. ')
+        shutil.copy2(self.path, new_path)
+        return VideoFile.from_path(new_path)
     
-    def move(self, new_fpath: Path, overwrite: bool = False) -> VideoFile:
-        '''Copy the file to a new location.'''
+    def move(self, new_path: Path, overwrite: bool = False) -> VideoFile:
+        '''Move the file to a new location.'''
         if overwrite:
-            self.fpath.replace(target=new_fpath)
+            self.path.replace(target=new_path)
         else:
-            self.fpath.rename(target=new_fpath)
-        return VideoFile.from_path(new_fpath)
+            self.path.rename(target=new_path)
+        return VideoFile.from_path(new_path)
 
 
     ############################# file operations #############################
@@ -258,7 +258,7 @@ class VideoFile:
         """
         return FFMPEG(
             inputs=[FFInput(
-                path = self.fpath,
+                path = self.path,
                 args = input_args or FFInputArgs(),
             )],
             outputs=outputs,
