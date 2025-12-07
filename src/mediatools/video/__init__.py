@@ -1,6 +1,6 @@
 from .video_info import VideoInfo
 from .video_file import VideoFile
-from .video_files import VideoFiles
+from .video_files import VideoFiles, VideoFilesDict
 from .util import VideoTime
 #from .functions import create_montage
 #from .probe_info import *

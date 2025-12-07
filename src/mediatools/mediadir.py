@@ -2,23 +2,27 @@ from __future__ import annotations
 import typing
 import pathlib
 import dataclasses
-
+from pathlib import Path
 #from .siteconfig import SiteConfig
 #from .siteconfig import SiteConfig
 #from .vidinfo import VidInfo
 #from .imginfo import ImgInfo
 #from ..util import format_memory, format_time, multi_extension_glob
-from .video import VideoFile, VideoFiles
-from .images import ImageFile, ImageFiles
+from .video import VideoFile, VideoFiles, VideoFilesDict
+from .video import VideoInfo
+
+from .images import ImageFile, ImageFiles, ImageFilesDict
+
 from .util import build_file_tree, hash_file
 from .constants import VIDEO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS
+from .file_base import FileBase, JSONable
 
 def scan_directory(
         root_path: pathlib.Path | str,
         use_absolute: bool = True,
         video_ext: typing.Iterable[str] = VIDEO_FILE_EXTENSIONS,
         image_ext: typing.Iterable[str] = IMAGE_FILE_EXTENSIONS,
-        ingore_folder_names: set[str] | None = None,
+        ignore_path: typing.Callable[[Path],bool] | None = None,
     ) -> MediaDir:
     '''Recursively scan a directory and return a MediaDir instance.'''
     return MediaDir.from_path(
@@ -26,7 +30,7 @@ def scan_directory(
         use_absolute=use_absolute,
         video_ext=video_ext,
         image_ext=image_ext,
-        ingore_folder_names=ingore_folder_names,
+        ignore_path=ignore_path,
     )
 
 @dataclasses.dataclass(repr=False)
@@ -36,12 +40,12 @@ class MediaDir:
         the tree only spans a part of the full path.
     '''
     path: pathlib.Path
-    videos: VideoFiles
-    images: ImageFiles
-    other_files: list[NonMediaFile]
-    subdirs: dict[str, typing.Self]
+    _videos: VideoFilesDict
+    _images: ImageFilesDict
+    _other_files: NonMediaFileDict
+    _subdirs: dict[str, typing.Self]
     parent: MediaDir | None = None
-    meta: dict = dataclasses.field(default_factory=dict)
+    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_path(
@@ -50,14 +54,25 @@ class MediaDir:
         use_absolute: bool = True,
         video_ext: typing.Iterable[str] = VIDEO_FILE_EXTENSIONS,
         image_ext: typing.Iterable[str] = IMAGE_FILE_EXTENSIONS,
-        ingore_folder_names: set[str] | None = None,
+        ignore_path: typing.Callable[[Path],bool] | None = None,
+        #ingore_folder_names: set[str] | None = None,
         meta: dict | None = None,
     ) -> typing.Self:
         '''Create a MediaDir instance from the current working directory.
+        Args:
+            root_path (pathlib.Path | str): The root directory path to scan.
+            use_absolute (bool): Whether to use absolute paths. Defaults to True.
+            video_ext (typing.Iterable[str]): Iterable of video file extensions to consider.
+            image_ext (typing.Iterable[str]): Iterable of image file extensions to consider.
+            ignore_path (typing.Callable[[Path],bool] | None): Optional function to ignore certain directories.
+            meta (dict | None): Optional metadata dictionary to associate with the MediaDir.
+        Returns:
+            MediaDir: The created MediaDir instance.
         '''
         root_path = pathlib.Path(root_path)
         if not root_path.is_dir():
             raise FileNotFoundError(f'Root path not found: {root_path}')
+        
 
         file_tree = build_file_tree(root_path)
         return cls.from_file_tree(
@@ -66,7 +81,7 @@ class MediaDir:
             video_ext=set([ext.lower() for ext in video_ext]),
             image_ext=set([ext.lower() for ext in image_ext]),
             check_exists=False,
-            ingore_folder_names=set(ingore_folder_names) if ingore_folder_names is not None else set(),
+            ignore_path=ignore_path,
             meta=meta if meta is not None else dict(),
         )
 
@@ -78,46 +93,46 @@ class MediaDir:
         video_ext: typing.Iterable[str],
         image_ext: typing.Iterable[str],
         check_exists: bool = False,
-        ingore_folder_names: set[str] | None = None,
+        ignore_path: typing.Callable[[Path],bool] | None = None,
         meta: dict | None = None,
     ) -> typing.Self:
         '''Create a MediaDir instance from a dictionary tree representation.
         '''
-        videos = VideoFiles()
-        images = ImageFiles()
-        other_files = list()
+
+        videos = VideoFilesDict()
+        images = ImageFilesDict()
+        other_files = NonMediaFileDict()
         subdirs = dict()
         for k,v in data.items():
             child_path = path / k
             if isinstance(v, dict): # k represents a directory
-                if str(k) not in ingore_folder_names:
+                if ignore_path is None or not ignore_path(child_path):
                     subdirs[k] = cls.from_file_tree(
                         data=v, 
                         path=child_path,
                         video_ext=video_ext,
                         image_ext=image_ext, 
                         check_exists=check_exists,
-                        ingore_folder_names=ingore_folder_names,
+                        ignore_path=ignore_path,
                     )
 
             elif v is None: # k is a file
                 ext = child_path.suffix.lower()
                 if ext in video_ext:
-                    videos.append(VideoFile.from_path(child_path, check_exists=check_exists))
+                    videos[child_path.name] = VideoFile.from_path(child_path, check_exists=check_exists)
                 elif ext in image_ext:
-                    images.append(ImageFile.from_path(child_path, check_exists=check_exists))
+                    images[child_path.name] = ImageFile.from_path(child_path, check_exists=check_exists)
                 else:
-                    other_files.append(child_path)
-
+                    other_files[child_path.name] = NonMediaFile.from_path(child_path, check_exists=check_exists)
             else:
                 raise ValueError(f'Unexpected value type in data: {v}')
         
-        o = cls(
+        o: typing.Self = cls(
             path = path,
-            videos = videos,
-            images = images,
-            other_files = other_files,
-            subdirs = subdirs,
+            _videos = videos,
+            _images = images,
+            _other_files = other_files,
+            _subdirs = subdirs,
             meta = meta if meta is not None else dict(),
         )
         for subdir in o.subdirs.values():
@@ -143,19 +158,13 @@ class MediaDir:
     def from_dict(cls, data: dict) -> typing.Self:
         '''Create a MediaDir instance from a dictionary representation.
         '''
-        videos = VideoFiles([VideoFile.from_dict(vfd) for vfd in data['videos']])
-        images = ImageFiles([ImageFile.from_dict(imfd) for imfd in data['images']])
-        other_files = [NonMediaFile(pathlib.Path(of)) for of in data['other_files']]
-        subdirs = {k: cls.from_dict(vd) for k,vd in data['subdirs'].items()}
-        meta = data['meta']
-
         o = cls(
             path = pathlib.Path(data.get('path', data.get('fpath'))),  # support both for backward compatibility
-            videos = videos,
-            images = images,
-            other_files = other_files,
-            subdirs = subdirs,
-            meta = meta,
+            _videos = VideoFilesDict.from_jsonable(data['videos']),
+            _images = ImageFilesDict.from_jsonable(data['images']),
+            _other_files = NonMediaFileDict.from_jsonable(data['other_files']),
+            _subdirs = {(sdf := cls.from_dict(vd)).path.name: sdf for vd in data['subdirs']},
+            meta = data['meta'],
         )
         for subdir in o.subdirs.values():
             subdir.parent = o
@@ -167,12 +176,13 @@ class MediaDir:
         '''
         return {
             'path': str(self.path),
-            'videos': [vf.to_dict() for vf in self.videos],
-            'images': [imf.to_dict() for imf in self.images],
-            'other_files': [str(of) for of in self.other_files],
-            'subdirs': {k: v.to_dict() for k,v in self.subdirs.items()},
+            'videos': self._videos.to_jsonable(),
+            'images': self._images.to_jsonable(),
+            'other_files': self._other_files.to_jsonable(),
+            'subdirs': [v.to_dict() for k,v in self.subdirs.items()],
             'meta': self.meta,
         }
+
 
     def get_changed_dirs(self,
         other: typing.Self,
@@ -205,6 +215,27 @@ class MediaDir:
         removed = this_fps - other_fps
         added = other_fps - this_fps
         return removed, added
+    
+    def all_file_paths(self) -> list[pathlib.Path]:
+        '''Get a list of all files in the directory, including subdirectories.
+        '''
+        return self.all_video_paths() + self.all_image_paths() + [of.path for of in self.other_files]
+    
+    def all_media_paths(self) -> list[pathlib.Path]:
+        '''Get a list of all media files in the directory, including subdirectories.
+        '''
+        files = self.video_paths() + self.image_paths()
+        for subdir in self.subdirs.values():
+            files.extend(subdir.all_media_paths())
+        return files
+    
+    def all_video_paths(self) -> list[pathlib.Path]:
+        '''Get the paths of all video files.'''
+        return [vf.path for vf in self.all_videos()]
+    
+    def all_image_paths(self) -> list[pathlib.Path]:
+        '''Get the paths of all image files.'''
+        return [ifp.path for ifp in self.all_images()]
 
     def all_dirs(self) -> list[typing.Self]:
         '''Get a list of all directories in the tree, including subdirectories.
@@ -220,54 +251,89 @@ class MediaDir:
         for subdir in self.subdirs.values():
             yield from subdir.all_dirs_iter()
         yield self
-    
-    def all_file_paths(self) -> list[pathlib.Path]:
-        '''Get a list of all files in the directory, including subdirectories.
-        '''
-        files = self.video_paths() + self.image_paths() + self.other_files
-        for subdir in self.subdirs.values():
-            files.extend(subdir.all_file_paths())
-        return files
-    
-    def all_media_files(self) -> list[pathlib.Path]:
-        '''Get a list of all media files in the directory, including subdirectories.
-        '''
-        files = self.video_paths() + self.image_paths()
-        for subdir in self.subdirs.values():
-            files.extend(subdir.all_file_paths())
-        return files
 
-    def all_video_files(self) -> VideoFiles:
+    def all_videos(self) -> VideoFiles:
         '''Get a list of all files in the directory, including subdirectories.
         '''
-        videos = VideoFiles(self.videos)
+        videos = self._videos.to_list()
         for subdir in self.subdirs.values():
-            videos.extend(subdir.all_video_files())
+            videos.extend(subdir.all_videos())
         return videos
     
-    def all_image_files(self) -> ImageFiles:
+    def all_images(self) -> ImageFiles:
         '''Get a list of all image files in the directory, including subdirectories.
         '''
-        images = ImageFiles(self.images)
+        images = self._images.to_list()
         for subdir in self.subdirs.values():
-            images.extend(subdir.all_image_files())
+            images.extend(subdir.all_images())
         return images
-    
-    def all_video_paths(self) -> list[pathlib.Path]:
-        '''Get the paths of all video files.'''
-        return [vf.path for vf in self.all_video_files()]
-    
-    def all_image_paths(self) -> list[pathlib.Path]:
-        '''Get the paths of all image files.'''
-        return [ifp.path for ifp in self.all_image_files()]
     
     def video_paths(self) -> list[pathlib.Path]:
         '''Get the paths of video files in this directory.'''
-        return [vf.path for vf in self.videos]
+        return [vf.path for vf in self._videos.values()]
 
     def image_paths(self) -> list[pathlib.Path]:
         '''Get the paths of image files in this directory.'''
-        return [ifp.path for ifp in self.images]
+        return [ifp.path for ifp in self._images.values()]
+    
+    @property
+    def videos(self) -> VideoFiles:
+        '''Get the video files in this directory.'''
+        return self._videos.to_list()
+    
+    @property
+    def images(self) -> ImageFiles:
+        '''Get the image files in this directory.'''
+        return self._images.to_list()
+    
+    @property
+    def other_files(self) -> list[NonMediaFile]:
+        '''Get the non-media files in this directory.'''
+        return list(self._other_files.values())
+    
+    @property
+    def subdirs(self) -> dict[str, typing.Self]:
+        '''Get the subdirectories in this directory.'''
+        return self._subdirs
+    
+    def get_nonmedia(self, path: Path) -> NonMediaFile:
+        '''Get a non-media file by filename.'''
+        path = self._resolve_relative_path(path)
+        try:
+            return self._subdir(path.parent)._other_files[path.name]
+        except KeyError:
+            raise NonMediaFileNotFoundError(f'Non-media file "{path.name}" not found in directory "{path.parent}".')
+
+    def get_image(self, path: Path) -> ImageFile:
+        '''Get an image file by filename.'''
+        path = self._resolve_relative_path(path)
+        try:
+            return self._subdir(path.parent)._images[path.name]
+        except KeyError:
+            raise ImageNotFoundError(f'Image file "{path.name}" not found in directory "{path.parent}".')
+
+    def get_video(self, path: Path) -> VideoFile:
+        '''Get a video file by filename.'''
+        path = self._resolve_relative_path(path)
+        try:
+            return self._subdir(path.parent)._videos[path.name]
+        except KeyError:
+            raise VideoNotFoundError(f'Video file "{path.name}" not found in directory "{path.parent}".')
+        
+    def _resolve_relative_path(self, path: str|pathlib.Path) -> pathlib.Path:
+        '''Resolve a path to be relative to this MediaDir's path.'''
+        path = pathlib.Path(path)
+        if self.path.is_absolute():
+            if not path.is_absolute():
+                raise ValueError(f'Path {path} is not absolute, but MediaDir path {self.path} is absolute.')
+            elif not path.is_relative_to(self.path):
+                raise ValueError(f'Path {path} is not relative to MediaDir path {self.path}.')
+        else:
+            if path.is_absolute():
+                raise ValueError(f'Path {path} is not relative, but MediaDir path {self.path} is relative.')
+            if not path.is_relative_to(self.path):
+                raise ValueError(f'Path {path} is not relative to MediaDir path {self.path}.')
+        return path.relative_to(self.path)
 
     def __getitem__(self, subdir_path: str|pathlib.Path) -> typing.Self:
         '''Get a subdirectory by key.'''
@@ -286,7 +352,7 @@ class MediaDir:
                 try:
                     current = current.subdirs[kp]
                 except KeyError as e:
-                    raise KeyError(f'Subdirectory "{kp}" not found in the media directory.') from e
+                    raise DirectoryNotFoundError(f'Subdirectory "{kp}" not found in the media directory.') from e
         return current
     
     def parents(self) -> list[typing.Self]:
@@ -302,6 +368,43 @@ class MediaDir:
         return f'{self.__class__.__name__}("{self.path}")'
 
 
-@dataclasses.dataclass(frozen=True)
-class NonMediaFile:
+class ImageNotFoundError:
+    '''Raised when an image file is not found in a MediaDir.'''
+    pass
+
+class NonMediaFileNotFoundError:
+    '''Raised when a non-media file is not found in a MediaDir.'''
+    pass
+
+class VideoNotFoundError:
+    '''Raised when a video file is not found in a MediaDir.'''
+    pass
+
+class DirectoryNotFoundError:
+    '''Raised when a directory is not found in a MediaDir.'''
+    pass
+
+@dataclasses.dataclass(frozen=True, repr=True, slots=True)
+class NonMediaFile(FileBase):
+    '''Represents a non-media file.'''
     path: pathlib.Path
+    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
+
+
+class NonMediaFileDict(dict[Path, NonMediaFile]):
+    '''Collection of non-media files.'''
+
+    @classmethod
+    def from_jsonable(cls, data: typing.List[dict]) -> typing.Self:
+        '''Create NonMediaFileDict from JSONable list.'''
+        return cls({(nmf := NonMediaFile.from_dict(nmfd)).path.name: nmf for nmfd in data})
+    
+    def to_jsonable(self) -> list[dict]:
+        '''Convert NonMediaFileDict to JSONable list.'''
+        return [nmf.to_dict() for nmf in self.values()]
+
+    @classmethod
+    def from_non_media_files(cls, non_media_files: typing.Iterable[NonMediaFile]) -> typing.Self:
+        '''Create NonMediaFileDict from NonMediaFile list.'''
+        return cls({nmf.path: nmf for nmf in non_media_files})
+

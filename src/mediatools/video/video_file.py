@@ -15,14 +15,14 @@ import tempfile
 from .video_info import VideoInfo
 from .errors import VideoFileDoesNotExistError
 from .ffmpeg import FFMPEG, FFInput, FFOutput, FFInputArgs, ffinput, ffoutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
+from ..file_base import FileBase, JSONable
 
 
-
-@dataclasses.dataclass(repr=False)
-class VideoFile:
+@dataclasses.dataclass(repr=True, frozen=True, slots=True)
+class VideoFile(FileBase):
     '''Represents a video file.'''
     path: Path
-    meta: dict[str, dict|str|int|float|bool|list|None] = dataclasses.field(default_factory=dict)
+    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
     
     @classmethod
     def from_path(cls,
@@ -39,29 +39,6 @@ class VideoFile:
         '''Get the video information for this video file.'''
         return VideoInfo.from_video_file(self, do_check=True)
     
-    def to_dict(self) -> dict[str, typing.Any]:
-        '''Convert the video file to a dictionary representation.'''
-        return {
-            'path': str(self.path),
-            'meta': self.meta,
-        }
-    
-    @classmethod
-    def from_dict(cls, data: dict[str, typing.Any]) -> VideoFile:
-        '''Create a VideoFile instance from a dictionary representation.'''
-        return VideoFile(
-            path = Path(data.get('path', data.get('fpath'))),  # support both for backward compatibility
-            meta = data.get('meta', {}),
-        )
-
-
-    ######################## dunder Methods ########################
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}("{self.path}")'
-    
-    ######################## File Methods ########################
-    def exists(self) -> bool:
-        return self.path.exists()
 
     ############################# Utility #############################
     def probe(self) -> ProbeInfo:
@@ -99,36 +76,6 @@ class VideoFile:
 
         return command.run()
 
-    def hash(filepath: Path|str, hash_func=hashlib.sha256):
-        """Calculate file hash with optimal chunk size."""
-        h = hash_func()
-        chunk_size = 128 * h.block_size  # Optimal chunk size
-    
-        with open(filepath, 'rb') as f:
-            for chunk in iter(lambda: f.read(chunk_size), b''):
-                h.update(chunk)
-        return h.hexdigest()
-    
-    def size(self) -> int:
-        '''Get the size of the video file in bytes.'''
-        return self.path.stat().st_size
-
-    ############################# file operations #############################
-    def copy(self, new_path: Path, overwrite: bool = False) -> VideoFile:
-        '''Copy the file to a new location.'''
-        new_path = Path(new_path)
-        if new_path.exists() and not overwrite:
-            raise FileExistsError(f'The file "{new_path}" already exists. ')
-        shutil.copy2(self.path, new_path)
-        return VideoFile.from_path(new_path)
-    
-    def move(self, new_path: Path, overwrite: bool = False) -> VideoFile:
-        '''Move the file to a new location.'''
-        if overwrite:
-            self.path.replace(target=new_path)
-        else:
-            self.path.rename(target=new_path)
-        return VideoFile.from_path(new_path)
 
 
     ############################# file operations #############################

@@ -2,7 +2,16 @@
 
 from .video import *
 from .images import *
-from .mediadir import MediaDir, scan_directory
+from .mediadir import (
+    MediaDir, 
+    scan_directory,
+    DirectoryNotFoundError,
+    VideoNotFoundError,
+    ImageNotFoundError,
+    NonMediaFileNotFoundError,
+    NonMediaFile,
+    NonMediaFileDict,
+)
 
 #from . import site
 #from .site import *
