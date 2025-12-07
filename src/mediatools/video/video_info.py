@@ -12,7 +12,7 @@ from ..util import format_memory, format_time, fname_to_title, fname_to_id
 
 if typing.TYPE_CHECKING:
     from .video_file import VideoFile
-    from .probe_info import ProbeInfo
+    from .ffmpeg.probe_info import ProbeInfo
 
 
 
