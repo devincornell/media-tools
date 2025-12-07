@@ -38,7 +38,7 @@ class MediaDir:
     fpath: pathlib.Path
     videos: VideoFiles
     images: ImageFiles
-    other_files: list[pathlib.Path]
+    other_files: list[NonMediaFile]
     subdirs: dict[str, typing.Self]
     parent: MediaDir | None = None
     meta: dict = dataclasses.field(default_factory=dict)
@@ -145,7 +145,7 @@ class MediaDir:
         '''
         videos = VideoFiles([VideoFile.from_dict(vfd) for vfd in data['videos']])
         images = ImageFiles([ImageFile.from_dict(imfd) for imfd in data['images']])
-        other_files = [pathlib.Path(of) for of in data['other_files']]
+        other_files = [NonMediaFile(pathlib.Path(of)) for of in data['other_files']]
         subdirs = {k: cls.from_dict(vd) for k,vd in data['subdirs'].items()}
         meta = data['meta']
 
@@ -300,3 +300,8 @@ class MediaDir:
     
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.fpath}")'
+
+
+@dataclasses.dataclass(frozen=True)
+class NonMediaFile:
+    fpath: pathlib.Path
