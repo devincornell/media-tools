@@ -22,16 +22,18 @@ from .ffmpeg import FFMPEG, FFInput, FFOutput, FFInputArgs, ffinput, ffoutput, F
 class VideoFile:
     '''Represents a video file.'''
     fpath: Path
+    meta: dict[str, dict|str|int|float|bool|list|None] = dataclasses.field(default_factory=dict)
     
     @classmethod
     def from_path(cls,
         fpath: str | Path,
         check_exists: bool = True,
+        meta: dict[str, dict|str|int|float|bool|list|None] = None,
     ) -> typing.Self:
         fp = Path(fpath)
         if check_exists and (not fp.exists() or not fp.is_file()):
             raise VideoFileDoesNotExistError(f'This video file does not exist: {fp}')
-        return cls(fp)
+        return cls(fp, meta=meta or {})
 
     def get_info(self) -> VideoInfo:
         '''Get the video information for this video file.'''
@@ -41,12 +43,15 @@ class VideoFile:
         '''Convert the video file to a dictionary representation.'''
         return {
             'fpath': str(self.fpath),
+            'meta': self.meta,
         }
     
-    def from_dict(data: dict[str, typing.Any]) -> VideoFile:
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]) -> VideoFile:
         '''Create a VideoFile instance from a dictionary representation.'''
         return VideoFile(
             fpath = Path(data['fpath']),
+            meta = data.get('meta', {}),
         )
 
 
