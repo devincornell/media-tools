@@ -818,6 +818,260 @@
             to { transform: translateX(0); }
         }
 
+        /* 3D Sphere and Crazy Visualizations */
+        .sphere-container {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            perspective: 1200px;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .sphere-container:active {
+            cursor: grabbing;
+        }
+
+        .sphere-space {
+            position: relative;
+            width: 600px;
+            height: 600px;
+            transform-style: preserve-3d;
+            animation: sphereRotate 60s infinite linear;
+            transform-origin: center center;
+            pointer-events: none; /* Let clicks pass through to container */
+        }
+
+        .sphere-thumbnail {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            pointer-events: auto; /* Enable clicks on thumbnails */
+        }
+
+        .sphere-thumbnail:hover {
+            box-shadow: 0 0 50px rgba(139, 92, 246, 0.6);
+            z-index: 100;
+        }
+
+        .sphere-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 14px;
+        }
+
+        .neural-network {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            overflow: hidden;
+            background: linear-gradient(45deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            border-radius: 20px;
+        }
+
+        .neural-node {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            animation: neuralPulse 3s ease-in-out infinite;
+        }
+
+        .neural-node:hover {
+            transform: scale(1.5);
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.8);
+            z-index: 100;
+        }
+
+        .neural-node img {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .neural-connection {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), transparent);
+            transform-origin: left center;
+            animation: connectionFlow 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .particle-system {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #0f0f23 0%, #000000 100%);
+            border-radius: 20px;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            animation: particleFloat 8s ease-in-out infinite;
+            opacity: 0.7;
+        }
+
+        .particle-thumbnail {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: pointer;
+            animation: particleThumbnailFloat 12s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .particle-thumbnail:hover {
+            animation-play-state: paused;
+            transform: scale(1.3) rotate(0deg);
+            box-shadow: 0 0 60px rgba(139, 92, 246, 0.8);
+            z-index: 100;
+        }
+
+        .particle-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 18px;
+        }
+
+        .gallery.sphere-view {
+            display: none;
+        }
+
+        .gallery.neural-view {
+            display: none;
+        }
+
+        .gallery.particles-view {
+            display: none;
+        }
+
+        /* Animations */
+        @keyframes sphereRotate {
+            0% { transform: rotateY(0deg) rotateX(0deg); }
+            25% { transform: rotateY(90deg) rotateX(10deg); }
+            50% { transform: rotateY(180deg) rotateX(0deg); }
+            75% { transform: rotateY(270deg) rotateX(-10deg); }
+            100% { transform: rotateY(360deg) rotateX(0deg); }
+        }
+
+        @keyframes neuralPulse {
+            0%, 100% { 
+                box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 40px rgba(139, 92, 246, 0.8);
+                transform: scale(1.1);
+            }
+        }
+
+        @keyframes connectionFlow {
+            0% { opacity: 0; transform: scaleX(0); }
+            50% { opacity: 1; transform: scaleX(1); }
+            100% { opacity: 0; transform: scaleX(0); }
+        }
+
+        @keyframes particleFloat {
+            0%, 100% { 
+                transform: translateY(0px) translateX(0px);
+                opacity: 0.3;
+            }
+            25% { 
+                transform: translateY(-20px) translateX(10px);
+                opacity: 0.7;
+            }
+            50% { 
+                transform: translateY(-10px) translateX(-15px);
+                opacity: 1;
+            }
+            75% { 
+                transform: translateY(-30px) translateX(5px);
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes particleThumbnailFloat {
+            0%, 100% { 
+                transform: translateY(0px) translateX(0px) rotate(0deg) scale(1);
+            }
+            25% { 
+                transform: translateY(-30px) translateX(20px) rotate(5deg) scale(1.05);
+            }
+            50% { 
+                transform: translateY(-15px) translateX(-25px) rotate(-3deg) scale(0.95);
+            }
+            75% { 
+                transform: translateY(-40px) translateX(10px) rotate(7deg) scale(1.1);
+            }
+        }
+
+        /* 3D Controls */
+        .view-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .view-controls.active {
+            display: flex;
+        }
+
+        .control-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 10px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -922,6 +1176,15 @@
                 </button>
                 <button class="view-btn" onclick="setViewMode('list')">
                     <i class="fas fa-list"></i>
+                </button>
+                <button class="view-btn" onclick="setViewMode('sphere3d')" title="3D Sphere View">
+                    <i class="fas fa-globe"></i>
+                </button>
+                <button class="view-btn" onclick="setViewMode('neural')" title="Neural Network View">
+                    <i class="fas fa-project-diagram"></i>
+                </button>
+                <button class="view-btn" onclick="setViewMode('particles')" title="Particle Cloud">
+                    <i class="fas fa-star"></i>
                 </button>
             </div>
         </div>
@@ -1162,17 +1425,43 @@
             currentViewMode = mode;
             const galleries = document.querySelectorAll('.gallery');
             const viewBtns = document.querySelectorAll('.view-btn');
+            const viewControls = document.querySelector('.view-controls');
             
             viewBtns.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // Find and activate the clicked button
+            const activeBtn = document.querySelector(`[onclick="setViewMode('${mode}')"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            
+            // Clean up existing 3D containers
+            document.querySelectorAll('.sphere-container, .neural-network, .particle-system').forEach(el => el.remove());
             
             galleries.forEach(gallery => {
+                gallery.classList.remove('list-view', 'sphere-view', 'neural-view', 'particles-view');
+                gallery.style.display = 'grid';
+                
                 if (mode === 'list') {
                     gallery.classList.add('list-view');
-                } else {
-                    gallery.classList.remove('list-view');
+                } else if (mode === 'sphere3d') {
+                    gallery.classList.add('sphere-view');
+                    gallery.style.display = 'none';
+                    create3DSphere(gallery);
+                    if (viewControls) viewControls.classList.add('active');
+                } else if (mode === 'neural') {
+                    gallery.classList.add('neural-view');
+                    gallery.style.display = 'none';
+                    createNeuralNetwork(gallery);
+                    if (viewControls) viewControls.classList.add('active');
+                } else if (mode === 'particles') {
+                    gallery.classList.add('particles-view');
+                    gallery.style.display = 'none';
+                    createParticleSystem(gallery);
+                    if (viewControls) viewControls.classList.add('active');
                 }
             });
+            
+            if (mode === 'grid' || mode === 'list') {
+                if (viewControls) viewControls.classList.remove('active');
+            }
         }
 
         // Search and Filter
@@ -1625,6 +1914,574 @@
                 closeImageLightbox();
             }
         });
+
+        // 3D View Controls
+        let autoRotateEnabled = true;
+        
+        function toggleAutoRotate() {
+            autoRotateEnabled = !autoRotateEnabled;
+            const sphereSpaces = document.querySelectorAll('.sphere-space');
+            sphereSpaces.forEach(space => {
+                if (autoRotateEnabled) {
+                    // Reset to auto-rotation
+                    space.style.animation = 'sphereRotate 20s linear infinite';
+                    space.style.transform = ''; // Clear manual transform
+                    sphereRotationX = 0;
+                    sphereRotationY = 0;
+                    console.log('Auto-rotation enabled');
+                } else {
+                    // Switch to manual control mode
+                    space.style.animation = 'none';
+                    space.style.transform = `rotateY(${sphereRotationY}deg) rotateX(${sphereRotationX}deg)`;
+                    console.log('Auto-rotation disabled - manual control enabled');
+                }
+            });
+            
+            // Update button text/icon to reflect current state
+            const toggleBtn = document.querySelector('.control-btn[onclick="toggleAutoRotate()"]');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (autoRotateEnabled) {
+                    icon.className = 'fas fa-sync-alt';
+                    toggleBtn.title = 'Disable Auto Rotation';
+                } else {
+                    icon.className = 'fas fa-hand-paper';
+                    toggleBtn.title = 'Enable Auto Rotation';
+                }
+            }
+        }
+        
+        function resetView() {
+            sphereRotationX = 0;
+            sphereRotationY = 0;
+            const sphereSpace = document.querySelector('.sphere-space');
+            if (sphereSpace) {
+                sphereSpace.style.transform = '';
+                sphereSpace.style.animation = 'sphereRotate 20s linear infinite';
+                autoRotateEnabled = true;
+            }
+            const containers = document.querySelectorAll('.neural-network, .particle-system');
+            containers.forEach(container => {
+                container.style.transform = 'none';
+            });
+        }
+        
+        function randomizePositions() {
+            if (currentViewMode === 'neural') {
+                const container = document.querySelector('.neural-network');
+                const nodes = container.querySelectorAll('.neural-node');
+                const containerWidth = container.offsetWidth || 1200;
+                const containerHeight = container.offsetHeight || 700;
+                const minDistance = 120;
+                const maxAttempts = 50;
+                
+                const newPositions = [];
+                
+                nodes.forEach((node, index) => {
+                    let x, y;
+                    let attempts = 0;
+                    let validPosition = false;
+                    
+                    // Try to find a position that doesn't overlap with existing nodes
+                    while (!validPosition && attempts < maxAttempts) {
+                        x = Math.random() * (containerWidth * 0.85) + containerWidth * 0.075;
+                        y = Math.random() * (containerHeight * 0.85) + containerHeight * 0.075;
+                        
+                        // Check distance from all existing positioned nodes
+                        validPosition = newPositions.every(pos => {
+                            const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                            return distance >= minDistance;
+                        });
+                        
+                        attempts++;
+                    }
+                    
+                    // If we couldn't find a valid position, use fallback
+                    if (!validPosition) {
+                        x = Math.random() * (containerWidth * 0.8) + containerWidth * 0.1;
+                        y = Math.random() * (containerHeight * 0.8) + containerHeight * 0.1;
+                    }
+                    
+                    // Ensure nodes don't go outside container bounds
+                    x = Math.max(90, Math.min(containerWidth - 90, x));
+                    y = Math.max(90, Math.min(containerHeight - 90, y));
+                    
+                    node.style.left = x + 'px';
+                    node.style.top = y + 'px';
+                    
+                    newPositions.push({ x: x, y: y });
+                });
+                
+                // Recreate connections with better spacing logic
+                document.querySelectorAll('.neural-connection').forEach(conn => conn.remove());
+                setTimeout(() => {
+                    const nodeElements = Array.from(container.querySelectorAll('.neural-node'));
+                    nodeElements.forEach((node, index) => {
+                        if (index > 0) {
+                            const nodeRect = node.getBoundingClientRect();
+                            const containerRect = container.getBoundingClientRect();
+                            const nodeX = nodeRect.left - containerRect.left + nodeRect.width / 2;
+                            const nodeY = nodeRect.top - containerRect.top + nodeRect.height / 2;
+                            
+                            // Find nearby nodes for connection
+                            const nearbyNodes = nodeElements.slice(0, index).filter(otherNode => {
+                                const otherRect = otherNode.getBoundingClientRect();
+                                const otherX = otherRect.left - containerRect.left + otherRect.width / 2;
+                                const otherY = otherRect.top - containerRect.top + otherRect.height / 2;
+                                const distance = Math.sqrt((nodeX - otherX) ** 2 + (nodeY - otherY) ** 2);
+                                return distance < 300 && distance > 100;
+                            });
+                            
+                            // Connect to 1-2 nearby nodes
+                            const connectionsToMake = Math.min(nearbyNodes.length, Math.random() > 0.5 ? 2 : 1);
+                            for (let i = 0; i < connectionsToMake; i++) {
+                                const randomNearby = nearbyNodes[Math.floor(Math.random() * nearbyNodes.length)];
+                                if (randomNearby) {
+                                    createConnection(container, randomNearby, node);
+                                    // Remove to avoid duplicate connections
+                                    nearbyNodes.splice(nearbyNodes.indexOf(randomNearby), 1);
+                                }
+                            }
+                        }
+                    });
+                }, 100);
+            } else if (currentViewMode === 'particles') {
+                const particles = document.querySelectorAll('.particle-thumbnail');
+                particles.forEach(particle => {
+                    particle.style.left = Math.random() * 80 + 10 + '%';
+                    particle.style.top = Math.random() * 80 + 10 + '%';
+                    particle.style.animationDelay = Math.random() * 8 + 's';
+                });
+            }
+        }
+        
+        // Mouse interaction for 3D containers
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let sphereRotationX = 0;
+        let sphereRotationY = 0;
+        
+        document.addEventListener('mousedown', function(e) {
+            // Check if we're in sphere view
+            const sphereContainer = document.querySelector('.sphere-container');
+            if (!sphereContainer) return;
+            
+            // Only start dragging if clicking on the sphere container but not on thumbnails or links
+            const clickedThumbnail = e.target.closest('.sphere-thumbnail');
+            const clickedLink = e.target.closest('a');
+            
+            if (sphereContainer.contains(e.target) && !clickedThumbnail && !clickedLink) {
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                sphereContainer.style.cursor = 'grabbing';
+                
+                // Disable auto-rotation and switch to manual control
+                const sphereSpace = sphereContainer.querySelector('.sphere-space');
+                if (sphereSpace) {
+                    // Remove animation entirely to avoid conflicts
+                    sphereSpace.style.animation = 'none';
+                    // Apply current manual rotation - sphere rotates around its center due to transform-origin
+                    sphereSpace.style.transform = `rotateY(${sphereRotationY}deg) rotateX(${sphereRotationX}deg)`;
+                }
+                autoRotateEnabled = false;
+                
+                e.preventDefault();
+                console.log('Started sphere rotation - auto rotation disabled');
+            }
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                
+                sphereRotationY += deltaX * 0.5;
+                sphereRotationX -= deltaY * 0.5;
+                
+                const sphereSpace = document.querySelector('.sphere-space');
+                if (sphereSpace) {
+                    // Apply manual rotation around center point (transform-origin: center center)
+                    sphereSpace.style.transform = `rotateY(${sphereRotationY}deg) rotateX(${sphereRotationX}deg)`;
+                }
+                
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                const sphereContainer = document.querySelector('.sphere-container');
+                if (sphereContainer) {
+                    sphereContainer.style.cursor = 'grab';
+                }
+                console.log('Ended sphere rotation - double-click to re-enable auto-rotation');
+            }
+        });
+        
+        // Add visual feedback for sphere interaction
+        document.addEventListener('mouseover', function(e) {
+            const sphereContainer = document.querySelector('.sphere-container');
+            if (sphereContainer && sphereContainer.contains(e.target) && !e.target.closest('.sphere-thumbnail')) {
+                sphereContainer.style.background = 'radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 70%)';
+            }
+        });
+        
+        document.addEventListener('mouseout', function(e) {
+            const sphereContainer = document.querySelector('.sphere-container');
+            if (sphereContainer && (!sphereContainer.contains(e.relatedTarget) || isDragging === false)) {
+                sphereContainer.style.background = 'radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%)';
+            }
+        });
+        
+        // Double-click to re-enable auto-rotation
+        document.addEventListener('dblclick', function(e) {
+            const sphereContainer = document.querySelector('.sphere-container');
+            if (sphereContainer && sphereContainer.contains(e.target) && !e.target.closest('.sphere-thumbnail')) {
+                const sphereSpace = sphereContainer.querySelector('.sphere-space');
+                if (sphereSpace) {
+                    // Reset to auto-rotation
+                    sphereRotationX = 0;
+                    sphereRotationY = 0;
+                    sphereSpace.style.animation = 'sphereRotate 20s linear infinite';
+                    sphereSpace.style.transform = ''; // Clear manual transform, let CSS animation handle it
+                    autoRotateEnabled = true;
+                    console.log('Auto-rotation re-enabled');
+                }
+            }
+        });
+
+        // 3D Sphere Visualization
+        function create3DSphere(gallery) {
+            console.log('Creating 3D sphere for gallery:', gallery);
+            const container = document.createElement('div');
+            container.className = 'sphere-container';
+            const sphereSpace = document.createElement('div');
+            sphereSpace.className = 'sphere-space';
+            
+            // Center the sphere in the viewport - no initial transform needed since we use transform-origin: center
+            // The sphere will rotate around its natural center point
+            
+            const thumbnails = gallery.querySelectorAll('.thumbnail');
+            const radius = 250; // Slightly smaller radius for better fit
+            
+            console.log(`Found ${thumbnails.length} thumbnails to place in sphere`);
+            
+            thumbnails.forEach((thumbnail, index) => {
+                const sphereThumbnail = document.createElement('div');
+                sphereThumbnail.className = 'sphere-thumbnail';
+                
+                const img = thumbnail.querySelector('img');
+                if (img) {
+                    sphereThumbnail.innerHTML = `<img src="${img.src}" alt="">`;
+                }
+                
+                // Improved sphere positioning using Fibonacci spiral
+                const y = 1 - (index / (thumbnails.length - 1)) * 2; // y goes from 1 to -1
+                const radiusAtY = Math.sqrt(1 - y * y);
+                const theta = Math.PI * 2 * index * 0.618034; // Golden angle
+                
+                const x = Math.cos(theta) * radiusAtY * radius;
+                const z = Math.sin(theta) * radiusAtY * radius;
+                const yPos = y * radius;
+                
+                // Center the coordinates within the 600px sphere-space container
+                // The container is 600px x 600px, so center is at 300px, 300px, 300px
+                const centerOffset = 300; // Half of 600px container size
+                const centeredX = x + centerOffset;
+                const centeredY = yPos + centerOffset;
+                const centeredZ = z + centerOffset;
+                
+                // Calculate angles to make thumbnail face away from center
+                const phi = Math.atan2(z, x); // Azimuthal angle (unchanged - relative to original center)
+                const thetaY = Math.atan2(Math.sqrt(x * x + z * z), yPos); // Polar angle from Y axis
+                
+                // Apply position and rotation to face outward from center
+                sphereThumbnail.style.transform = `translate3d(${centeredX}px, ${centeredY}px, ${centeredZ}px) rotateY(${phi}rad) rotateX(${thetaY - Math.PI/2}rad)`;
+                
+                // Store original angles for hover effects
+                sphereThumbnail.dataset.phi = phi;
+                sphereThumbnail.dataset.thetaY = thetaY;
+                
+                // Copy ALL data attributes
+                for (let attr of thumbnail.attributes) {
+                    if (attr.name.startsWith('data-')) {
+                        sphereThumbnail.setAttribute(attr.name, attr.value);
+                    }
+                }
+                
+                // Add hover effects that maintain orientation
+                sphereThumbnail.addEventListener('mouseenter', function() {
+                    const currentPhi = parseFloat(this.dataset.phi);
+                    const currentThetaY = parseFloat(this.dataset.thetaY);
+                    this.style.transform = `translate3d(${centeredX}px, ${centeredY}px, ${centeredZ}px) rotateY(${currentPhi}rad) rotateX(${currentThetaY - Math.PI/2}rad) scale(1.2)`;
+                });
+                
+                sphereThumbnail.addEventListener('mouseleave', function() {
+                    const currentPhi = parseFloat(this.dataset.phi);
+                    const currentThetaY = parseFloat(this.dataset.thetaY);
+                    this.style.transform = `translate3d(${centeredX}px, ${centeredY}px, ${centeredZ}px) rotateY(${currentPhi}rad) rotateX(${currentThetaY - Math.PI/2}rad) scale(1)`;
+                });
+                
+                // Copy click handlers for videos and folders
+                if (thumbnail.onclick) {
+                    sphereThumbnail.onclick = thumbnail.onclick.bind(thumbnail);
+                }
+                
+                // Copy image lightbox handlers
+                const link = thumbnail.querySelector('a');
+                if (link && link.onclick) {
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.onclick = link.onclick;
+                    newLink.innerHTML = sphereThumbnail.innerHTML;
+                    sphereThumbnail.innerHTML = '';
+                    sphereThumbnail.appendChild(newLink);
+                } else if (link && !link.onclick) {
+                    // For folder links without onclick
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.style.textDecoration = 'none';
+                    newLink.style.color = 'inherit';
+                    newLink.innerHTML = sphereThumbnail.innerHTML;
+                    sphereThumbnail.innerHTML = '';
+                    sphereThumbnail.appendChild(newLink);
+                }
+                
+                sphereSpace.appendChild(sphereThumbnail);
+            });
+            
+            container.appendChild(sphereSpace);
+            gallery.parentNode.insertBefore(container, gallery.nextSibling);
+            
+            console.log('3D sphere created successfully');
+        }
+        
+        // Neural Network Visualization
+        function createNeuralNetwork(gallery) {
+            const container = document.createElement('div');
+            container.className = 'neural-network';
+            
+            const thumbnails = gallery.querySelectorAll('.thumbnail');
+            const connections = [];
+            const nodePositions = []; // Track positions to avoid overlap
+            const minDistance = 120; // Minimum distance between nodes
+            const maxAttempts = 50; // Maximum attempts to find a valid position
+            
+            thumbnails.forEach((thumbnail, index) => {
+                const node = document.createElement('div');
+                node.className = 'neural-node';
+                
+                const img = thumbnail.querySelector('img');
+                if (img) {
+                    node.innerHTML = `<img src="${img.src}" alt="">`;
+                }
+                
+                // Random positioning with collision detection
+                const containerWidth = container.offsetWidth || 1200;
+                const containerHeight = container.offsetHeight || 700;
+                let x, y;
+                let attempts = 0;
+                let validPosition = false;
+                
+                // Try to find a position that doesn't overlap with existing nodes
+                while (!validPosition && attempts < maxAttempts) {
+                    x = Math.random() * (containerWidth * 0.85) + containerWidth * 0.075;
+                    y = Math.random() * (containerHeight * 0.85) + containerHeight * 0.075;
+                    
+                    // Check distance from all existing nodes
+                    validPosition = nodePositions.every(pos => {
+                        const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                        return distance >= minDistance;
+                    });
+                    
+                    attempts++;
+                }
+                
+                // If we couldn't find a valid position, use fallback with slight offset
+                if (!validPosition) {
+                    x = Math.random() * (containerWidth * 0.8) + containerWidth * 0.1;
+                    y = Math.random() * (containerHeight * 0.8) + containerHeight * 0.1;
+                }
+                
+                // Ensure nodes don't go outside container bounds
+                x = Math.max(90, Math.min(containerWidth - 90, x));
+                y = Math.max(90, Math.min(containerHeight - 90, y));
+                
+                node.style.left = x + 'px';
+                node.style.top = y + 'px';
+                node.style.animationDelay = (index * 0.2) + 's';
+                
+                // Store position for connection calculations
+                nodePositions.push({ x: x, y: y, element: node });
+                
+                // Copy ALL data attributes
+                for (let attr of thumbnail.attributes) {
+                    if (attr.name.startsWith('data-')) {
+                        node.setAttribute(attr.name, attr.value);
+                    }
+                }
+                
+                // Copy click handlers for videos and folders
+                if (thumbnail.onclick) {
+                    node.onclick = thumbnail.onclick.bind(thumbnail);
+                }
+                
+                // Copy image lightbox handlers
+                const link = thumbnail.querySelector('a');
+                if (link && link.onclick) {
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.onclick = link.onclick;
+                    newLink.innerHTML = node.innerHTML;
+                    node.innerHTML = '';
+                    node.appendChild(newLink);
+                } else if (link && !link.onclick) {
+                    // For folder links without onclick
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.style.textDecoration = 'none';
+                    newLink.style.color = 'inherit';
+                    newLink.innerHTML = node.innerHTML;
+                    node.innerHTML = '';
+                    node.appendChild(newLink);
+                }
+                
+                container.appendChild(node);
+            });
+            
+            // Create connections between nearby nodes after all nodes are positioned
+            setTimeout(() => {
+                nodePositions.forEach((nodePos, index) => {
+                    if (index > 0) {
+                        // Find nodes within connection range but not too close
+                        const nearbyNodes = nodePositions.slice(0, index).filter(otherPos => {
+                            const distance = Math.sqrt((nodePos.x - otherPos.x) ** 2 + (nodePos.y - otherPos.y) ** 2);
+                            return distance < 300 && distance > 100; // Connection range
+                        });
+                        
+                        // Connect to 1-2 nearby nodes randomly
+                        const connectionsToMake = Math.min(nearbyNodes.length, Math.random() > 0.6 ? 2 : 1);
+                        for (let i = 0; i < connectionsToMake; i++) {
+                            const randomNearby = nearbyNodes[Math.floor(Math.random() * nearbyNodes.length)];
+                            if (randomNearby) {
+                                createConnection(container, randomNearby.element, nodePos.element);
+                                // Remove to avoid duplicate connections
+                                nearbyNodes.splice(nearbyNodes.indexOf(randomNearby), 1);
+                            }
+                        }
+                    }
+                });
+            }, 200);
+            
+            gallery.parentNode.insertBefore(container, gallery.nextSibling);
+        }
+        
+        function createConnection(container, node1, node2) {
+            const connection = document.createElement('div');
+            connection.className = 'neural-connection';
+            
+            const rect1 = node1.getBoundingClientRect();
+            const rect2 = node2.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            const x1 = rect1.left - containerRect.left + rect1.width / 2;
+            const y1 = rect1.top - containerRect.top + rect1.height / 2;
+            const x2 = rect2.left - containerRect.left + rect2.width / 2;
+            const y2 = rect2.top - containerRect.top + rect2.height / 2;
+            
+            const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            
+            connection.style.width = length + 'px';
+            connection.style.left = x1 + 'px';
+            connection.style.top = y1 + 'px';
+            connection.style.transform = `rotate(${angle}deg)`;
+            connection.style.animationDelay = Math.random() * 2 + 's';
+            
+            container.appendChild(connection);
+        }
+        
+        // Particle System Visualization
+        function createParticleSystem(gallery) {
+            const container = document.createElement('div');
+            container.className = 'particle-system';
+            
+            // Create background particles
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 8 + 's';
+                particle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                
+                const hue = Math.random() * 60 + 200; // Blue to purple range
+                particle.style.background = `hsl(${hue}, 70%, 60%)`;
+                particle.style.boxShadow = `0 0 ${Math.random() * 10 + 5}px hsl(${hue}, 70%, 60%)`;
+                
+                container.appendChild(particle);
+            }
+            
+            // Add thumbnail particles
+            const thumbnails = gallery.querySelectorAll('.thumbnail');
+            thumbnails.forEach((thumbnail, index) => {
+                const particleThumbnail = document.createElement('div');
+                particleThumbnail.className = 'particle-thumbnail';
+                
+                const img = thumbnail.querySelector('img');
+                if (img) {
+                    particleThumbnail.innerHTML = `<img src="${img.src}" alt="">`;
+                }
+                
+                // Random initial position
+                particleThumbnail.style.left = Math.random() * 80 + 10 + '%';
+                particleThumbnail.style.top = Math.random() * 80 + 10 + '%';
+                particleThumbnail.style.animationDelay = (index * 0.3) + 's';
+                particleThumbnail.style.animationDuration = (Math.random() * 8 + 8) + 's';
+                
+                // Copy ALL data attributes
+                for (let attr of thumbnail.attributes) {
+                    if (attr.name.startsWith('data-')) {
+                        particleThumbnail.setAttribute(attr.name, attr.value);
+                    }
+                }
+                
+                // Copy click handlers for videos and folders
+                if (thumbnail.onclick) {
+                    particleThumbnail.onclick = thumbnail.onclick.bind(thumbnail);
+                }
+                
+                // Copy image lightbox handlers
+                const link = thumbnail.querySelector('a');
+                if (link && link.onclick) {
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.onclick = link.onclick;
+                    newLink.innerHTML = particleThumbnail.innerHTML;
+                    particleThumbnail.innerHTML = '';
+                    particleThumbnail.appendChild(newLink);
+                } else if (link && !link.onclick) {
+                    // For folder links without onclick
+                    const newLink = document.createElement('a');
+                    newLink.href = link.href;
+                    newLink.style.textDecoration = 'none';
+                    newLink.style.color = 'inherit';
+                    newLink.innerHTML = particleThumbnail.innerHTML;
+                    particleThumbnail.innerHTML = '';
+                    particleThumbnail.appendChild(newLink);
+                }
+                
+                container.appendChild(particleThumbnail);
+            });
+            
+            gallery.parentNode.insertBefore(container, gallery.nextSibling);
+        }
 
         // Initialize with fade-in animations
         document.addEventListener('DOMContentLoaded', function() {
