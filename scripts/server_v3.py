@@ -38,6 +38,7 @@ class ServerConfig:
     template: jinja2.Template|None = None
     sort_by_name: bool|None = None
     max_clip_duration: float|None = None
+    index_path: Path|None = None
     #_config_file: Path = TMP_CONFIG_FNAME
 
     def set_values_from_args(
@@ -82,16 +83,25 @@ class ServerConfig:
                 self.site_index = mediatools.MediaDir.from_dict(json.load(f))
         else:
             print(f'creating index {index_path}')
-            self.site_index = create_site_index(root_path, thumb_path, sort_by_name, max_clip_duration)
-            with index_path.open('w') as f:
-                json.dump(self.site_index.to_dict(), f, indent=2)
+            #self.site_index = create_site_index(root_path, thumb_path, sort_by_name, max_clip_duration)
+            ignore_path = lambda p: p.name == thumb_path.name or p.name.startswith('.')
+            mdir = mediatools.MediaDir.from_path(root_path, use_absolute=True, ignore_path=ignore_path)
+            print(f'Indexing media directory: {root_path}')
+            print(f'Found {len(mdir.all_videos())} videos and {len(mdir.all_images())} images.')
+
+            self.site_index = create_page_index(mdir, root_path, thumbs_path=thumb_path, max_clip_duration=max_clip_duration)
 
         print(f'{self.site_index=}')
         print(f'Site index has {len(self.site_index.all_videos())} videos and {len(self.site_index.all_images())} images.')
 
         self.max_clip_duration = float(max_clip_duration)
-
+        self.index_path = index_path
         return self
+    
+    def write_index(self) -> None:
+        '''Write the site index to the index file.'''
+        with self.index_path.open('w') as f:
+            json.dump(self.site_index.to_dict(), f, indent=2)
     
     def get_template_vars(self, path: Path) -> dict[str, typing.Any]:
         '''Get template variables.'''
@@ -106,16 +116,104 @@ class ServerConfig:
             **mdir.meta['info'],
             'subpages': [sd.meta['info'] for sd in mdir.subdirs.values()],
         }
+    
+    def update_index(self) -> None:
+        '''Update the site index with any changed media files.'''
+        vid_info_lookup = {vf.path:vf.meta['info'] for vf in self.site_index.all_videos()}
+        img_info_lookup = {imf.path:imf.meta['info'] for imf in self.site_index.all_images()}
+        page_info_lookup = {pd.path:pd.meta['info'] for pd in self.site_index.all_dirs()}
+        
+        print(f'SCANNING MEDIA DIRECTORY...')
+        ignore_path = lambda p: p.name == self.thumb_path.name or p.name.startswith('.')
+        new_mdir = mediatools.MediaDir.from_path(self.root_path, use_absolute=True, ignore_path=ignore_path)
 
+        dirs_to_update = set()
 
-def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool, max_clip_duration: float, verbose: bool = True) -> mediatools.MediaDir:
-    '''Create the index page for the site.'''
-    ignore_path = lambda p: p.name == Path(thumbs_path).name
-    mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ignore_path=ignore_path)
-    if verbose:
-        print(f'Indexing media directory: {root}')
-        print(f'Found {len(mdir.all_videos())} videos and {len(mdir.all_images())} images.')
-    return create_page_index(mdir, root, thumbs_path=Path(thumbs_path), max_clip_duration=max_clip_duration)
+        videos_to_add = list()
+        for vf in new_mdir.all_videos():
+            try:
+                vf.meta['info'] = vid_info_lookup[vf.path]
+            except KeyError:
+                videos_to_add.append(vf)
+                parent = vf.path.parent.relative_to(new_mdir.path)
+                dirs_to_update.update([parent] + get_all_parents(parent))
+                #parent_dir = new_mdir.subdir(vf.path.parent.relative_to(new_mdir.path))
+                #dirs_to_update.update([parent_dir.path] + [p.path for p in parent_dir.parents()])
+
+        images_to_add = list()
+        for imf in new_mdir.all_images():
+            try:
+                imf.meta['info'] = img_info_lookup[imf.path]
+            except KeyError:
+                images_to_add.append(imf)
+                parent = imf.path.parent.relative_to(new_mdir.path)
+                dirs_to_update.update([parent] + get_all_parents(parent))
+                #parent_dir = new_mdir.subdir(imf.path.parent.relative_to(new_mdir.path))
+                #dirs_to_update.update([parent_dir.path] + [p.path for p in parent_dir.parents()])
+
+        for md in new_mdir.all_dirs():
+            try:
+                md.meta['info'] = page_info_lookup[md.path]
+            except KeyError:
+                dirs_to_update.add(md.path.relative_to(new_mdir.path))
+
+        #old_media_paths = set(self.site_index.all_media_paths())
+        #new_media_paths = set(new_mdir.all_media_paths())
+        #removed_media_paths = old_media_paths - new_media_paths
+        #for p in removed_media_paths:
+        #    rel_p = p.relative_to(new_mdir.path)
+        #    dirs_to_update.update([rel_p] + get_all_parents(rel_p))
+
+        #removed_file_paths = set(self.site_index.all_file_paths()) - set(new_mdir.all_file_paths())
+        #for p in removed_file_paths:
+        #    try:
+        #        parent_dir = new_mdir.subdir(p.parent.relative_to(new_mdir.path))
+        #        dirs_to_update.update([parent_dir.path] + [p.path for p in parent_dir.parents()])
+        #    except mediatools.DirectoryNotFoundError as e:
+        #        pass
+        
+        if True:
+            for vf in videos_to_add:
+                print(f'New video: {vf.path}')
+            for imf in images_to_add:
+                print(f'New image: {imf.path}')
+            for d in dirs_to_update:
+                print(f'Updated directory: {d}')
+
+        #print(f'UPDATE: {len(removed_media_paths)} files were removed.')
+        print(f'UPDATE: adding {len(videos_to_add)} videos and {len(images_to_add)} images, updating {len(dirs_to_update)} directories')
+        #dirs_to_update = [new_mdir.subdir(p) for p in dirs_to_update]
+        dirs_to_update_use = list()
+        for p in dirs_to_update:
+            #try:
+            dirs_to_update_use.append(new_mdir.subdir(p))
+            #except mediatools.DirectoryNotFoundError as e:
+            #    pass
+
+        add_vid_info(videos_to_add, self.root_path, self.thumb_path, self.max_clip_duration, verbose=False)
+        add_img_info(images_to_add, self.root_path, self.thumb_path, verbose=False)
+        add_page_info(dirs_to_update_use, self.root_path)
+        self.site_index = new_mdir
+
+        print(f'Done! Writing index to {self.index_path}')
+        #self.write_index()
+
+#def create_site_index(root: pathlib.Path, thumbs_path: Path|str, sort_by_name: bool, max_clip_duration: float, verbose: bool = True) -> mediatools.MediaDir:
+#    '''Create the index page for the site.'''
+#    ignore_path = lambda p: p.name == Path(thumbs_path).name
+#    mdir = mediatools.MediaDir.from_path(root, use_absolute=True, ignore_path=ignore_path)
+#    if verbose:
+#        print(f'Indexing media directory: {root}')
+#        print(f'Found {len(mdir.all_videos())} videos and {len(mdir.all_images())} images.')
+#    return create_page_index(mdir, root, thumbs_path=Path(thumbs_path), max_clip_duration=max_clip_duration)
+
+def get_all_parents(p: Path) -> list[Path]:
+    parents = []
+    current = p.parent
+    while current != current.parent:
+        parents.append(current)
+        current = current.parent
+    return parents
 
 def create_page_index(
     mdir: mediatools.MediaDir, 
@@ -124,32 +222,58 @@ def create_page_index(
     max_clip_duration: float,
     verbose: bool = True,
 ) -> mediatools.MediaDir:
+    '''Modify the MediaDir in place by adding image, video, and page info.'''
+    add_img_info(mdir.all_images(), root, thumbs_path, verbose=verbose)
+    add_vid_info(mdir.all_videos(), root, thumbs_path, max_clip_duration, verbose=verbose)
+    add_page_info(mdir.all_dirs(), root)
+    return mdir
 
-    all_imfs = mdir.all_images()
-    elements = [(imf,root, thumbs_path) for imf in all_imfs]
-    image_infos = util.parallel_starmap(get_image_info, elements, num_processes=os.cpu_count(), use_tqdm=verbose)
-    for imf,ii in zip(all_imfs, image_infos):
-        imf.meta['info'] = ii
-    
-    all_vfs = mdir.all_videos()
-    elements = [(vf,root,thumbs_path, max_clip_duration) for vf in all_vfs]
-    video_infos = util.parallel_starmap(get_video_info, elements, num_processes=os.cpu_count(), use_tqdm=verbose)
-    for vf,vi in zip(all_vfs, video_infos):
-        vf.meta['info'] = vi
 
-    for sdir in tqdm.tqdm(mdir.all_dirs()):
+def add_page_info(
+    mdirs: list[mediatools.MediaDir],
+    root: pathlib.Path,
+) -> None:
+    if not mdirs:
+        return
+    for sdir in tqdm.tqdm(mdirs):
         sdir.meta['info'] = get_page_info(
             mdir=sdir, 
             root=root, 
         )
 
-    return mdir
+def add_img_info(
+    ifiles: list[mediatools.ImageFile],
+    root: pathlib.Path,
+    thumbs_path: pathlib.Path,
+    verbose: bool = True,
+) -> None:
+    '''Extract image info in parallel and add it back to the image files.'''
+    if not ifiles:
+        return
+    elements = [(imf,root,thumbs_path) for imf in ifiles]
+    image_infos = util.parallel_starmap(get_image_info, elements, num_processes=os.cpu_count(), use_tqdm=verbose)
+    for imf,ii in zip(ifiles, image_infos):
+        imf.meta['info'] = ii
+
+def add_vid_info(
+    vfiles: list[mediatools.VideoFile],
+    root: pathlib.Path,
+    thumbs_path: pathlib.Path,
+    max_clip_duration: float,
+    verbose: bool = True,
+) -> None:
+    '''Extract video info in parallel and add it back to the video files.'''
+    if not vfiles:
+        return
+    elements = [(vf,root,thumbs_path, max_clip_duration) for vf in vfiles]
+    video_infos = util.parallel_starmap(get_video_info, elements, num_processes=os.cpu_count(), use_tqdm=verbose)
+    for vf,vi in zip(vfiles, video_infos):
+        vf.meta['info'] = vi
 
 def get_page_info(mdir: mediatools.MediaDir, root: pathlib.Path) -> dict[str,typing.Any]:
     '''Get page info dictionary. Assume image and video infos have already been populated.'''
     page_path_abs = mdir.path
     page_path_rel = mdir.path.relative_to(root)
-
 
     all_subdir_videos = mdir.all_videos()
     all_subdir_images = mdir.all_images()
@@ -284,6 +408,11 @@ def create_app(config: ServerConfig) -> FastAPI:
     @app.get('/page')
     async def page_redirect():
         return RedirectResponse(url='/page/')
+
+    @app.get('/update', response_class=PlainTextResponse)
+    async def list_pages(config: ServerConfig = Depends(get_config)):
+        config.update_index()
+        return 'Updated successfully!'
 
     @app.get('/list_directories', response_class=PlainTextResponse)
     async def list_pages(config: ServerConfig = Depends(get_config)):
