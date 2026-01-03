@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, PlainTextResponse
 from pathlib import Path
 import argparse
+import datetime
 
 from fastapi import Depends
 import pathlib
@@ -108,10 +109,12 @@ class ServerConfig:
         
         print(f'{path=}, {self.site_index=}')
         mdir = self.site_index.subdir(path)
+        sorted_subdirs = sorted(mdir.subdirs.values(), key=lambda d: str(d.path.name).lower())
+        #print([sd.path.name.lower() for sd in sorted_subdirs])
         print(f'{mdir=}')
         return {
             **mdir.meta['info'],
-            'subpages': [sd.meta['info'] for sd in mdir.subdirs.values()],
+            'subpages': [sd.meta['info'] for sd in sorted_subdirs],
         }
     
     def update_index(self) -> str:
@@ -272,6 +275,9 @@ def get_page_info(mdir: mediatools.MediaDir, root: pathlib.Path) -> dict[str,typ
         if ii is not None and ii['thumb_exists']:
             all_subfolder_thumbs.append(ii['thumb_path_rel'])
 
+    sorted_vids = list(sorted(mdir.videos, key=lambda v: v.path.name.lower()))
+    sorted_imgs = list(sorted(mdir.images, key=lambda i: i.path.name.lower()))
+
     return {
         'page_path_abs': str(page_path_abs),
         'page_path_rel': str(page_path_rel),
@@ -281,9 +287,9 @@ def get_page_info(mdir: mediatools.MediaDir, root: pathlib.Path) -> dict[str,typ
         'subfolder_thumbs_all': all_subfolder_thumbs,
         'subfolder_thumb': '',#best_thumb.get_final_path(),
         'subfolder_aspect': '',#best_thumb.get_final_aspect(),
-        'vids': [vf.meta['info'] for vf in mdir.videos if vf.meta['info'] is not None and not vf.meta['info']['is_clip']],
-        'clips': [vf.meta['info'] for vf in mdir.videos if vf.meta['info'] is not None and vf.meta['info']['is_clip']],
-        'images': [imf.meta['info'] for imf in mdir.images if imf.meta['info'] is not None],
+        'vids': [vf.meta['info'] for vf in sorted_vids if vf.meta['info'] is not None and not vf.meta['info']['is_clip']],
+        'clips': [vf.meta['info'] for vf in sorted_vids if vf.meta['info'] is not None and vf.meta['info']['is_clip']],
+        'images': [imf.meta['info'] for imf in sorted_imgs if imf.meta['info'] is not None],
         'num_vids': len(all_subdir_videos),
         'num_imgs': len(all_subdir_images),
         'num_subpages': len(mdir.subdirs),
@@ -308,6 +314,14 @@ def get_video_info(
         thumb_path = thumbs_path / (hash_str + '.gif')
         thumb_path_rel = thumb_path.relative_to(root)
 
+        if info.probe.tags is not None and 'creation_time' in info.probe.tags:
+            created_ts_str = info.probe.tags['creation_time']
+            created_ts = datetime.datetime.fromisoformat(created_ts_str)
+            created_str = created_ts.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            created_ts = None
+            created_str = None
+
         return {
             'vid_path_abs': str(vid_path_abs),
             'vid_path_rel': str(vid_path_rel),
@@ -324,6 +338,8 @@ def get_video_info(
             'aspect': info.aspect_ratio(),
             'hash': hash_str,
             'is_clip': info.probe.duration < max_clip_duration,
+            'created_ts': created_ts.timestamp() if created_ts is not None else None,
+            'created': created_str,
         }
 
 
@@ -415,10 +431,10 @@ def create_app(config: ServerConfig) -> FastAPI:
         except mediatools.DirectoryNotFoundError:
             raise HTTPException(status_code=404, detail=f"Page not found: {page_path}")
         
-        tmp = page_data.copy()
-        del tmp['subfolder_thumbs_all']
-        print(json.dumps(tmp, indent=2))
-        
+        #tmp = page_data.copy()
+        #del tmp['subfolder_thumbs_all']
+        #print(json.dumps(tmp, indent=2))
+        print(f'rendering template {config.template_path}')
         with config.template_path.open('r') as f:
             template = f.read()
         environment = jinja2.Environment()
