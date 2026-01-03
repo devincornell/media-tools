@@ -16,12 +16,12 @@ class ProbeInfo(pydantic.BaseModel):
     nb_programs: int
     format_name: str
     format_long_name: str
-    start_time: str
-    bit_rate: int
-    dur: str
+    start_time: str|None
+    bit_rate: int|None
+    dur: str|None
     size: int
     probe_score: int
-    tags: typing.Dict[str, str | int | bool | float]
+    tags: typing.Dict[str, str | int | bool | float]|None
     video_streams: typing.List[VideoStreamInfo]
     audio_streams: typing.List[AudioStreamInfo]
     other_streams: typing.List[typing.Dict[str, typing.Any]] # no idea if this will be used.
