@@ -35,12 +35,6 @@ def get_or_None(data: typing.Dict, key: str, convert_type: type[T] = str) -> typ
     return convert_type(data[key]) if key in data else None
 
 
-class VideoTime(str):
-    '''Represents a time value in video. Retain as string for perfect storage.'''
-    
-    def as_float(self) -> float:
-        return float(self)
-
 
 def multi_extension_glob(
     glob_func: typing.Callable[[str],list[Path]], 

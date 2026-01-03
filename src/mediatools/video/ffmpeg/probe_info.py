@@ -3,14 +3,14 @@ from __future__ import annotations
 import dataclasses
 import typing
 import pathlib
+import pydantic
 
 from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
 from .stream_info import VideoStreamInfo, AudioStreamInfo
-from ..util import get_or_None_factory, VideoTime
+from ..util import get_or_None_factory
 
 
-@dataclasses.dataclass
-class ProbeInfo:
+class ProbeInfo(pydantic.BaseModel):
     fname: str
     nb_streams: int
     nb_programs: int

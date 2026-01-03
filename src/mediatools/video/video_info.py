@@ -18,7 +18,7 @@ if typing.TYPE_CHECKING:
 
 @dataclasses.dataclass#(repr=False)
 class VideoInfo:
-    '''Info about a single video.'''
+    '''Container for video probe and os.stat_result.'''
     vfile: VideoFile
     probe: ProbeInfo
     stat: os.stat_result

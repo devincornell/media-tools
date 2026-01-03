@@ -3,27 +3,27 @@ from __future__ import annotations
 import dataclasses
 import typing
 
+import pydantic
+import json
 
 from ..util import get_or_None_factory, VideoTime
 from .errors import ProbeError, NoDurationError, NoResolutionError
 
-@dataclasses.dataclass
-class BaseStreamInfo:
+class BaseStreamInfo(pydantic.BaseModel):
     stream_ind: int
     codec_name: typing.Optional[str]
     codec_long_name: typing.Optional[str]
-    start_time: typing.Optional[VideoTime]
+    start_time: typing.Optional[str]
     start_pts: typing.Optional[int]
     time_base: typing.Optional[str]
-    tags: typing.Dict[str,str]
+    tags: typing.Dict[str,str]|None
     disposition: typing.Dict[str,bool]
 
-@dataclasses.dataclass
 class AudioStreamInfo(BaseStreamInfo):
     sample_fmt: str
     sample_rate: int
     channels: int
-    channel_layout: str
+    channel_layout: str|None
 
     @classmethod
     def from_dict(cls, stream_info: typing.Dict[str,typing.Any], check_for_errors: bool = False) -> typing.Self:
@@ -35,7 +35,7 @@ class AudioStreamInfo(BaseStreamInfo):
             start_time = from_stream('start_time', VideoTime), # type: ignore
             start_pts = from_stream('start_pts'), # type: ignore
             time_base = from_stream('time_base'), # type: ignore
-            tags = from_stream('tags'), # type: ignore
+            tags = from_stream('tags', lambda x: x), # type: ignore
             sample_fmt = from_stream('sample_fmt'), # type: ignore
             sample_rate = from_stream('sample_rate', int), # type: ignore
             channels = from_stream('channels', int), # type: ignore
@@ -47,7 +47,6 @@ class AudioStreamInfo(BaseStreamInfo):
 
         return o
 
-@dataclasses.dataclass
 class VideoStreamInfo(BaseStreamInfo):
     height: int
     width: int
@@ -74,6 +73,10 @@ class VideoStreamInfo(BaseStreamInfo):
     def from_dict(cls, stream_info: typing.Dict[str,typing.Any], check_for_errors: bool = False) -> typing.Self:
         '''Create a VideoStreamInfo from a stream info dictionary.'''
         from_stream = get_or_None_factory(stream_info)
+        
+        #print(json.dumps(stream_info, indent=2))
+        #a = from_stream('tags')
+        #print(type(a), a)
 
         o = cls(
             stream_ind = from_stream('index'),
@@ -82,7 +85,7 @@ class VideoStreamInfo(BaseStreamInfo):
             start_time = from_stream('start_time'), # type: ignore
             start_pts = from_stream('start_pts'), # type: ignore
             time_base = from_stream('time_base'), # type: ignore
-            tags = from_stream('tags'), # type: ignore
+            tags = from_stream('tags', lambda x: x), # type: ignore
 
             height = from_stream('height', int), # type: ignore
             width = from_stream('width', int), # type: ignore
