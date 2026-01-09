@@ -16,7 +16,8 @@ import tqdm
 import random
 import pydantic
 import pathlib
-
+from beanie.operators import Set
+from pathlib import Path
 
 import sys
 sys.path.append('../src')
@@ -142,13 +143,25 @@ class MediaDirIndex(beanie.Document):
             if verbose:
                 print(f'Scanning dir: {mdir.path}')
             mdi = MediaDirIndex.from_media_dir(mdir, root_path)
-            from beanie.operators import Set
+            
             await cls.find_one(cls.path_rel == mdi.path_rel).upsert(
                 Set(mdi.model_dump()),
                 on_insert=mdi
             )
             if verbose:
                 print(f'Inserted/updated dir: {mdir.path}')
+
+    @classmethod
+    async def fetch_by_rel_path(cls, path_rel: str|Path) -> Optional[typing.Self]:
+        '''Get a MediaDirIndex document by its relative path.
+        '''
+        return await cls.find_one(cls.path_rel == str(path_rel))
+    
+    @classmethod
+    async def fetch_by_abs_path(cls, path_abs: str|Path) -> Optional[typing.Self]:
+        '''Get a MediaDirIndex document by its absolute path.
+        '''
+        return await cls.find_one(cls.path_abs == str(path_abs))
 
     async def get_video_infos(self) -> List[VideoInfo]:
         '''Get the VideoInfo documents for the video files in this media directory index.
@@ -164,7 +177,7 @@ class MediaDirIndex(beanie.Document):
         '''
         subdir_indexes = []
         for sp_rel in self.subpaths_rel:
-            mdi = await MediaDirIndex.find_one(MediaDirIndex.path_rel == sp_rel)
+            mdi = await MediaDirIndex.fetch_by_rel_path(sp_rel)
             if mdi:
                 subdir_indexes.append(mdi)
         return subdir_indexes
@@ -179,10 +192,14 @@ async def init_db(db_name: str) -> None:
 async def main():
     await init_db("dwhost")
 
-    if False:
-        mdir = mediatools.scan_directory('/mnt/HDDStorage/sys/dwhelper/')
-        print(len(mdir.all_videos()))
+    if True:
+        root_path = pathlib.Path('/mnt/HDDStorage/sys/dwhelper/collections/')
+        mdir = mediatools.scan_directory(root_path)
         await VideoInfo.insert_video_files(mdir.all_videos(), verbose=True)
+        
+        #await MediaDirIndex.delete_all()
+        await MediaDirIndex.insert_media_dirs(all_dirs, root_path, verbose=True)
+
 
     if False:
         all_vfs = mediatools.scan_directory('/mnt/HDDStorage/sys/dwhelper/').all_videos()
@@ -199,12 +216,7 @@ async def main():
         print(f'Loading VideoFile took: {datetime.now()-start}')
         #print(vfd)
 
-    if True:
-        await MediaDirIndex.delete_all()
-        root_path = pathlib.Path('/mnt/HDDStorage/sys/dwhelper/pros/rilynn_rae')
-        all_dirs = mediatools.scan_directory(root_path).all_dirs()
-        await MediaDirIndex.insert_media_dirs(all_dirs, root_path, verbose=True)
-
+    if False:
         all_index_dirs = await MediaDirIndex.find_all().to_list()
         for mdi in all_index_dirs:
             print(f'Dir: {mdi.path_rel}, Videos: {len(mdi.video_files)}')
@@ -217,6 +229,13 @@ async def main():
             subdir_indexes = await mdi.get_subdir_indexes()
             for sdi in subdir_indexes:
                 print(f'  Subdir: {sdi.path_rel}, Videos: {len(sdi.video_files)}')
+
+    if True:
+        all_dirs = await MediaDirIndex.find_all().to_list()
+        for dir in all_dirs:
+            print(f'==== Dir: {dir.path_abs}, Videos: {len(dir.video_files)} ====')
+            for vf in dir.video_files:
+                print(vf.hash_firstmb[:10], vf, vf.name)
 
 if __name__ == "__main__":
     asyncio.run(main())
