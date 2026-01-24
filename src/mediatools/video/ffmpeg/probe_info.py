@@ -8,7 +8,7 @@ import pydantic
 from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
 from .stream_info import VideoStreamInfo, AudioStreamInfo
 from ..util import get_or_None_factory
-
+from ...util import format_memory, format_time, fname_to_title, fname_to_id
 
 class ProbeInfo(pydantic.BaseModel):
     fname: str
@@ -58,6 +58,14 @@ class ProbeInfo(pydantic.BaseModel):
         if not self.video_streams:
             raise NoVideoStreamError(f'The file {self.fname} does not contain any video streams.')
 
+    def duration_str(self) -> str:
+        '''Get the duration of the video file as a string.'''
+        return format_time(self.duration)
+    
+    def resolution_str(self) -> str:
+        '''Get the resolution of the video file as a string.'''
+        return f'{self.video.width}x{self.video.height}'
+
     @property
     def file_bitrate(self) -> float:
         '''File size divided by video duration.'''
@@ -75,6 +83,7 @@ class ProbeInfo(pydantic.BaseModel):
             return float(self.dur)
         except (ValueError,TypeError):
             raise NoDurationError(f'The duration of the file {self.fname} could not be determined. It is likely that the file is not a valid video file or is corrupted.')
+
 
     ############################# stream accessors #############################
     @property

@@ -5,24 +5,22 @@ import typing
 from pathlib import Path
 import shutil
 import hashlib
-
-
+import pydantic
 
 from .util import multi_extension_glob
 
-JSONable = str | int | float | bool | None | dict[str, "JSONable"] | list["JSONable"]
 
 
 class FileBase:
     """Base class for all file types (ImageFile, VideoFile, NonMediaFile)."""
     path: Path
-    meta: dict[str, JSONable]
+    meta: dict[str, pydantic.JsonValue]
     
     @classmethod
     def from_path(cls,
         path: str | Path,
         check_exists: bool = True,
-        meta: dict[str, JSONable] | None = None,
+        meta: dict[str, pydantic.JsonValue] | None = None,
     ) -> typing.Self:
         """Create a file instance from a path."""
         fp = Path(path)

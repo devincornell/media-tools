@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 import jinja2
 import typing
@@ -13,55 +11,44 @@ import sys
 import html
 import urllib.parse
 from PIL import Image
+import pydantic
+from pathlib import Path
 
-
-from ..util import format_memory, fname_to_title, fname_to_id
+from ..file_stat_result import FileStatResult
+#from ..util import format_memory, fname_to_title, fname_to_id
 
 if typing.TYPE_CHECKING:
     from .image_file import ImageFile
 
-@dataclasses.dataclass
-class ImageInfo:
-    '''Info about a single video.'''
-    ifile: ImageFile
+class ImageMeta(pydantic.BaseModel):
+    '''Info about a single image.'''
+    path: Path
     res: typing.Tuple[int, int]
-    stat: os.stat_result
+    stat: FileStatResult
+    meta: dict[str, pydantic.JsonValue] = pydantic.Field(default_factory=dict)
 
     @classmethod
     def from_image_file(cls, ifile: ImageFile) -> typing.Self:
         '''Get video information by probing video file.'''
-        stat = ifile.path.stat()   
+        stat = FileStatResult.read_from_path(ifile.path)
         im = Image.open(str(ifile.path))
         width, height = im.size
      
         return cls(
-            ifile = ifile,
+            path = ifile.path,
+            meta = ifile.meta,
             res=(width, height),
             stat = stat,
         )
-    
-    def size_str(self) -> str:
-        '''Get the size of the video file in bytes.'''
-        return format_memory(self.stat.st_size)
-    
+        
     def aspect_ratio(self) -> float:
         return self.res[0]/self.res[1]
 
     def title(self) -> str:
         '''Get the title of the image file.'''
-        return fname_to_title(self.ifile.path.stem)
+        return fname_to_title(self.path.stem)
     
     def id(self) -> str:
         '''Get the ID of the image file.'''
-        return fname_to_id(self.ifile.path.stem)
-    
-    @property
-    def size(self) -> int:
-        '''Get the size of the video file in bytes.'''
-        return self.stat.st_size
-    
-    @property
-    def path(self) -> pathlib.Path:
-        '''Get the file path of the image file.'''
-        return self.ifile.path
-    
+        return fname_to_id(self.path.stem)
+        

@@ -9,13 +9,13 @@ from pathlib import Path
 #from .imginfo import ImgInfo
 #from ..util import format_memory, format_time, multi_extension_glob
 from .video import VideoFile, VideoFiles, VideoFilesDict
-from .video import VideoInfo
-
+from .video import VideoMeta
+import pydantic
+from .file_base import FileBase
 from .images import ImageFile, ImageFiles, ImageFilesDict
 
 from .util import build_file_tree, hash_file
 from .constants import VIDEO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS
-from .file_base import FileBase, JSONable
 
 def scan_directory(
         root_path: pathlib.Path | str,
@@ -44,8 +44,8 @@ class MediaDir:
     _images: ImageFilesDict
     _other_files: NonMediaFileDict
     _subdirs: dict[str, typing.Self]
-    parent: MediaDir | None = None
-    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
+    parent: typing.Self | None = None
+    meta: dict[str, pydantic.JsonValue] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_path(
@@ -381,7 +381,7 @@ class DirectoryNotFoundError(Exception):
 class NonMediaFile(FileBase):
     '''Represents a non-media file.'''
     path: pathlib.Path
-    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
+    meta: dict[str, pydantic.JsonValue] = dataclasses.field(default_factory=dict)
 
 
 class NonMediaFileDict(dict[Path, NonMediaFile]):
@@ -389,11 +389,11 @@ class NonMediaFileDict(dict[Path, NonMediaFile]):
 
     @classmethod
     def from_jsonable(cls, data: typing.List[dict]) -> typing.Self:
-        '''Create NonMediaFileDict from JSONable list.'''
+        '''Create NonMediaFileDict from pydantic.JsonValue list.'''
         return cls({(nmf := NonMediaFile.from_dict(nmfd)).path.name: nmf for nmfd in data})
     
     def to_jsonable(self) -> list[dict]:
-        '''Convert NonMediaFileDict to JSONable list.'''
+        '''Convert NonMediaFileDict to pydantic.JsonValue list.'''
         return [nmf.to_dict() for nmf in self.values()]
 
     @classmethod

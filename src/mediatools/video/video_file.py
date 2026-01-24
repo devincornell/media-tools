@@ -11,18 +11,30 @@ import datetime
 import hashlib
 import mediatools.util
 import tempfile
+import pydantic
 
-from .video_info import VideoInfo
+from .video_meta import VideoMeta
 from .errors import VideoFileDoesNotExistError
-from .ffmpeg import FFMPEG, FFInput, FFOutput, FFInputArgs, ffinput, ffoutput, FFMPEGResult, ProbeInfo, NoDurationError, probe, LOGLEVEL_OPTIONS
-from ..file_base import FileBase, JSONable
+from .ffmpeg import (
+    FFMPEG, 
+    FFInput, 
+    FFOutput, 
+    FFInputArgs, 
+    ffinput, 
+    ffoutput, 
+    FFMPEGResult, 
+    ProbeInfo, 
+    probe, 
+    LOGLEVEL_OPTIONS,
+)
+from ..file_base import FileBase
 
 
 @dataclasses.dataclass(repr=True, frozen=True, slots=True)
 class VideoFile(FileBase):
     '''Represents a video file.'''
     path: Path
-    meta: dict[str, JSONable] = dataclasses.field(default_factory=dict)
+    meta: dict[str, pydantic.JsonValue] = dataclasses.field(default_factory=dict)
     
     @classmethod
     def from_path(cls,
@@ -33,28 +45,27 @@ class VideoFile(FileBase):
         fp = Path(path)
         if check_exists and (not fp.exists() or not fp.is_file()):
             raise VideoFileDoesNotExistError(f'This video file does not exist: {fp}')
-        return cls(fp, meta=meta or {})
-
-    def get_info(self) -> VideoInfo:
-        '''Get the video information for this video file.'''
-        return VideoInfo.from_video_file(self, do_check=True)
-    
+        return cls(fp, meta=meta or {})    
 
     ############################# Utility #############################
+    def read_meta(self, do_check: bool = True) -> VideoMeta:
+        '''Get the video metadata for this video file.'''
+        return VideoMeta.from_video_file(self, do_check=do_check)
+
     def probe(self) -> ProbeInfo:
         '''Probe the file in question.'''
         return probe(str(self.path))
     
-    def read_metadata(self) -> dict[str, typing.Any]:
+    def read_tags(self) -> dict[str, typing.Any]:
         '''Read metadata from the video file.'''
         pinfo = self.probe()
         return pinfo.tags
     
-    def update_metadata(self, new_metadata: dict[str, str], delete_old: bool = False) -> FFMPEGResult:
+    def update_tags(self, new_tags: dict[str, str], delete_old: bool = False) -> FFMPEGResult:
         '''Update metadata for the video file.'''
 
-        exist_meta = self.read_metadata() if not delete_old else {}
-        metadata = {**exist_meta, **new_metadata}
+        exist_tags = self.read_tags() if not delete_old else {}
+        tags = {**exist_tags, **new_tags}
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_fp = Path(tmpdir) / self.path.name
             command = FFMPEG(
@@ -63,12 +74,12 @@ class VideoFile(FileBase):
                     temp_fp,
                     c_v='copy',
                     c_a='copy',
-                    metadata=metadata,
+                    metadata=tags,
                 )],
             )
             result = command.run()
             new_meta = probe(temp_fp).tags
-            if (new_keys := set(new_meta.keys())) != (exp_keys := set(metadata.keys())):
+            if (new_keys := set(new_meta.keys())) != (exp_keys := set(tags.keys())):
                 missing = exp_keys - new_keys
                 raise RuntimeError(f'Metadata update failed. These fields could not be updated: {missing}')
             shutil.move(temp_fp, self.path)

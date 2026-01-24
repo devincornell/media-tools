@@ -5,9 +5,6 @@ import skimage # type: ignore
 import numpy as np
 import pathlib
 
-#from .imagegrid import ImageGrid
-#from .distances import Distances
-
 Height = int
 Width = int
 

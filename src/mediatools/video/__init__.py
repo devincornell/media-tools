@@ -1,4 +1,4 @@
-from .video_info import VideoInfo
+from .video_meta import VideoMeta
 from .video_file import VideoFile
 from .video_files import VideoFiles, VideoFilesDict
 from .util import VideoTime
