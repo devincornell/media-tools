@@ -17,9 +17,10 @@ import tqdm
 import random
 import pydantic
 import pathlib
-from beanie.operators import Set
+import beanie.operators
 from pathlib import Path
 from PIL import Image
+import PIL
 
 
 from ..util import format_memory, fname_to_title, fname_to_id, format_time
@@ -37,21 +38,21 @@ FileName = str
 
 class IndexMediaFile(pydantic.BaseModel):
     '''Base class for indexed media files.'''
-    _path_abs: str
+    path_abs_str: str
 
     @property
     def name(self) -> str:
         '''Get the name of the indexed media file.'''
-        return pathlib.Path(self._path_abs).name
+        return pathlib.Path(self.path_abs_str).name
     
     @property
     def path_abs(self) -> pathlib.Path:
         '''Get the absolute file path of the indexed media file.'''
-        return pathlib.Path(self._path_abs)
+        return pathlib.Path(self.path_abs_str)
     
     def path_rel(self, relative_to: pathlib.Path) -> pathlib.Path:
         '''Get the relative file path of the indexed media file.'''
-        return pathlib.Path(self._path_abs).relative_to(pathlib.Path(relative_to))
+        return pathlib.Path(self.path_abs_str).relative_to(pathlib.Path(relative_to))
     
 
 class IndexVideoFile(IndexMediaFile):
@@ -70,7 +71,7 @@ class IndexImageFile(IndexMediaFile):
     def from_path(cls, path: pathlib.Path) -> typing.Self:
         '''Create an IndexImageFile from a file path.'''
         return cls(
-            _path_abs=str(path),
+            path_abs_str=str(path),
             meta=ImageMeta.from_path(path),
         )
     
@@ -78,7 +79,7 @@ class IndexImageFile(IndexMediaFile):
     def from_image_file(cls, ifile: ImageFile) -> typing.Self:
         '''Create an IndexImageFile from an ImageFile instance.'''
         return cls(
-            _path_abs=str(ifile.path),
+            path_abs_str=str(ifile.path),
             meta=ifile.read_meta(),
         )
             
@@ -100,7 +101,7 @@ class IndexOtherFile(IndexMediaFile):
 class MediaDirIndex(beanie.Document):
     class Settings:
         name = "media_dir_index"  # The collection name in MongoDB
-    _path_abs: beanie.Indexed(str, unique=True)
+    path_abs_str: beanie.Indexed(str, unique=True)
     subpaths_rel: dict[str, str]
     video_files: dict[FileName, IndexVideoFile]
     image_files: dict[FileName, IndexImageFile]
@@ -115,26 +116,33 @@ class MediaDirIndex(beanie.Document):
             mdirs = tqdm.tqdm(mdirs, ncols=80)
         for mdir in mdirs:
             mdi = MediaDirIndex.from_media_dir(mdir)
-            await cls.find_one(cls._path_abs == mdi._path_abs).upsert(
-                Set(mdi.model_dump()),
+            await cls.find_one(cls.path_abs_str == str(mdir.path)).upsert(
+                beanie.operators.Set(mdi.model_dump()),
                 on_insert=mdi
             )
     
     @classmethod
     def from_media_dir(cls, mdir: MediaDir) -> typing.Self:
         '''Create a MediaDirIndex from a MediaDir instance. The root_path is used to compute relative paths.'''
+
+        image_files: dict[str, IndexImageFile] = dict()
+        for imf in mdir.images:
+            try:
+                index_imf = IndexImageFile.from_image_file(imf)
+                image_files[imf.path.name] = index_imf
+            except PIL.UnidentifiedImageError:
+                continue
+            
         return cls(
-            _path_abs=str(mdir.path),
+            path_abs_str=str(mdir.path),
             subpaths_rel={sd.path.name:str(sd.path.relative_to(mdir.path)) for sd in mdir.subdirs.values()},
             video_files={vf.path.name: IndexVideoFile(
-                _path_abs=str(vf.path),
+                path_abs_str=str(vf.path),
                 hash_firstlast1kb=get_hash_firstlast_hex(vf.path, chunk_size=1024)
             ) for vf in mdir.videos},
-            image_files={imf.path.name: IndexImageFile.from_image_file(
-                imf
-            ) for imf in mdir.images},
+            image_files=image_files,
             other_files={of.path.name: IndexOtherFile(
-                _path_abs=str(of.path)
+                path_abs_str=str(of.path)
             ) for of in mdir.other_files},
         )
     
@@ -146,13 +154,13 @@ class MediaDirIndex(beanie.Document):
     @property
     def path_abs(self) -> pathlib.Path:
         '''Get the absolute path of the media directory index.'''
-        return pathlib.Path(self._path_abs)
+        return pathlib.Path(self.path_abs_str)
         
     @classmethod
     async def fetch_by_abs_path(cls, path_abs: str|Path) -> Optional[typing.Self]:
         '''Get a MediaDirIndex document by its absolute path.
         '''
-        return await cls.find_one(cls._path_abs == str(path_abs))
+        return await cls.find_one(cls.path_abs_str == str(path_abs))
 
     async def fetch_video_metas(self) -> List[VideoFileIndex]:
         '''Get the VideoMeta documents for the video files in this media directory index.

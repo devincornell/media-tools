@@ -3,10 +3,28 @@ import hashlib
 import multiprocessing
 import tqdm
 from pathlib import Path
+import os
 
 T = typing.TypeVar('T')
 R = typing.TypeVar('R')
 
+
+
+
+def get_hash_firstlast_hex(file_path: Path, chunk_size: int = 1024) -> str:
+    '''Creates a SHA256 hash from first and last chunks of the file.'''
+    sha256_hash = hashlib.sha256()
+    with Path(file_path).open("rb") as f:
+        # first chunk
+        sha256_hash.update(f.read(chunk_size))
+        file_size = os.path.getsize(file_path)
+        
+        # last chunk
+        offset = max(0, file_size - chunk_size)
+        f.seek(offset, os.SEEK_SET)
+        sha256_hash.update(f.read(chunk_size))
+
+    return sha256_hash.hexdigest()
 
 
 def get_hash_hex_THUMB(vid_path_abs: Path) -> str:

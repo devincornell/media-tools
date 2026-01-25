@@ -41,16 +41,18 @@ async def main():
                         print(f'  {fn}')
             print(len(hash_fnames))
 
-        if False:
-            await db.video_index.insert_video_files(mdir.all_video_files(), verbose=True)
-            vfis = await db.video_index.find(db.video_index.path==re.compile(f"^{re.escape(str(root_path))}")).to_list()
-            print(f'Found {len(vfis)} video files in database under {root_path}')
-        
         if True:
+            await db.insert_from_media_dirs(mdir, verbose=True)
+            #vfis = await db.video_index.find(db.video_index.path==re.compile(f"^{re.escape(str(root_path))}")).to_list()
+            di = await db.dir_index.fetch_by_abs_path('/mnt/HDDStorage/sys/creators/_Greatest')
+            print(di.video_files)
+            #print(f'Found {len(vfis)} video files in database under {root_path}')
+        
+        if False:
             for vf in tqdm.tqdm(mdir.all_video_files(), ncols=80):
                 #print(f'Video file: {vf.path}')
                 try:
-                    vfi = await db.video_index.find_and_add_by_path(vf.path)
+                    vfi = await db.video_index.find_or_add_from_path(vf.path)
                 except mediatools.ffmpeg.ProbeError as e:
                     pass
 
