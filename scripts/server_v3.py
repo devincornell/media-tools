@@ -237,7 +237,7 @@ def add_img_info(
     if not ifiles:
         return
     elements = [(imf,root,thumbs_path) for imf in ifiles]
-    image_infos = util.parallel_starmap(get_image_info, elements, num_processes=os.cpu_count(), use_tqdm=verbose)
+    image_infos = util.parallel_starmap(get_image_info, elements, num_processes=1, use_tqdm=verbose)
     for imf,ii in zip(ifiles, image_infos):
         imf.meta['info'] = ii
 
@@ -478,7 +478,7 @@ def create_app(config: ServerConfig) -> FastAPI:
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Accept-Ranges": "bytes",
             "Content-Length": str(content_length),
-            "Content-Type": "video/mp4",
+            "Content-Type": f"video/mp4",
             "Cache-Control": "public, max-age=31536000",
             "Connection": "keep-alive",
         }
