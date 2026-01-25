@@ -220,11 +220,12 @@ def parallel_map(
     func: typing.Callable[[T], R], 
     elements: list[T], 
     num_processes: int = 1, 
-    use_tqdm: bool = False
+    use_tqdm: bool = False,
+    ncols: int = 120
 ) -> list[R]:
     '''Map function in parallel using multiprocessing.'''
     if use_tqdm:
-        elements = tqdm.tqdm(elements, total=len(elements))
+        elements = tqdm.tqdm(elements, total=len(elements), desc=str(func), ncols=ncols)
     if num_processes == 1:
         return list(map(func, elements))
     else:
@@ -235,7 +236,7 @@ def parallel_starmap(
     func: typing.Callable[..., R],
     elements: list[tuple[typing.Any, ...]], 
     num_processes: int = 1, 
-    use_tqdm: bool = False
+    use_tqdm: bool = False,
 ) -> list[R]:
     '''Map function in parallel using multiprocessing.'''
     if use_tqdm:
