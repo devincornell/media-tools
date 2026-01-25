@@ -17,7 +17,7 @@ import sys
 sys.path.append('../src/')
 sys.path.append('src/')
 import mediatools
-from util import get_hash_hex, get_hash_hex_THUMB
+from util import get_hash_hex, get_hash_hex_THUMB, parallel_starmap, parallel_map
 
 
 
@@ -48,25 +48,23 @@ def make_thumbs(
     mdir: mediatools.MediaDir, 
     thumbs_path: pathlib.Path,
     cores: int = 1,
+    check_probe: bool = False,
 ) -> None:
     thumbs_path = Path(thumbs_path)
     thumbs_path.mkdir(parents=False, exist_ok=True)
 
-    vfiles = mdir.all_video_files()
+    vfiles = mdir.all_videos()
     vfiles = random.sample(vfiles, len(vfiles))
     print(f'Found {len(vfiles)} video files in {mdir.path}. Scanning for thumbnails...')
 
-    #for vf in tqdm.tqdm(vfiles, "testing hash speed.", ncols=80):
-    #    get_hash_hex(str(vf.path), max_chunks=1000)
-    #return
-
     thumbs_to_create = []
     for vf in tqdm.tqdm(vfiles, ncols=80):
-        try:
-            probe_info = vf.probe()
-        except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
-            print(f'\nError: {vf.path} could not be probed. Skipping.')
-            continue
+        if check_probe:
+            try:
+                probe_info = vf.probe()
+            except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
+                print(f'\nError: {vf.path} could not be probed. Skipping.')
+                continue
 
         thumb_fname_old = get_thumb_path(vf.path.relative_to(mdir.path), thumbs_path)
         thumb_fname = get_thumb_path2(vf.path, thumbs_path)
@@ -79,26 +77,33 @@ def make_thumbs(
             #samp = max(1, int(probe_info.duration/10))
             thumbs_to_create.append( (vf.path, thumb_fname) )
 
-    if cores > 1:
-        with multiprocessing.Pool(processes=cores) as pool:
-            list(tqdm.tqdm(
-                pool.imap_unordered(
-                    lambda args: make_animated_thumb(
-                        input_fname=args[0],
-                        output_fname=args[1],
-                    ),
-                    thumbs_to_create,
-                ),
-                total=len(thumbs_to_create),
-                ncols=80,
-            ))
-    else:
-        for input_fp, output_fp in tqdm.tqdm(thumbs_to_create, ncols=80):
-            output_fp.parent.mkdir(parents=True, exist_ok=True)
-            make_animated_thumb(
-                input_fname=input_fp,
-                output_fname=output_fp,
-            )
+    parallel_starmap(
+        make_animated_thumb,
+        thumbs_to_create,
+        num_processes=cores,
+        use_tqdm=True,
+    )
+
+    #if cores > 1:
+    #    with multiprocessing.Pool(processes=cores) as pool:
+    #        list(tqdm.tqdm(
+    #            pool.imap_unordered(
+    #                lambda args: make_animated_thumb(
+    #                    input_fname=args[0],
+    #                    output_fname=args[1],
+    #                ),
+    #                thumbs_to_create,
+    #            ),
+    #            total=len(thumbs_to_create),
+    #            ncols=80,
+    #        ))
+    #else:
+    #    for input_fp, output_fp in tqdm.tqdm(thumbs_to_create, ncols=80):
+    #        output_fp.parent.mkdir(parents=True, exist_ok=True)
+    #        make_animated_thumb(
+    #            input_fname=input_fp,
+    #            output_fname=output_fp,
+    #        )
 
 
 def make_animated_thumb(
@@ -164,7 +169,7 @@ def compress_videos(
     thumbs_path: pathlib.Path,
 ) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
 
-    vfiles = mdir.all_video_files()
+    vfiles = mdir.all_videos()
     print(f'Found {len(vfiles)} video files in {mdir.path}')
 
     for vf in tqdm.tqdm(vfiles, ncols=80):
