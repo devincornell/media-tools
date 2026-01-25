@@ -69,7 +69,7 @@ class VideoFileIndex(beanie.Document):
         )
     
     @classmethod
-    async def find_and_add_by_path(cls, path: pathlib.Path) -> typing.Self:
+    async def find_or_add_from_path(cls, path: pathlib.Path) -> typing.Self:
         """Find a VideoFileIndex by path, or add it if it doesn't exist and return it."""
         path = Path(path).resolve()
         if not path.exists():
