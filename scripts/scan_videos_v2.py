@@ -1,4 +1,5 @@
 import collections
+import functools
 import typing
 import argparse
 import os
@@ -20,28 +21,6 @@ sys.path.append('src/')
 import mediatools
 from util import get_hash_hex, get_hash_hex_THUMB, parallel_starmap, parallel_map
 
-
-
-def scan_media_folders(
-    mdir: mediatools.MediaDir, 
-    root: pathlib.Path, 
-    thumbs_path: pathlib.Path,
-    sort_by_name: bool,
-    max_clip_duration: float,
-) -> tuple[dict[Path,dict[str,typing.Any]],dict[str,typing.Any]]:
-    '''Scans media files by directory.'''
-
-
-
-    print(f'entering {mdir.path}')
-    
-    for sdir in sorted(mdir.subdirs.values(), key=lambda sd: sd.path):
-        if len(sdir.all_media_files()) > 0 or len(sdir.subdirs) > 0:
-            scan_media_folders(
-                mdir=sdir, 
-                root=root, 
-                thumbs_path=thumbs_path, 
-            )
 
 
 
@@ -129,40 +108,24 @@ def scan_media_dir(
     if delete_empty_videos:
         for vf in tqdm.tqdm(mdir.all_video_files(), ncols=80):
             if vf.path.exists() and vf.path.stat().st_size == 0:
-                print(f'Deleting empty video file: {vf.path}')
+                print(f'\nDeleting empty video file: {vf.path}')
                 if not safety: vf.path.unlink(missing_ok=True)
 
     if delete_unprobable_videos:
-        for vf in tqdm.tqdm(mdir.all_video_files(), ncols=80):
-            if vf.path.exists():
-                try:
-                    probe_info = vf.probe()
-                    #if probe_info.duration is None or probe_info.duration == 0:
-                    #    print(f'Deleting unprobable video file (no duration): {vf.path}')
-                    #    vf.path.unlink(missing_ok=True)
-                except mediatools.ffmpeg.ProbeError as e:
-                    print(f'Deleting unprobable video file (probe error): {vf.path}')
-                    if not safety: vf.path.unlink(missing_ok=True)
+        mediatools.parallel_map(
+            functools.partial(probe_or_delete, safety=safety),
+            mdir.all_video_files(),
+            num_processes=multiprocessing.cpu_count(),
+            use_tqdm=True,
+        )
 
     if delete_duplicates:
-        for md in tqdm.tqdm(mdir.all_dirs(), ncols=80):
-            hash_to_paths: dict[str, set[pathlib.Path]] = collections.defaultdict(set)
-            for vf in md.videos:
-                if vf.path.exists():
-                    try:
-                        h = get_hash_hex(vf.path, chunk_size=1024*1024)
-                        hash_to_paths[h].add(vf.path)
-                    except Exception as e:
-                        print(f'Error hashing file {vf.path}: {e}')
-
-            for h, paths in hash_to_paths.items():
-                if len(paths) > 1:
-                    print(f'Found {len(paths)} duplicate videos with hash {h}:')
-                    use_path = list(sorted(paths, key=lambda p: len(str(p))))[-1]
-                    for dup_path in list(paths):
-                        if dup_path != use_path:
-                            print(f'  Deleting duplicate video file: {dup_path}')
-                            if not safety: dup_path.unlink(missing_ok=True)
+        mediatools.parallel_map(
+            functools.partial(delete_duplicates_thisdir, safety=safety),
+            mdir.all_dirs(),
+            num_processes=multiprocessing.cpu_count(),
+            use_tqdm=True,
+        )
     
     if convert_to_mp4:
         for vf in tqdm.tqdm(mdir.all_video_files(), ncols=80):
@@ -170,9 +133,9 @@ def scan_media_dir(
                 try:
                     new_fp = vf.path.with_suffix('.mp4')
                     if new_fp.exists():
-                        print(f'Skipping conversion for {vf.path}; {new_fp} already exists.')
+                        print(f'\nSkipping conversion for {vf.path}; {new_fp} already exists.')
                         continue
-                    print(f'Converting {vf.path} to {new_fp}')
+                    print(f'\nConverting {vf.path} to {new_fp}')
                     mediatools.FFMPEG(
                         inputs=[mediatools.ffinput(vf.path)],
                         outputs=[mediatools.ffoutput(new_fp,y=True)]
@@ -181,7 +144,35 @@ def scan_media_dir(
                     print(f'ERROR: Could not convert {vf.path}: {e}')
 
 
+def probe_or_delete(vf: mediatools.VideoFile, safety: bool = True) -> None:
+    '''Probes a video file, deleting it if unprobable.'''
+    if vf.path.exists():
+        try:
+            probe_info = vf.probe()
+        except (mediatools.ffmpeg.ProbeError, mediatools.ffmpeg.FFMPEGExecutionError) as e:
+            print(f'\nDeleting unprobable video file (probe error): {vf.path}')
+            if not safety: vf.path.unlink(missing_ok=True)
 
+
+def delete_duplicates_thisdir(mdir: mediatools.MediaDir, safety: bool = True) -> None:
+    '''Deletes duplicate video files in the given media directory.'''
+    hash_to_paths: dict[str, set[pathlib.Path]] = collections.defaultdict(set)
+    for vf in mdir.videos:
+        if vf.path.exists():
+            try:
+                h = get_hash_hex(vf.path, chunk_size=1024*1024)
+            except Exception as e:
+                print(f'\nError hashing file {vf.path}: {e}')
+            hash_to_paths[h].add(vf.path)
+
+    for h, paths in hash_to_paths.items():
+        if len(paths) > 1:
+            print(f'\nFound {len(paths)} duplicate videos with hash {h}:'+"\n\t" + "\n\t".join(str(p.name) for p in paths))
+            use_path = list(sorted(paths, key=lambda p: len(str(p))))[-1]
+            for dup_path in list(paths):
+                if dup_path != use_path:
+                    print(f'\nDeleting duplicate video file: {dup_path}')
+                    if not safety: dup_path.unlink(missing_ok=True)
 
 
 if __name__ == '__main__':
