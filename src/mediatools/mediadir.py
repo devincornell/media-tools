@@ -224,11 +224,11 @@ class MediaDir:
     
     def all_video_paths(self) -> list[pathlib.Path]:
         '''Get the paths of all video files.'''
-        return [vf.path for vf in self.all_videos()]
+        return [vf.path for vf in self.all_video_files()]
     
     def all_image_paths(self) -> list[pathlib.Path]:
         '''Get the paths of all image files.'''
-        return [ifp.path for ifp in self.all_images()]
+        return [ifp.path for ifp in self.all_image_files()]
 
     def all_dirs(self) -> list[typing.Self]:
         '''Get a list of all directories in the tree, including subdirectories.
@@ -246,19 +246,29 @@ class MediaDir:
         yield self
 
     def all_videos(self) -> VideoFiles:
-        '''Get a list of all files in the directory, including subdirectories.
+        '''DEPRICATED. Use all_video_files() instead. Get a list of all video files in the directory, including subdirectories.
+        '''
+        return self.all_video_files()
+    
+    def all_video_files(self) -> VideoFiles:
+        '''Get a list of all video files in the directory, including subdirectories.
         '''
         videos = self._videos.to_list()
         for subdir in self.subdirs.values():
-            videos.extend(subdir.all_videos())
+            videos.extend(subdir.all_video_files())
         return videos
     
     def all_images(self) -> ImageFiles:
+        '''DEPRICATED. Use all_image_files() instead. Get a list of all image files in the directory, including subdirectories.
+        '''
+        return self.all_image_files()
+    
+    def all_image_files(self) -> ImageFiles:
         '''Get a list of all image files in the directory, including subdirectories.
         '''
         images = self._images.to_list()
         for subdir in self.subdirs.values():
-            images.extend(subdir.all_images())
+            images.extend(subdir.all_image_files())
         return images
     
     def video_paths(self) -> list[pathlib.Path]:

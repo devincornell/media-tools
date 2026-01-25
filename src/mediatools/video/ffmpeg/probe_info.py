@@ -7,8 +7,7 @@ import pydantic
 
 from .errors import NoVideoStreamError, NoAudioStreamError, ProbeError, NoDurationError
 from .stream_info import VideoStreamInfo, AudioStreamInfo
-from ..util import get_or_None_factory
-from ...util import format_memory, format_time, fname_to_title, fname_to_id
+from ...util import format_memory, format_time, fname_to_title, fname_to_id, get_or_None_factory
 
 class ProbeInfo(pydantic.BaseModel):
     fname: str

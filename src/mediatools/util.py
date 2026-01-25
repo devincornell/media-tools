@@ -1,3 +1,4 @@
+import multiprocessing
 import typing
 from pathlib import Path
 import functools
@@ -8,17 +9,56 @@ import urllib.parse
 import glob
 import os
 
+import tqdm
+
 Constant = str | int | bool | float
+T = typing.TypeVar('T')
+R = typing.TypeVar('R')
 
 
-#def get_or_None_factory(data: typing.Dict) -> typing.Callable[[str, type], typing.Optional[Constant]]:
-#    return functools.partial(get_or_None, data)
 
-#def get_or_None_int(data: typing.Dict, key: str) -> typing.Optional[int]:
-#    return int(data[key]) if key in data else None
+################# Hashing utilities ################
 
-#def get_or_None_str(data: typing.Dict, key: str) -> typing.Optional[str]:
-#    return str(data[key]) if key in data else None
+def get_hash_firstlast_hex(file_path: Path, chunk_size: int = 1024) -> str:
+    '''Creates a SHA256 hash from first and last chunks of the file.'''
+    sha256_hash = hashlib.sha256()
+    with Path(file_path).open("rb") as f:
+        # first chunk
+        sha256_hash.update(f.read(chunk_size))
+        file_size = os.path.getsize(file_path)
+        
+        # last chunk
+        offset = max(0, file_size - chunk_size)
+        f.seek(offset, os.SEEK_SET)
+        sha256_hash.update(f.read(chunk_size))
+
+    return sha256_hash.hexdigest()
+
+def get_hash_hex_THUMB(vid_path_abs: Path) -> str:
+    '''Creates a hash from first 1000 kb chunks. Used for thumbnails filenames.'''
+    return get_hash_hex(vid_path_abs, chunk_size=1024, max_chunks=1000)
+
+def get_hash_firstmb_hex(vid_path_abs: Path) -> str:
+    '''Creates a hash from first 1000 kb chunks. Used for thumbnails filenames.'''
+    return get_hash_hex(vid_path_abs, chunk_size=1024, max_chunks=1000)
+
+def get_hash_hex(file_path: Path, chunk_size: int = 1024, max_chunks: int|None = None) -> str:
+    '''Creates a SHA256 hash from the file. Only uses up to max_chunks of chunk_size bytes.'''
+    sha256_hash = hashlib.sha256()
+    with Path(file_path).open("rb") as f:
+        for i, byte_block in enumerate(iter(lambda: f.read(chunk_size), b"")):
+            if max_chunks is not None and i >= max_chunks:
+                break
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+def hash_file(path, hash_algo='sha256') -> str:
+    """Generate a hash for a file using the specified hash algorithm."""
+    hasher = hashlib.new(hash_algo)
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 
@@ -34,7 +74,13 @@ def get_or_None_factory(data: typing.Dict) -> typing.Callable[[str, type[T]], ty
 def get_or_None(data: typing.Dict, key: str, convert_type: type[T] = str) -> typing.Optional[T]:
     return convert_type(data[key]) if key in data else None
 
+class VideoTime(str):
+    '''Represents a time value in video. Retain as string for perfect storage.'''
+    
+    def as_float(self) -> float:
+        return float(self)
 
+################# File extension utilities ################
 
 def multi_extension_glob(
     glob_func: typing.Callable[[str],list[Path]], 
@@ -60,6 +106,7 @@ def multi_extension_glob(
     return list(sorted(all_paths))
     
 
+################ Print formatting utilities ################
 
 def format_time(num_seconds: int, decimals: int = 2):
     ''' Get string representing time quantity with correct units.
@@ -91,19 +138,9 @@ def format_memory(num_bytes: int, decimals: int = 2):
 
 
 
-def hash_file(path, hash_algo='sha256') -> str:
-    """Generate a hash for a file using the specified hash algorithm."""
-    hasher = hashlib.new(hash_algo)
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(8192), b''):
-            hasher.update(chunk)
-    return hasher.hexdigest()
 
 
-
-
-
-
+################ File tree utilities ################
 
 def build_file_tree(root: pathlib.Path, pattern: str = '*') -> defaultdict:
     """Build a tree structure from file paths in a directory.
@@ -150,6 +187,9 @@ def print_tree(d: dict, indent=0):
         if isinstance(value, dict):
             print_tree(value, indent + 1)
 
+
+
+################# File system utilities ################
 def get_all_files(root: pathlib.Path|str) -> list[pathlib.Path]:
     all_files = []
     for dirpath, dirnames, filenames in os.walk(str(root), followlinks=True):
@@ -171,3 +211,37 @@ def parse_url(urlstr: str) -> str:
     except TypeError as e:
         return ''
 
+
+
+
+############### parallelization utilities ################
+
+def parallel_map(
+    func: typing.Callable[[T], R], 
+    elements: list[T], 
+    num_processes: int = 1, 
+    use_tqdm: bool = False
+) -> list[R]:
+    '''Map function in parallel using multiprocessing.'''
+    if use_tqdm:
+        elements = tqdm.tqdm(elements, total=len(elements))
+    if num_processes == 1:
+        return list(map(func, elements))
+    else:
+        with multiprocessing.Pool(num_processes) as pool:
+            return list(pool.map(func, elements))
+        
+def parallel_starmap(
+    func: typing.Callable[..., R],
+    elements: list[tuple[typing.Any, ...]], 
+    num_processes: int = 1, 
+    use_tqdm: bool = False
+) -> list[R]:
+    '''Map function in parallel using multiprocessing.'''
+    if use_tqdm:
+        elements = tqdm.tqdm(elements, total=len(elements))
+    if num_processes == 1:
+        return [func(*e) for e in elements]
+    else:
+        with multiprocessing.Pool(num_processes) as pool:
+            return list(pool.starmap(func, elements))

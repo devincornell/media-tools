@@ -6,7 +6,7 @@ import typing
 import pydantic
 import json
 
-from ..util import get_or_None_factory, VideoTime
+from ...util import get_or_None_factory, VideoTime
 from .errors import ProbeError, NoDurationError, NoResolutionError
 
 class BaseStreamInfo(pydantic.BaseModel):

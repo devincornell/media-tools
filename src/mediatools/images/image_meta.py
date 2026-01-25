@@ -40,6 +40,19 @@ class ImageMeta(pydantic.BaseModel):
             res=(width, height),
             stat = stat,
         )
+
+    @classmethod
+    def from_path(cls, path: pathlib.Path) -> typing.Self:
+        '''Get image information by probing image file.'''
+        stat = FileStatResult.read_from_path(path)
+        im = Image.open(str(path))
+        width, height = im.size
+        return cls(
+            path = path,
+            meta = {},
+            res=(width, height),
+            stat = stat,
+        )
         
     def aspect_ratio(self) -> float:
         return self.res[0]/self.res[1]
