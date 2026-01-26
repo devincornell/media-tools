@@ -1,5 +1,5 @@
 
-
+from . import ai
 from .video import *
 from .images import *
 from .mediadir import (
