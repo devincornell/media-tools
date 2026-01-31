@@ -19,7 +19,7 @@ import mediatools
 async def main():
     #await init_db("dwhost")
     db = mediatools.MediaSiteIndexDB(db_name="dwhost", url='mongodb://localhost:32768/?directConnection=true')
-    await db.init()
+    #await db.init()
     print('initialized database')
 
     async with db.lifespan():
@@ -45,7 +45,10 @@ async def main():
             await db.insert_from_media_dir(mdir, verbose=True)
             #vfis = await db.video_index.find(db.video_index.path==re.compile(f"^{re.escape(str(root_path))}")).to_list()
             di = await db.dir_index.fetch_by_abs_path('/mnt/HDDStorage/sys/dwhelper/creators/_Greatest')
-            print(di.subpaths_rel)
+            subdir_indexes = await di.fetch_subdir_indexes()
+            for sdi in subdir_indexes:
+                print(f'Subdir: {sdi.path_abs}, Videos: {len(sdi.video_files)}')
+            #subdir_indexes = await di.fetch_subdir_indexes()
             #print(f'Found {len(vfis)} video files in database under {root_path}')
         
         if False:

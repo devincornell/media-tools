@@ -26,10 +26,12 @@ import PIL
 from ..util import format_memory, fname_to_title, fname_to_id, format_time
 from ..mediadir import MediaDir
 
-from .video_file_index import VideoFileIndex
 from ..util import get_hash_firstlast_hex
 from ..file_stat_result import FileStatResult
 from ..images import ImageMeta, ImageFile
+
+
+from .video_file_index import VideoFileIndex
 
 Height = int
 Width = int
@@ -147,7 +149,7 @@ class MediaDirIndex(beanie.Document):
         )
     
     @property
-    def parent(self) -> pathlib.Path:
+    def parent_path(self) -> pathlib.Path:
         '''Get the absolute path of the parent directory of the media directory index.'''
         return self.path_abs.parent
 
@@ -173,20 +175,23 @@ class MediaDirIndex(beanie.Document):
             vid_metas.append(await ivf.get_video_file_index())
         return vid_metas
 
-    async def fetch_subdir_indexes(self) -> List[typing.Self]:
+    async def fetch_subdir_indexes(self, error_on_missing: bool = True) -> List[typing.Self]:
         '''Get the MediaDirIndex documents for the subdirectories of this media directory index.
         '''
         subdir_indexes = []
-        for sp_rel in self.subpaths_rel.keys():
-            mdi = await MediaDirIndex.fetch_by_rel_path(sp_rel)
+        for subpath_name in self.subpaths_rel.keys():
+            mdi = await self.__class__.fetch_by_abs_path(self.path_abs / subpath_name)
             if mdi:
                 subdir_indexes.append(mdi)
+            elif error_on_missing:
+                raise ValueError(f'Subdirectory MediaDirIndex not found for path: {subpath_name}')
+                
         return subdir_indexes
     
     async def fetch_parent_index(self) -> Optional[typing.Self]:
         '''Get the MediaDirIndex document for the parent directory of this media directory index.
         '''
-        return await MediaDirIndex.fetch_by_abs_path(self.parent_abs)
+        return await self.__class__.fetch_by_abs_path(self.parent_path)
 
     async def template_dict(self) -> dict[str, str|int|float|dict]:
         '''Get a dictionary of template variables for this media directory index.
