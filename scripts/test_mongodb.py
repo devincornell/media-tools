@@ -18,15 +18,15 @@ import mediatools
 
 async def main():
     #await init_db("dwhost")
-    db = mediatools.MediaSiteIndexDB(db_name="dwhost", url='mongodb://localhost:32769/?directConnection=true')
+    db = mediatools.MediaSiteIndexDB(db_name="dwhost", url='mongodb://localhost:32768/?directConnection=true')
     await db.init()
     print('initialized database')
 
-    if True:
-        # add files to the database
-        root_path = pathlib.Path('/mnt/HDDStorage/')
-        mdir = mediatools.scan_directory(root_path)
-
+    async with db.lifespan():
+        if True:
+            # add files to the database
+            root_path = pathlib.Path('/mnt/HDDStorage/')
+            mdir = mediatools.scan_directory(root_path)
         if False:
             hash_fnames = collections.defaultdict(set)
             for vf in tqdm.tqdm(mdir.all_video_files(), ncols=80):
@@ -42,10 +42,10 @@ async def main():
             print(len(hash_fnames))
 
         if True:
-            await db.insert_from_media_dirs(mdir, verbose=True)
+            await db.insert_from_media_dir(mdir, verbose=True)
             #vfis = await db.video_index.find(db.video_index.path==re.compile(f"^{re.escape(str(root_path))}")).to_list()
-            di = await db.dir_index.fetch_by_abs_path('/mnt/HDDStorage/sys/creators/_Greatest')
-            print(di.video_files)
+            di = await db.dir_index.fetch_by_abs_path('/mnt/HDDStorage/sys/dwhelper/creators/_Greatest')
+            print(di.subpaths_rel)
             #print(f'Found {len(vfis)} video files in database under {root_path}')
         
         if False:
@@ -86,12 +86,12 @@ async def main():
             for sdi in subdir_indexes:
                 print(f'  Subdir: {sdi.path_rel}, Videos: {len(sdi.video_files)}')
 
-    if True:
+    if False:
         all_dirs = await db.find_all_dirs()
         for dir in all_dirs:
             print(f'==== Dir: {dir.path_abs}, Videos: {len(dir.video_files)} ====')
             for vf in dir.video_files.values():
-                print(vf.hash_firstmb[:10], vf, vf.name)
+                print(vf.hash_firstlast1kb[:10], vf, vf.name)
 
 if __name__ == "__main__":
     asyncio.run(main())

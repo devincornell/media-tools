@@ -5,11 +5,11 @@ import typing
 #from beanie import Document, Indexed, Link
 import beanie
 import beanie.exceptions
+import fastapi
 from pydantic import Field, BaseModel
 import pymongo
 import pymongo.errors
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 import os
 import typing
@@ -19,6 +19,7 @@ import pydantic
 import pathlib
 from beanie.operators import Set
 from pathlib import Path
+import contextlib
 
 #import sys
 #sys.path.append('../src')
@@ -40,11 +41,28 @@ class MediaSiteIndexDB:
     video_index: typing.Type[VideoFileIndex] = VideoFileIndex
     dir_index: typing.Type[MediaDirIndex] = MediaDirIndex
 
-    async def init(self) -> None:
-        await init_beanie_models(self.url, self.db_name)
+    async def init(self) -> pymongo.AsyncMongoClient:
+        '''DEPRICATED. Use .lifespan() instead. Initialize the database connection and Beanie models.'''
+        return await self._init_beanie_models()
 
-    async def insert_from_media_dirs(self, mdir: MediaDir, verbose: bool = False) -> None:
-        '''Insert media directories and video files from a MediaDir instance into the database.
+    @contextlib.asynccontextmanager
+    async def lifespan(self, app: fastapi.FastAPI|None = None):
+        '''Lifespan context manager to initialize and close the database connection. For use with or outside FastAPI apps.'''
+        client = await self._init_beanie_models()
+        yield
+        await client.close()
+
+    async def _init_beanie_models(self) -> pymongo.AsyncMongoClient:
+        '''Initialize Beanie with the specified MongoDB URL and database name.'''
+        client = pymongo.AsyncMongoClient(self.url)
+        await init_beanie(
+            database=client[self.db_name],
+            document_models=[VideoFileIndex, MediaDirIndex],  # Add more models here as you create them
+        )
+        return client
+
+    async def insert_from_media_dir(self, mdir: MediaDir, verbose: bool = False) -> None:
+        '''Insert media directories and video files recursively from a MediaDir instance into the database.
         '''
         await self.video_index.insert_video_files(mdir.all_videos(), verbose=verbose)
         await self.dir_index.upsert_media_dirs(mdirs=mdir.all_dirs(), verbose=verbose)
@@ -52,32 +70,3 @@ class MediaSiteIndexDB:
     async def find_all_dirs(self) -> list[MediaDirIndex]:
         '''Find all media directory indexes in the database.'''
         return await self.dir_index.find_all().to_list()
-
-
-
-async def init_beanie_models(url: str, db_name: str) -> None:
-    """Initialize Beanie with all document models for the specified database."""
-    client = await get_database_client(url=url)
-        
-    await init_beanie(
-        database=client[db_name],
-        document_models=[VideoFileIndex, MediaDirIndex],  # Add more models here as you create them
-    )
-
-async def close_database_connection():
-    """Close the MongoDB connection. Call this on app shutdown."""
-    global _client
-    if _client:
-        _client.close()
-        _client = None
-
-# Store client as module-level variable for reuse
-_client: Optional[pymongo.AsyncMongoClient] = None
-
-async def get_database_client(url: str) -> pymongo.AsyncMongoClient:
-    """Get or create the MongoDB client singleton."""
-    global _client
-    if _client is None:
-        _client = pymongo.AsyncMongoClient(url)
-    return _client
-
