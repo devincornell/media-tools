@@ -108,7 +108,7 @@ class MediaDirIndex(beanie.Document):
     other_files: dict[FileName, IndexOtherFile]
     
     @classmethod
-    async def insert_media_dirs(cls, mdirs: list[MediaDir], verbose: bool = False) -> None:
+    async def upsert_media_dirs(cls, mdirs: list[MediaDir], verbose: bool = False) -> None:
         '''Insert multiple MediaDir instances into the database. Typically you could use MediaDir.scan_directory() to 
             get the list of MediaDir instances.
         '''
@@ -160,7 +160,10 @@ class MediaDirIndex(beanie.Document):
     async def fetch_by_abs_path(cls, path_abs: str|Path) -> Optional[typing.Self]:
         '''Get a MediaDirIndex document by its absolute path.
         '''
-        return await cls.find_one(cls.path_abs_str == str(path_abs))
+        di = await cls.find_one(cls.path_abs_str == str(path_abs))
+        if di is None:
+            raise ValueError(f'MediaDirIndex not found for path: {path_abs}')
+        return di
 
     async def fetch_video_metas(self) -> List[VideoFileIndex]:
         '''Get the VideoMeta documents for the video files in this media directory index.

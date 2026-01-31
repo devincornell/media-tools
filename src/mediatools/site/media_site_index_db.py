@@ -47,7 +47,7 @@ class MediaSiteIndexDB:
         '''Insert media directories and video files from a MediaDir instance into the database.
         '''
         await self.video_index.insert_video_files(mdir.all_videos(), verbose=verbose)
-        await self.dir_index.insert_media_dirs(mdirs=mdir.all_dirs(), verbose=verbose)
+        await self.dir_index.upsert_media_dirs(mdirs=mdir.all_dirs(), verbose=verbose)
 
     async def find_all_dirs(self) -> list[MediaDirIndex]:
         '''Find all media directory indexes in the database.'''
