@@ -22,20 +22,21 @@ import mediatools
 
 
 if __name__ == "__main__":
-    root_path = pathlib.Path('/mnt/MoStorage/shows/Bleach/')
-    output_dir = pathlib.Path('/mnt/MoStorage/shows/Bleach_Downscaled/')
+    root_path = pathlib.Path('/mnt/MoStorage/shows/Bleach_Downscaled/')
+    output_dir = pathlib.Path('/mnt/MoStorage/shows/Bleach_Upscaled/')
 
     mdir = mediatools.scan_directory(root_path)
-    print(len(mdir.all_videos()))
+    all_videos = list(sorted(mdir.all_videos(), key=lambda vf: str(vf.path.name), reverse=True))
+    print(len(all_videos))
 
-    for vf in tqdm.tqdm(mdir.all_videos(), ncols=80):
+    for vf in tqdm.tqdm(all_videos, ncols=80):
         relative_path = vf.path.relative_to(root_path)
         output_path = output_dir / relative_path.parent
         output_path.mkdir(parents=True, exist_ok=True)
 
-        output_file = output_path / relative_path.name
+        output_file = (output_path / relative_path.name).with_stem(relative_path.stem + '_1080p_upscaled')
 
-        if True:
+        if False:
             'ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i Bleach-00168.mp4 -vf "scale_cuda=1280:720" -c:v h264_nvenc -rc constqp -qp 18 -c:a copy -c:s copy Bleach-00168_720p.mp4'
             result = mediatools.ffmpeg.FFMPEG(
                 inputs = [
@@ -60,4 +61,8 @@ if __name__ == "__main__":
             ).run()
 
         else:
-            mediatools.ai.run_upscale(vf.path, output_file)
+            if not output_file.exists():
+                print('\nUpscaling ', vf.path.name, ' to ', output_file.name)
+                mediatools.ai.run_upscale(vf.path, output_file)
+            else:
+                print('\nSkipping existing file ', output_file.name)
