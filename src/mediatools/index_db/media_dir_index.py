@@ -1,3 +1,4 @@
+from __future__ import annotations
 import dataclasses
 from typing import List, Optional
 from datetime import datetime
@@ -32,11 +33,38 @@ FileName = str
 class MediaDirIndexCollection:
     '''Interface for working with the media_dir_index collection.'''
     _collection: AsyncCollection
+    collection_name: str = "media_dir_index"
+
+    @classmethod
+    def from_db(cls, db: pymongo.AsyncMongoClient) -> typing.Self:
+        '''Create a MediaDirIndexCollection from a MongoDB database.'''
+        return cls(_collection=db[cls.collection_name])
 
     @classmethod
     def from_collection(cls, collection: AsyncCollection) -> typing.Self:
         '''Create a MediaDirIndexCollection from a MongoDB collection.'''
         return cls(_collection=collection)
+    
+    async def scan_and_upsert_directory(self, mdir: MediaDir) -> None:
+        '''Scan a media directory and upsert the index document to the database.'''
+        index_doc = MediaDirIndexDoc.from_media_dir_scan(mdir)
+        await self.upsert_directory(index_doc)
+
+    async def upsert_directory(self, doc: MediaDirIndexDoc):
+        """Update existing record by path_str or insert a new one."""
+        await self._collection.replace_one(
+            filter={"path_str": doc.path_str},
+            replacement=doc.model_dump(), # Pydantic v2 dict conversion
+            upsert=True
+        )
+
+    async def find_first(self) -> Optional[MediaDirIndexDoc]:
+        '''Get the first document in the collection.'''
+        doc = await self._collection.find_one()
+        if doc:
+            return MediaDirIndexDoc.model_validate(doc) # Pydantic v2 model validation
+        return None
+
 
 class IndexMediaFile(pydantic.BaseModel):
     '''Base class for indexed media files.'''
