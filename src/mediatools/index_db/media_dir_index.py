@@ -30,6 +30,10 @@ Height = int
 Width = int
 FileName = str
 
+class MediaDirIndexNotFoundError(Exception):
+    '''Raised when a media directory index document is not found in the database.'''
+    pass
+
 @dataclasses.dataclass
 class MediaDirIndexCollection:
     '''Interface for working with the media_dir_index collection.'''
@@ -37,9 +41,9 @@ class MediaDirIndexCollection:
     collection_name: str
 
     @classmethod
-    def from_db(cls, db: pymongo.AsyncMongoClient, collection_name: str = "media_dir_index") -> typing.Self:
+    def from_client(cls, client: pymongo.AsyncMongoClient, collection_name: str = "media_dir_index") -> typing.Self:
         '''Create a MediaDirIndexCollection from a MongoDB database.'''
-        return cls.from_collection(collection=db[collection_name])
+        return cls.from_collection(collection=client[collection_name])
 
     @classmethod
     def from_collection(cls, collection: AsyncCollection) -> typing.Self:
@@ -50,7 +54,7 @@ class MediaDirIndexCollection:
         '''Create a unique index on path_str to speed up prefix searches and upserts.'''
         await self._collection.create_index("path_str", unique=True)
 
-    async def rescan_directories(self, root_mdir: MediaDir, verbose: bool = False) -> None:
+    async def rescan_recursive(self, root_mdir: MediaDir, verbose: bool = False) -> None:
         '''Rescan all directories in the collection and update their index documents.'''
         await self.delete_by_path_prefix(root_mdir.path)
         return await self.scan_and_upsert_recursive(root_mdir, verbose=verbose)
@@ -82,6 +86,13 @@ class MediaDirIndexCollection:
         if doc:
             return MediaDirIndexDoc.model_validate(doc) # Pydantic v2 model validation
         return None
+    
+    async def find_by_path(self, path: pathlib.Path) -> Optional[MediaDirIndexDoc]:
+        '''Find a MediaDirIndexDoc by its path.'''
+        doc = await self._collection.find_one({"path_str": str(path)})
+        if doc:
+            return MediaDirIndexDoc.model_validate(doc) # Pydantic v2 model validation
+        raise MediaDirIndexNotFoundError(f'Media directory index not found for path: {path}')
 
     async def find_by_path_prefix(self, prefix: str | pathlib.Path) -> list[MediaDirIndexDoc]:
         '''Find all documents where path_str starts with the given prefix.'''
@@ -202,7 +213,7 @@ class MediaDirIndexDoc(pydantic.BaseModel):
             
         return cls(
             path_str=str(mdir.path),
-            subpaths={sd.path.name:str(sd.path.relative_to(mdir.path)) for sd in mdir.subdirs.values()},
+            subpaths={str(sd.path.relative_to(mdir.path)):str(sd.path) for sd in mdir.subdirs.values()},
             video_files={vf.path.name: IndexVideoFile.from_video_file_scan(vf, index_hash_func(vf.path)) for vf in mdir.videos},
             image_files=image_files,
             other_files={of.path.name: IndexOtherFile.from_path_scan(of.path) for of in mdir.other_files},

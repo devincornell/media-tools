@@ -31,10 +31,10 @@ async def main():
 
     # 2. Setup Database Connection
     async with AsyncMongoClient(mongo_uri, serverSelectionTimeoutMS=2000) as client:
-        mdir_index = mediatools.MediaDirIndexCollection.from_db(client[db_name])
-        video_index = mediatools.VideoIndexCollection.from_db(client[db_name])
-        print(type(await mdir_index.find_first()))
-        print(await video_index.find_first())
+        media_index = await mediatools.MediaIndex.from_client(client[db_name])
+        await media_index.create_indexes()  # Ensure indexes are created before scanning
+        print(type(await media_index.mdir_index.find_first()))
+        print(await media_index.mdir_index.find_first())
         print(f'Connected to MongoDB at {mongo_uri}')
         
         # Initialize your custom collection interface
@@ -42,18 +42,15 @@ async def main():
         # 3. Load and Scan the Media Directory
         print(f"--- Starting scan of {library_path} ---")
         mdir = mediatools.MediaDir.from_path(library_path)
+        await media_index.rescan_recursive(mdir, verbose=True)
 
-        
-        print(f"Scanning media directory: {library_path}")
-        await mdir_index.scan_and_upsert_recursive(mdir, verbose=True)
-        for vf in tqdm.tqdm(mdir.all_videos(), desc="Indexing videos", ncols=100):
-            video_doc = mediatools.VideoIndexDoc.from_video_file_scan(vf, mediatools.index_hash_func(vf.path))
-            await video_index.insert(video_doc)
+        video_proj = await media_index.video_index.find_created_at_projection('/mnt/HugeHDD/gopro/gopro_raw_organized/')
+        for vp in video_proj:
+            print(f"{vp.path_str}: created at {vp.created_at}")
 
 
 
-
-        md_inds = await mdir_index.find_by_path_prefix('/mnt/HugeHDD/gopro/gopro_raw_organized/2025-11-28')
+        md_inds = await media_index.mdir_index.find_by_path_prefix('/mnt/HugeHDD/gopro/gopro_raw_organized/2025-11-28')
         for md_ind in md_inds:
             print(md_ind.path_str)
             print(f"  {len(md_ind.video_files)} videos, {len(md_ind.image_files)} images")
