@@ -33,8 +33,11 @@ from .util import (
 )
 
 from . import util
+from . import site
 
 
-from .site.media_site_index_db import (
+from .site import (
     MediaSiteIndexDB,
+    MediaDirIndex,
+    VideoFileIndex,
 )

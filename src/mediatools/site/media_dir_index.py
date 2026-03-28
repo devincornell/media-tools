@@ -9,7 +9,6 @@ from pydantic import Field, BaseModel
 import pymongo
 import pymongo.errors
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 import os
 import typing
@@ -167,12 +166,12 @@ class MediaDirIndex(beanie.Document):
             raise ValueError(f'MediaDirIndex not found for path: {path_abs}')
         return di
 
-    async def fetch_video_metas(self) -> List[VideoFileIndex]:
+    async def fetch_video_metas(self) -> List[tuple[IndexVideoFile, VideoFileIndex]]:
         '''Get the VideoMeta documents for the video files in this media directory index.
         '''
         vid_metas = []
         for ivf in self.video_files.values():
-            vid_metas.append(await ivf.get_video_file_index())
+            vid_metas.append((ivf, await ivf.get_video_file_index()))
         return vid_metas
 
     async def fetch_subdir_indexes(self, error_on_missing: bool = True) -> List[typing.Self]:

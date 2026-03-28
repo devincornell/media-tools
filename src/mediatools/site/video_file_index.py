@@ -7,7 +7,6 @@ from pydantic import Field, BaseModel
 import pymongo
 import pymongo.errors
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
 
 import beanie
 import beanie.exceptions
