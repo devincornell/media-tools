@@ -41,3 +41,4 @@ from .site import (
     MediaDirIndex,
     VideoFileIndex,
 )
+from .index_db import *
