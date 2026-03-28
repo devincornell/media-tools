@@ -41,11 +41,17 @@ class HashProjection(BaseModel):
 class VideoIndexCollection:
     '''Interface for working with the video_file_index collection.'''
     _collection: AsyncCollection
+    collection_name: str
+
+    @classmethod
+    def from_db(cls, db: pymongo.AsyncMongoClient, collection_name: str = 'video_file_index') -> typing.Self:
+        '''Create a VideoIndexCollection from a MongoDB database.'''
+        return cls.from_collection(collection=db[collection_name])
 
     @classmethod
     def from_collection(cls, collection: AsyncCollection) -> typing.Self:
         '''Create a VideoIndexCollection from a MongoDB collection.'''
-        return cls(_collection=collection)
+        return cls(_collection=collection, collection_name=collection.name)
 
     async def create_indexes(self) -> None:
         '''Create necessary indexes on the collection.'''
@@ -79,6 +85,13 @@ class VideoIndexCollection:
     async def insert(self, video_index_doc: VideoIndexDoc) -> None:
         '''Insert a VideoIndexDoc into the collection.'''
         await self._collection.insert_one(video_index_doc.model_dump())
+    
+    async def find_first(self) -> Optional[VideoIndexDoc]:
+        '''Get the first document in the collection.'''
+        doc = await self._collection.find_one()
+        if doc:
+            return VideoIndexDoc.model_validate(doc) # Pydantic v2 model validation
+        return None
 
 class VideoIndexDoc(pydantic.BaseModel):
     path_str: str

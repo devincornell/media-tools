@@ -1,5 +1,6 @@
 from __future__ import annotations
 import dataclasses
+import re
 from typing import List, Optional
 from datetime import datetime
 import typing
@@ -33,19 +34,36 @@ FileName = str
 class MediaDirIndexCollection:
     '''Interface for working with the media_dir_index collection.'''
     _collection: AsyncCollection
-    collection_name: str = "media_dir_index"
+    collection_name: str
 
     @classmethod
-    def from_db(cls, db: pymongo.AsyncMongoClient) -> typing.Self:
+    def from_db(cls, db: pymongo.AsyncMongoClient, collection_name: str = "media_dir_index") -> typing.Self:
         '''Create a MediaDirIndexCollection from a MongoDB database.'''
-        return cls(_collection=db[cls.collection_name])
+        return cls.from_collection(collection=db[collection_name])
 
     @classmethod
     def from_collection(cls, collection: AsyncCollection) -> typing.Self:
         '''Create a MediaDirIndexCollection from a MongoDB collection.'''
-        return cls(_collection=collection)
-    
-    async def scan_and_upsert_directory(self, mdir: MediaDir) -> None:
+        return cls(_collection=collection, collection_name=collection.name)
+
+    async def create_indexes(self):
+        '''Create a unique index on path_str to speed up prefix searches and upserts.'''
+        await self._collection.create_index("path_str", unique=True)
+
+    async def rescan_directories(self, root_mdir: MediaDir, verbose: bool = False) -> None:
+        '''Rescan all directories in the collection and update their index documents.'''
+        await self.delete_by_path_prefix(root_mdir.path)
+        return await self.scan_and_upsert_recursive(root_mdir, verbose=verbose)
+
+    async def scan_and_upsert_recursive(self, mdir: MediaDir, verbose: bool = False) -> None:
+        '''Scan a media directory and upsert the index document to the database.'''
+        dirs = list(mdir.all_dirs())
+        if verbose:
+            dirs = tqdm.tqdm(dirs, desc="Scanning directories", ncols=100)
+        for md in dirs:
+            await self.scan_and_upsert(md)
+
+    async def scan_and_upsert(self, mdir: MediaDir) -> None:
         '''Scan a media directory and upsert the index document to the database.'''
         index_doc = MediaDirIndexDoc.from_media_dir_scan(mdir)
         await self.upsert_directory(index_doc)
@@ -65,6 +83,25 @@ class MediaDirIndexCollection:
             return MediaDirIndexDoc.model_validate(doc) # Pydantic v2 model validation
         return None
 
+    async def find_by_path_prefix(self, prefix: str | pathlib.Path) -> list[MediaDirIndexDoc]:
+        '''Find all documents where path_str starts with the given prefix.'''
+        prefix_str = str(prefix)
+        
+        # Use re.escape to handle paths with special regex characters
+        # The '^' anchor ensures we only match the start of the string
+        regex = re.compile(f"^{re.escape(prefix_str)}")
+        
+        cursor = self._collection.find({"path_str": regex})
+        
+        # Validate each document returned by the cursor
+        return [MediaDirIndexDoc.model_validate(doc) async for doc in cursor]
+    
+    async def delete_by_path_prefix(self, prefix: str | pathlib.Path) -> int:
+        '''Delete all documents where path_str starts with the given prefix. Returns the count of deleted documents.'''
+        prefix_str = str(prefix)
+        regex = re.compile(f"^{re.escape(prefix_str)}")
+        result = await self._collection.delete_many({"path_str": regex})
+        return result.deleted_count
 
 class IndexMediaFile(pydantic.BaseModel):
     '''Base class for indexed media files.'''
@@ -181,4 +218,5 @@ class MediaDirIndexDoc(pydantic.BaseModel):
         '''Get the absolute path of the media directory index.'''
         return pathlib.Path(self.path_str)
         
-
+    def __repr__(self) -> str:
+        return f"<MediaDirIndexDoc path={self.path_str} videos={len(self.video_files)} images={len(self.image_files)} other_files={len(self.other_files)}>"

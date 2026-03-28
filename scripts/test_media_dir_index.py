@@ -31,8 +31,10 @@ async def main():
 
     # 2. Setup Database Connection
     async with AsyncMongoClient(mongo_uri, serverSelectionTimeoutMS=2000) as client:
-        media_index = mediatools.MediaDirIndexCollection.from_db(client[db_name])
-        print(await media_index.find_first())
+        mdir_index = mediatools.MediaDirIndexCollection.from_db(client[db_name])
+        video_index = mediatools.VideoIndexCollection.from_db(client[db_name])
+        print(type(await mdir_index.find_first()))
+        print(await video_index.find_first())
         print(f'Connected to MongoDB at {mongo_uri}')
         
         # Initialize your custom collection interface
@@ -40,11 +42,23 @@ async def main():
         # 3. Load and Scan the Media Directory
         print(f"--- Starting scan of {library_path} ---")
         mdir = mediatools.MediaDir.from_path(library_path)
+
         
         print(f"Scanning media directory: {library_path}")
-        for md in tqdm.tqdm(mdir.all_dirs()):
-            #print(f"Scanning directory: {md.path}")
-            await media_index.scan_and_upsert_directory(md)
+        await mdir_index.scan_and_upsert_recursive(mdir, verbose=True)
+        for vf in tqdm.tqdm(mdir.all_videos(), desc="Indexing videos", ncols=100):
+            video_doc = mediatools.VideoIndexDoc.from_video_file_scan(vf, mediatools.index_hash_func(vf.path))
+            await video_index.insert(video_doc)
+
+
+
+
+        md_inds = await mdir_index.find_by_path_prefix('/mnt/HugeHDD/gopro/gopro_raw_organized/2025-11-28')
+        for md_ind in md_inds:
+            print(md_ind.path_str)
+            print(f"  {len(md_ind.video_files)} videos, {len(md_ind.image_files)} images")
+            for vi in md_ind.video_files.values():
+                print(f"    Video: {vi.path.name}, {vi.stat.modified_at}, {vi.stat.size_str()}")
 
         # This triggers your classmethod logic to build the Pydantic model
         #index_doc = mediatools.MediaDirIndexDoc.from_media_dir_scan(mdir)
