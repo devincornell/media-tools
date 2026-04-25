@@ -1,6 +1,6 @@
 *.env*
 
-scripts/Makefile
+scripts/Makefile_hidden
 
 *.jpg
 *.mp4
