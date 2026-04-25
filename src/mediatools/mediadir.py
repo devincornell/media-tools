@@ -367,6 +367,74 @@ class MediaDir:
             current = current.parent
         return parents
     
+    def display(self, prefix: str = '', show_files: bool = True, show_file_types: bool = True) -> str:
+        '''Return a visual tree representation of the directory structure.
+        
+        Args:
+            prefix (str): Internal prefix for indentation (used in recursion).
+            show_files (bool): Whether to show individual files or just directories.
+            show_file_types (bool): Whether to show file type indicators ([V], [I], [F]).
+        
+        Returns:
+            str: A tree-like string representation of the directory structure.
+        '''
+        lines = []
+        
+        # Add current directory name
+        if prefix == '':
+            lines.append(f'{self.path}/')
+        
+        # Collect all items to display
+        items = []
+        
+        if show_files:
+            # Add video files
+            for video in sorted(self._videos.keys()):
+                type_indicator = '[V] ' if show_file_types else ''
+                items.append(f'{type_indicator}{video}')
+            
+            # Add image files  
+            for image in sorted(self._images.keys()):
+                type_indicator = '[I] ' if show_file_types else ''
+                items.append(f'{type_indicator}{image}')
+            
+            # Add other files
+            for other_file in sorted(self._other_files.keys()):
+                type_indicator = '[F] ' if show_file_types else ''
+                items.append(f'{type_indicator}{other_file}')
+        
+        # Add subdirectories
+        subdirs = sorted(self._subdirs.keys())
+        for subdir_name in subdirs:
+            items.append(f'{subdir_name}/')
+        
+        # Generate tree lines for items
+        for i, item in enumerate(items):
+            is_last = i == len(items) - 1
+            
+            # Choose connector
+            connector = '└── ' if is_last else '├── '
+            lines.append(f'{prefix}{connector}{item}')
+            
+            # If this is a subdirectory, recurse
+            if item.endswith('/'):
+                subdir_name = item[:-1]  # Remove trailing slash
+                subdir = self._subdirs[subdir_name]
+                
+                # Determine prefix for next level
+                next_prefix = prefix + ('    ' if is_last else '│   ')
+                
+                # Get subtree (skip the first line which would be the subdir path)
+                subtree = subdir.display(prefix=next_prefix, show_files=show_files, show_file_types=show_file_types)
+                subtree_lines = subtree.split('\n')[1:] if subtree.split('\n')[0].endswith('/') else subtree.split('\n')
+                
+                # Add non-empty subtree lines
+                for line in subtree_lines:
+                    if line.strip():
+                        lines.append(line)
+        
+        return '\n'.join(lines)
+
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}("{self.path}")'
 
