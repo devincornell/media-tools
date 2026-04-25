@@ -81,8 +81,20 @@ class FileStatResult(BaseModel):
         return datetime.fromtimestamp(self.st_ctime, tz=timezone.utc)
 
     def size_str(self) -> str:
-        '''Get the size of the video file in bytes.'''
+        '''Get the size of the file as a formatted string.'''
         return format_memory(self.st_size)
+
+    def modified_at_str(self) -> str:
+        '''Get the modification time as a formatted string.'''
+        return self.modified_at.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    def accessed_at_str(self) -> str:
+        '''Get the access time as a formatted string.'''
+        return self.accessed_at.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    def changed_at_str(self) -> str:
+        '''Get the change time as a formatted string.'''
+        return self.changed_at.strftime('%Y-%m-%d %H:%M:%S %Z')
 
     @property
     def size(self) -> int:
