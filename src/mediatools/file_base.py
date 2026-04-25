@@ -7,6 +7,7 @@ import shutil
 import hashlib
 import pydantic
 
+from .file_stat_result import FileStatResult
 from .util import multi_extension_glob
 
 
@@ -78,9 +79,9 @@ class FileBase:
         """Get the file size in bytes."""
         return self.path.stat().st_size
     
-    def stat(self) -> pathlib.stat_result:
+    def stat(self) -> FileStatResult:
         """Get the file's stat result."""
-        return self.path.stat()
+        return FileStatResult.read_from_path(self.path)
 
     def exists(self) -> bool:
         """Check if the file exists."""
