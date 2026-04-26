@@ -141,8 +141,8 @@ class DistanceCalculator:
 
     def euclid(self, other: Image) -> float:
         '''Euclidean distance between images.'''
-        return np.linalg.norm(self.image.im - other.im)
+        return float(np.linalg.norm(self.image.im - other.im))
             
     def sobel(self, other: Image) -> float:
         '''Distances between sobel filtered images.'''
-        return np.linalg.norm(self.image.filter.sobel().im - other.filter.sobel().im)
+        return float(np.linalg.norm(self.image.filter.sobel().im - other.filter.sobel().im))

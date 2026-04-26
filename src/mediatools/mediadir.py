@@ -3,16 +3,11 @@ import typing
 import pathlib
 import dataclasses
 from pathlib import Path
-#from .siteconfig import SiteConfig
-#from .siteconfig import SiteConfig
-#from .vidinfo import VidInfo
-#from .imginfo import ImgInfo
-#from ..util import format_memory, format_time, multi_extension_glob
 from .video import VideoFile, VideoFiles, VideoFilesDict
+from .images import ImageFile, ImageFiles, ImageFilesDict
 from .video import VideoMeta
 import pydantic
 from .file_base import FileBase
-from .images import ImageFile, ImageFiles, ImageFilesDict
 
 from .util import build_file_tree, hash_file
 from .constants import VIDEO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS
@@ -256,7 +251,7 @@ class MediaDir:
         videos = self._videos.to_list()
         for subdir in self.subdirs.values():
             videos.extend(subdir.all_video_files())
-        return videos
+        return VideoFiles(videos)
     
     def all_images(self) -> ImageFiles:
         '''DEPRICATED. Use all_image_files() instead. Get a list of all image files in the directory, including subdirectories.
@@ -269,7 +264,7 @@ class MediaDir:
         images = self._images.to_list()
         for subdir in self.subdirs.values():
             images.extend(subdir.all_image_files())
-        return images
+        return ImageFiles(images)
     
     def video_paths(self) -> list[pathlib.Path]:
         '''Get the paths of video files in this directory.'''
