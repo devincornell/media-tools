@@ -999,28 +999,6 @@ def ffoutput(
     )
 
 
-def stream_filter(
-    instreams: Stream|typing.Iterable[Stream], 
-    outstreams: Stream|typing.Iterable[Stream], 
-    filter_str: str|None, 
-    **filter_args
-) -> str:
-    '''Build a filter_complex string for FFMPEG command. Each call is one filter link, so it will be used in sequence.
-    Examples:
-        stream_filter(['0:v'], ['scaled'], scale='640:480')
-        stream_filter('0:a', 'normalized', 'loudnorm', I='-16', LRA='11', TP='-1.5')
-    '''
-    if isinstance(instreams, (str)):
-        instreams = [instreams]
-    if isinstance(outstreams, (str)):
-        outstreams = [outstreams]
-    
-    in_labels = ''.join(f'[{s}]' for s in instreams) if len(instreams) > 0 else ''
-    out_labels = ''.join(f'[{s}]' for s in outstreams) if len(outstreams) > 0 else ''
-    filter_arg_str = ''.join(f':{k}={v}' for k,v in filter_args.items())
-    if filter_str is not None:
-        filter_arg_str = f'{filter_str}{filter_arg_str}'
-    return f'{in_labels}{filter_arg_str}{out_labels}'
 
 
 
@@ -1066,7 +1044,7 @@ class FFMPEGResult:
         '''Return the return code of the FFMPEG command.'''
         return self.result.returncode
     
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         '''Return a string representation of the FFMPEGResult.'''
         return f"{self.__class__.__name__}(command={self.command.get_command()}, returncode={self.returncode}, output_length={len(self.result.stderr)})"
 
