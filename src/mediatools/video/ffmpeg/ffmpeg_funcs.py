@@ -10,7 +10,8 @@ import json
 import datetime
 from pathlib import Path
 
-from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, run_ffmpeg_subprocess
+from .ffmpeg import FFMPEG, ffmpeg, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, run_ffmpeg_subprocess
+from .filters import filter_link, filterchain, filtergraph_link, filtergraph
 from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .probe_info import ProbeInfo
 from .probe import probe
@@ -36,9 +37,9 @@ def compress(
     if not overwrite and output_fname.exists():
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
-    command = FFMPEG(
-        inputs=[ffinput(str(input_fname))],
-        outputs=[ffoutput(str(output_fname), c_v=vcodec, crf=crf, y=overwrite)],
+    command = ffmpeg(
+        input=ffinput(input_fname),
+        output=ffoutput(output_fname, c_v=vcodec, crf=crf, y=overwrite),
         **output_kwargs
     )
 
@@ -57,9 +58,9 @@ def splice(
     if output_fname.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
-    command = FFMPEG(
-        inputs=[ffinput(str(input_fname), ss=start_time.total_seconds(), to=end_time.total_seconds())],
-        outputs=[ffoutput(str(output_fname), y=overwrite)],
+    command = ffmpeg(
+        input=ffinput(input_fname, ss=start_time.total_seconds(), to=end_time.total_seconds()),
+        output=ffoutput(output_fname, y=overwrite),
         **output_kwargs
     )
     return command.run()
@@ -82,9 +83,20 @@ def crop(
     if output_fname.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
 
-    command = FFMPEG(
-        inputs=[ffinput(str(input_fname))],
-        outputs=[ffoutput(str(output_fname), v_f=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}', overwrite=overwrite)],
+    command = ffmpeg(
+        input=ffinput(input_fname),
+        output=ffoutput(
+            output_fname, 
+            #v_f=f'crop={size[0]}:{size[1]}:{topleft_point[0]}:{topleft_point[1]}', 
+            v_f=filter_link(
+                'crop',
+                w=size[0],
+                h=size[1],
+                x=topleft_point[0],
+                y=topleft_point[1],
+            ),
+            overwrite=overwrite
+        ),
         **output_kwargs
     )
     return command.run()
@@ -108,9 +120,9 @@ def make_thumb(
     if ofp.exists() and not overwrite:
         raise FileExistsError(f'The file {output_fname} already exists. User overwrite=True to overwrite it.')
     
-    command = FFMPEG(
-        inputs=[ffinput(str(input_fname), ss=time_point_sec)],
-        outputs=[ffoutput(str(ofp), overwrite=overwrite, v_f=f'scale={width}:{height}', vframes=1)],
+    command = ffmpeg(
+        input=ffinput(input_fname, ss=time_point_sec),
+        output=ffoutput(ofp, overwrite=overwrite, v_f=f'scale={width}:{height}', vframes=1),
         **output_kwargs
     )
     return command.run()
@@ -140,9 +152,18 @@ def make_animated_thumb(
     duration = probe(input_fname).duration
     pts = duration / target_period
 
-    command = FFMPEG(
-        inputs=[ffinput(str(input_fname))],
-        outputs=[ffoutput(str(ofp), v_f=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1", y=overwrite)],
+    command = ffmpeg(
+        input=ffinput(input_fname),
+        output=ffoutput(
+            ofp, 
+            #v_f=f"setpts=PTS/{pts},fps={fps},scale={width}:{height}:-1",
+            v_f=filterchain(
+                filter_link('setpts', f'PTS/{pts}'),
+                filter_link('fps', fps=fps),
+                filter_link('scale', w=width, h=height, force_original_aspect_ratio='decrease'),
+            ),
+            y=overwrite
+        ),
         **output_kwargs
     )
     
@@ -166,33 +187,29 @@ def compress_video_by_bitrate(
         # pass 1: ffmpeg -i "your_source_video.mp4" -c:v libx264 -b:v 2000k -pass 1 -an -f mp4 /dev/null
         # pass 2: ffmpeg -i "your_source_video.mp4" -c:v libx264 -b:v 2000k -pass 2 -c:a copy "output_at_2000k.mp4"
         
-        result1 = FFMPEG(
-            inputs = [ffinput(path)],
-            outputs = [
-                ffoutput(
-                    '/dev/null',
-                    c_v=vcodec,
-                    b_v=target_av_bitrate,
-                    an=True,
-                    f='mp4',
-                    #y=overwrite,
-                ),
-            ],
+        result1 = ffmpeg(
+            input=ffinput(path),
+            output=ffoutput(
+                '/dev/null',
+                c_v=vcodec,
+                b_v=target_av_bitrate,
+                an=True,
+                f='mp4',
+                #y=overwrite,
+            ),
             pass_num=1,
             passlogfile=str(tmp_log_dir),
         ).run()
 
-        result2 = FFMPEG(
-            inputs = [ffinput(path)],
-            outputs = [
-                ffoutput(
-                    new_fpath,
-                    c_v=vcodec,
-                    b_v=target_av_bitrate,
-                    c_a='copy',
-                    y=overwrite,
-                )
-            ],
+        result2 = ffmpeg(
+            input=ffinput(path),
+            output=ffoutput(
+                new_fpath,
+                c_v=vcodec,
+                b_v=target_av_bitrate,
+                c_a='copy',
+                y=overwrite,
+            ),
             passlogfile=str(tmp_log_dir),
             pass_num=2,
         ).run()
