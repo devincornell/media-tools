@@ -1,16 +1,43 @@
 {
 	"updated": "Tuesday, August 26",
-	"groups": [
+	"collections": [
 		{
-			"name": "hi",
-			"start": 32797823,
-			"end": 98438,
-			"groups": [
+			"slug": "virginislands",
+			"title": "Virgin Islands",
+			"periods": [
 				{
-					"name": "hello",
-					"start": 32797823,
-					"end": 98438,
-					"groups": []
+					"start": "",
+					"end": "December 31, 2023"
+			}
+			]
+		},
+		{
+			"slug": "virginislands-baths",
+			"title": "Virgin Islands Baths",
+			"periods": [
+				{
+					"start": "",
+					"end": ""
+				}
+			]
+		},
+		{
+			"slug": "hi",
+			"title": "Hi",
+			"periods": [
+				{
+					"start": "",
+					"end": ""
+				}
+			]
+		},
+		{
+			"slug": "hi",
+			"title": "Hi",
+			"periods": [
+				{
+					"start": "",
+					"end": ""
 				}
 			]
 		}

@@ -26,7 +26,7 @@ async def main():
     mongo_uri = "mongodb://127.0.0.1:27017/?directConnection=true"
     db_name = "media_archive"
     # Change this to the actual directory you want to scan
-    library_path = Path("/mnt/HugeHDD/gopro/gopro_raw_organized/") 
+    library_path = Path("/mnt/HDDStorage/sys/dwhelper/") 
     
 
     # 2. Setup Database Connection
