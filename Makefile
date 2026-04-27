@@ -19,6 +19,14 @@ examples_compile:
 	-jupyter nbconvert --to markdown $(EXAMPLE_NOTEBOOK_FOLDER)/*.ipynb
 	-mv $(EXAMPLE_NOTEBOOK_FOLDER)/*.md $(MKDOCS_FOLDER)
 
+################################## Testing ##################################
+
+test:
+	uv run pytest tests/test_ffmpeg_clean.py
+	uv run pytest tests/test_ffmpeg_tools.py
+	uv run pytest tests/test_image_tools.py
+	uv run pytest tests/test_media_files.py
+	
 
 
 ################################## MKDocs-Material Documentation Website Generation ##################################
