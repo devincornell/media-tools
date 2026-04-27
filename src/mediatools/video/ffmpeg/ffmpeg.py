@@ -26,9 +26,6 @@ LOGLEVEL_OPTIONS = typing.Literal['error', 'warning', 'info', 'quiet', 'panic']
 
 
 
-
-
-
 @dataclasses.dataclass
 class FFMPEG:
     """A dataclass for building and executing FFmpeg commands with type safety and structured configuration.
@@ -202,6 +199,60 @@ class FFMPEG:
             args.extend(output_spec.to_args())
 
         return CmdArgs(["ffmpeg"] + args)
+
+def ffmpeg(
+    input: FFInput|None = None,
+    inputs: list[FFInput]|None = None,
+
+    output: FFOutput|None = None,
+    outputs: list[FFOutput]|None = None,
+
+    # Global command options
+    filter_complex: str|list[str]|None = None,
+    loglevel: LOGLEVEL_OPTIONS|None = None,
+    hide_banner: bool = True,
+    nostats: bool = True,
+    progress: str|None = None,
+    passlogfile: str|None = None,
+    pass_num: int|None = None,
+
+    # Generic extensibility
+    other_args: list[tuple[str,str]]|None = None,
+    other_flags: list[str]|None = None
+) -> FFMPEG:
+    '''Create a new ffmpeg command with type safety and structured configuration.
+    '''
+    return FFMPEG(
+        inputs=_parse_multi_items("input", single_item=input, multi_items=inputs),
+        outputs=_parse_multi_items("output", single_item=output, multi_items=outputs),
+        filter_complex=filter_complex,
+        loglevel=loglevel,
+        hide_banner=hide_banner,
+        nostats=nostats,
+        progress=progress,
+        passlogfile=passlogfile,
+        pass_num=pass_num,
+        other_args=other_args if other_args is not None else [],
+        other_flags=other_flags if other_flags is not None else []
+    )
+
+def _parse_multi_items(
+    items_name: str,
+    single_item: typing.Any | None = None,
+    multi_items: typing.Sequence[typing.Any] | None = None
+) -> list[typing.Any]:
+    '''Parse single or multiple items into a list.'''
+    if single_item is not None and multi_items is not None:
+        raise ValueError('Cannot specify both single_item and multi_items.')
+    
+    if single_item is not None:
+        return [single_item]
+    
+    if multi_items is not None:
+        return list(multi_items)
+    
+    raise ValueError(f'Must specify either {items_name} or {items_name}s.')
+
 
 
 
@@ -472,7 +523,7 @@ def ffinput(
             >>> inp = ffinput("audio.flac", c_a="flac", ar="48000")
     """
     return FFInput(
-        path=path,
+        path=path if not isinstance(path, Path) else str(path),
         args=FFInputArgs(
             f=f,
             t=t,
@@ -938,7 +989,7 @@ def ffoutput(
             ...                preset="slow", overwrite=True)
     """
     return FFOutput(
-        path=path,
+        path=path if not isinstance(path, Path) else str(path),
         args=FFOutputArgs(
             y=y,
             maps=maps or [],

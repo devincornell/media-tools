@@ -17,7 +17,7 @@ import multiprocessing
 import dataclasses
 
 
-from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, ffinput, ffoutput, stream_filter)
+from .ffmpeg import (FFMPEG, FFMPEGResult, FFInput, FFOutput, ffinput, ffoutput)
 from .probe import probe
 from .errors import FFMPEGExecutionError
 

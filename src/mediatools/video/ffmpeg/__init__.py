@@ -1,4 +1,5 @@
 from .ffmpeg import (
+    ffmpeg,
     FFMPEG, 
     FFMPEGResult, 
     FFInput, 
@@ -7,9 +8,16 @@ from .ffmpeg import (
     FFInputArgs,
     ffoutput,
     FFOutputArgs,
-    stream_filter,
     LOGLEVEL_OPTIONS
 )
+
+from .filters import (
+    filtergraph_link,
+    filter_link,
+    filterchain,
+    filtergraph,
+)
+
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,
     compress,

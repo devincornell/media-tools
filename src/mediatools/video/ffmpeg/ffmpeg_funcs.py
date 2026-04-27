@@ -10,7 +10,7 @@ import json
 import datetime
 from pathlib import Path
 
-from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, stream_filter, FFMPEGResult, run_ffmpeg_subprocess
+from .ffmpeg import FFMPEG, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, run_ffmpeg_subprocess
 from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
 from .probe_info import ProbeInfo
 from .probe import probe
