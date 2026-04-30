@@ -10,7 +10,7 @@ authors = [
 ]
 description = " Tools for working with video, audio, and image data."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -21,7 +21,6 @@ dependencies = [
     "jinja2>=3.1.6",
     "pydantic>=2.13.3",
     "pymongo>=4.17.0",
-    "pytest>=9.0.3",
     "requests>=2.33.1",
     "scikit-image>=0.25.2",
     "tqdm>=4.67.3",
@@ -49,4 +48,12 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+]
+
+[dependency-groups]
+dev = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "nbconvert>=7.17.1",
+    "pytest>=9.0.3",
 ]
