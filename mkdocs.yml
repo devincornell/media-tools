@@ -6,3 +6,13 @@ theme:
     repo: fontawesome/brands/git-alt 
 repo_url: https://github.com/devincornell/mediatools
 repo_name: devincornell/mediatools
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
