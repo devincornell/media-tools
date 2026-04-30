@@ -39,7 +39,7 @@ mkdocs_deploy:
 
 # https://squidfunk.github.io/mkdocs-material/creating-your-site/
 mkdocs_serve:
-	mkdocs serve
+	mkdocs serve -a localhost:8080
 
 mkdocs_build:
 	mkdocs build
