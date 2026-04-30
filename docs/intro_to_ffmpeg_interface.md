@@ -4,17 +4,17 @@ The `mediatools` package maintains a custom interface for using the ffmpeg libra
 
 
 ```python
-import pathlib
-
 import mediatools
 ```
 
+#### Load Test Data
 Let's download a public video file for demonstration.
 
 
 ```python
 import tempfile
 import requests
+import pathlib
 
 def download_test_video(
     target_path: pathlib.Path,
@@ -39,13 +39,13 @@ ex_vid
 ```
 
     
-    Downloading test video to /tmp/tmpt6i9ra7r/test_video.mkv...
+    Downloading test video to /tmp/tmplc6zxr4m/test_video.mkv...
 
 
 
 
 
-    PosixPath('/tmp/tmpt6i9ra7r/test_video.mkv')
+    PosixPath('/tmp/tmplc6zxr4m/test_video.mkv')
 
 
 
