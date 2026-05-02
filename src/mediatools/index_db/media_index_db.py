@@ -39,7 +39,7 @@ class MediaIndexDirInfo:
 
 
 @dataclasses.dataclass(repr=False)
-class MediaIndex:
+class MediaIndexDB:
     dirs: MediaDirIndexCollection
     videos: VideoIndexCollection
 
