@@ -26,7 +26,7 @@ import contextlib
 #sys.path.append('src')
 #import mediatools
 #import util
-from ..mediadir import MediaDir
+from ...mediadir import MediaDir
 from .media_dir_index import MediaDirIndex
 from .video_file_index import VideoFileIndex
 
