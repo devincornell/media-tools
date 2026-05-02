@@ -72,8 +72,12 @@ def create_app(config: ServerConfig) -> FastAPI:
         mongo_client = pymongo.AsyncMongoClient(config.mongodb_url)
         database = mongo_client[config.database_name]
         app.state.db = await MediaIndexDB.from_client(database)
+        print("\nAvailable routes:")
+        for route in app.routes:
+            print(f"  {route.methods} {route.path}")
+        print()
         yield
-        mongo_client.close()
+        await mongo_client.aclose()
 
     app = FastAPI(lifespan=lifespan)
     app.state.config = config
@@ -86,13 +90,6 @@ def create_app(config: ServerConfig) -> FastAPI:
 
     CHUNK_SIZE = 1024 * 1024  # 1 MB
 
-    @app.on_event("startup")
-    async def startup_event():
-        print("\nAvailable routes:")
-        for route in app.routes:
-            print(f"  {route.methods} {route.path}")
-        print()
-
     @app.get("/")
     async def root():
         return RedirectResponse(url='/page/')
@@ -100,6 +97,25 @@ def create_app(config: ServerConfig) -> FastAPI:
     @app.get('/page')
     async def page_redirect():
         return RedirectResponse(url='/page/')
+
+    @app.get('/page/', response_class=HTMLResponse)
+    async def page_root(
+        config: ServerConfig = Depends(get_config),
+        db: MediaIndexDB = Depends(get_db),
+    ):
+        try:
+            dir_doc = await db.dirs.find_by_path(config.root_path)
+        except MediaDirIndexNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Root path not indexed: {config.root_path}")
+
+        subdirs = await db.dirs.find_direct_subdirs(config.root_path)
+        page_data = await build_page_dict(dir_doc, subdirs, db, config)
+
+        with config.template_path.open('r') as f:
+            template_str = f.read()
+        environment = jinja2.Environment()
+        template = environment.from_string(template_str)
+        return template.render(**page_data)
 
     @app.get('/list_directories', response_class=PlainTextResponse)
     async def list_directories(
@@ -329,6 +345,7 @@ def build_subdir_info(
         'num_vids': len(sd.video_files),
         'num_imgs': len(sd.image_files),
         'num_subpages': len(sd.subpaths),
+        'subfolder_thumbs_all': [],
     }
 
 
