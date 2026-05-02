@@ -27,8 +27,8 @@ from ..images import ImageMeta, ImageFile
 from ..video import VideoFile, VideoMeta
 
 
-from .media_dir_index import MediaDirIndexCollection, MediaDirIndexDoc
-from .video_index import VideoIndexCollection, VideoIndexDoc
+from .mediadir_index_collection import MediaDirIndexCollection, MediaDirIndexDoc
+from .video_index_collection import VideoIndexCollection, VideoIndexDoc
 
 @dataclasses.dataclass
 class MediaIndexDirInfo:
