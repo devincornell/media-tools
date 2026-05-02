@@ -113,6 +113,14 @@ class MediaDirIndexCollection:
         
         # Validate each document returned by the cursor
         return [MediaDirIndexDoc.model_validate(doc) async for doc in cursor]
+
+    async def find_direct_subdirs(self, path: str | pathlib.Path) -> list[MediaDirIndexDoc]:
+        '''Find documents that are direct subdirectories of the given path (one level deep only).'''
+        prefix_str = str(path).rstrip('/')
+        # Match prefix + exactly one more path segment (no further slashes)
+        regex = re.compile(f"^{re.escape(prefix_str)}/[^/]+$")
+        cursor = self._collection.find({"path_str": regex})
+        return [MediaDirIndexDoc.model_validate(doc) async for doc in cursor]
     
     async def delete_by_path_prefix(self, prefix: str | pathlib.Path) -> int:
         '''Delete all documents where path_str starts with the given prefix. Returns the count of deleted documents.'''
