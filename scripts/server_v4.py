@@ -23,14 +23,14 @@ from mediatools.index_db.mediadir_index_collection import IndexVideoFile, IndexI
 class Settings(pydantic_settings.BaseSettings):
     model_config = pydantic_settings.SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
-    root_path: Path
-    template_path: Path
-    thumb_path: Path
-    mongodb_url: str = "mongodb://127.0.0.1:27017/?directConnection=true"
-    database_name: str = "dwhost"
-    port: int = 8000
-    sort_by_name: bool = False
-    max_clip_duration: float = 0.0
+    site_root_path: Path
+    site_template_path: Path
+    site_thumb_path: Path
+    site_mongodb_url: str
+    site_database_name: str
+    site_port: int
+    site_sort_by_name: bool = False
+    site_max_clip_duration: float = 0.0
 
 
 @dataclasses.dataclass
@@ -46,15 +46,15 @@ class ServerConfig:
     @classmethod
     def from_settings(cls, settings: Settings) -> typing.Self:
         '''Create config from a Settings instance, validating that all paths exist.'''
-        root_path = settings.root_path.resolve()
+        root_path = settings.site_root_path.resolve()
         if not root_path.exists():
             raise FileNotFoundError(f"Root path not found: {root_path}")
 
-        thumb_path = settings.thumb_path.resolve()
+        thumb_path = settings.site_thumb_path.resolve()
         if not thumb_path.exists():
             raise FileNotFoundError(f"Thumbnail path not found: {thumb_path}")
 
-        template_path = settings.template_path.resolve()
+        template_path = settings.site_template_path.resolve()
         if not template_path.exists():
             raise FileNotFoundError(f"Template path not found: {template_path}")
 
@@ -62,10 +62,10 @@ class ServerConfig:
             root_path=root_path,
             thumb_path=thumb_path,
             template_path=template_path,
-            sort_by_name=settings.sort_by_name,
-            max_clip_duration=settings.max_clip_duration,
-            mongodb_url=settings.mongodb_url,
-            database_name=settings.database_name,
+            sort_by_name=settings.site_sort_by_name,
+            max_clip_duration=settings.site_max_clip_duration,
+            mongodb_url=settings.site_mongodb_url,
+            database_name=settings.site_database_name,
         )
 def create_app(config: ServerConfig) -> FastAPI:
     """Create a FastAPI application with the given configuration."""
@@ -382,10 +382,10 @@ if __name__ == "__main__":
     overrides = {k: v for k, v in vars(args).items() if v is not None}
     if overrides:
         settings = settings.model_copy(update={
-            k.replace('-', '_'): v for k, v in overrides.items()
+            f'site_{k.replace("-", "_")}': v for k, v in overrides.items()
         })
 
-    port = settings.port
+    port = settings.site_port
     config = ServerConfig.from_settings(settings)
     app = create_app(config)
 
