@@ -60,3 +60,7 @@ dev = [
     "pydantic-settings>=2.14.0",
     "pytest>=9.0.3",
 ]
+site = [
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
+]
