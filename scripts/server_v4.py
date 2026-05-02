@@ -247,10 +247,9 @@ async def build_page_dict(
         for iif in sorted(dir_doc.image_files.values(), key=lambda i: Path(i.path_str).name.lower())
     ]
 
-    subpage_items = [
-        build_subdir_info(sd, config)
-        for sd in sorted(subdirs, key=lambda d: d.path.name.lower())
-    ]
+    subpage_items = []
+    for sd in sorted(subdirs, key=lambda d: d.path.name.lower()):
+        subpage_items.append(await build_subdir_info(sd, db, config))
 
     total_size = sum(
         [ivf.stat.size for ivf in dir_doc.video_files.values()] +
@@ -335,12 +334,21 @@ def build_image_info(
     }
 
 
-def build_subdir_info(
+async def build_subdir_info(
     sd: MediaDirIndexDoc,
+    db: MediaIndexDB,
     config: ServerConfig,
 ) -> dict[str, typing.Any]:
     '''Build the subpage summary dict for a subdirectory card.'''
     sd_path_rel = sd.path.relative_to(config.root_path)
+
+    all_docs = await db.dirs.find_by_path_prefix(sd.path)
+    subfolder_thumbs: list[str] = []
+    for doc in all_docs:
+        for ivf in doc.video_files.values():
+            if (config.thumb_path / f"{ivf.file_hash}.gif").exists():
+                subfolder_thumbs.append(ivf.file_hash)
+
     return {
         'page_path_rel': str(sd_path_rel),
         'idx': mediatools.fname_to_id(sd.path.name),
@@ -348,7 +356,7 @@ def build_subdir_info(
         'num_vids': len(sd.video_files),
         'num_imgs': len(sd.image_files),
         'num_subpages': len(sd.subpaths),
-        'subfolder_thumbs_all': [],
+        'subfolder_thumbs_all': subfolder_thumbs,
     }
 
 
