@@ -148,7 +148,7 @@ def create_app(config: ServerConfig) -> FastAPI:
     ):
         if page_path == '':
             page_path = '.'
-        page_path_full = (config.root_path / page_path).resolve()
+        page_path_full = (config.root_path / page_path)#.resolve()
 
         try:
             dir_doc = await db.dirs.find_by_path(page_path_full)
