@@ -19,7 +19,7 @@ import sys
 sys.path.append('../src/')
 sys.path.append('src/')
 import mediatools
-from util import get_hash_hex, get_hash_hex_THUMB, parallel_starmap, parallel_map
+from util import get_hash_hex, parallel_starmap, parallel_map
 
 
 
@@ -46,12 +46,7 @@ def make_thumbs(
                 print(f'\nError: {vf.path} could not be probed. Skipping.')
                 continue
 
-        thumb_fname_old = get_thumb_path(vf.path.relative_to(mdir.path), thumbs_path)
-        thumb_fname = get_thumb_path2(vf.path, thumbs_path)
-
-        if thumb_fname_old.exists() and not thumb_fname.exists():
-            shutil.move(thumb_fname_old, thumb_fname)
-            #print(f'\nMoved old thumbnail {thumb_fname_old} to new location {thumb_fname}.')
+        thumb_fname = get_thumb_path(vf.path, thumbs_path)
 
         if not thumb_fname.exists() or thumb_fname.stat().st_size == 0:
             #samp = max(1, int(probe_info.duration/10))
@@ -89,11 +84,9 @@ def make_animated_thumb(
         print(f'\nERROR: FFMPEG failed to create thumbnail for {input_fname}: {e}')
 
 
-def get_thumb_path(vid_path_rel: Path|str, thumbs_path: Path|str) -> Path:
-    return thumbs_path / str(Path(vid_path_rel).with_suffix('.gif')).replace('/', '.')
 
-def get_thumb_path2(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
-    return Path(thumbs_path) / Path(get_hash_hex_THUMB(vid_path_abs) + '.gif')
+def get_thumb_path(vid_path_abs: Path|str, thumbs_path: Path|str) -> Path:
+    return Path(thumbs_path) / Path(mediatools.index_hash_func(vid_path_abs) + '.gif')
 
 
 def scan_media_dir(
@@ -218,6 +211,10 @@ if __name__ == '__main__':
         delete_duplicates=args.delete_duplicates,
         safety=not args.no_safety,
     )
+
+    if args.make_thumbs:
+        thumbs_path = Path(args.thumbs_path) if args.thumbs_path is not None else Path(args.root_directory) / '_thumbs'
+        make_thumbs(mdir=mdir, thumbs_path=thumbs_path, cores=args.num_cores)
 
 
 
