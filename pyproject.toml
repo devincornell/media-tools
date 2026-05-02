@@ -29,6 +29,11 @@ dependencies = [
 [project.urls]
 Homepage = "https://devinjcornell.com"
 
+[project.optional-dependencies]
+transcribe = [
+    "openai-whisper>=20250625",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
