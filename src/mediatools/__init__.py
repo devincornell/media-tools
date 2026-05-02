@@ -1,6 +1,8 @@
 
 from . import ai
 from .video import *
+from .video import ffmpeg
+
 from .images import *
 from .mediadir import (
     MediaDir, 

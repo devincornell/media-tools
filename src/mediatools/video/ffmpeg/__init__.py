@@ -1,4 +1,4 @@
-from .ffmpeg import (
+from .ffmpeg_command import (
     ffmpeg,
     FFMPEG, 
     FFMPEGResult, 

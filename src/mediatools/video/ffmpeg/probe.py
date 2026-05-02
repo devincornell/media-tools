@@ -4,7 +4,7 @@ import typing
 from .errors import FFMPEGExecutionError, ProbeError
 
 from .probe_info import ProbeInfo
-from .ffmpeg import run_ffmpeg_subprocess
+from .ffmpeg_command import run_ffmpeg_subprocess
 
 def probe(fp: str|Path) -> ProbeInfo:
     '''Probe the file in question and return a ProbeInfo object.'''
