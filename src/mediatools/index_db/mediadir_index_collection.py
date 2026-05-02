@@ -80,6 +80,13 @@ class MediaDirIndexCollection:
             upsert=True
         )
 
+    async def count(self, path_prefix: str | pathlib.Path | None = None) -> int:
+        '''Return the number of documents in the collection. If path_prefix is provided, only counts documents where path_str starts with the given prefix.'''
+        if path_prefix is None:
+            return await self._collection.count_documents({})
+        regex = re.compile(f"^{re.escape(str(path_prefix))}")
+        return await self._collection.count_documents({"path_str": regex})
+
     async def find_first(self) -> Optional[MediaDirIndexDoc]:
         '''Get the first document in the collection.'''
         doc = await self._collection.find_one()
