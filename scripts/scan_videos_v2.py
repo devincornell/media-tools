@@ -202,11 +202,8 @@ if __name__ == '__main__':
     if not os.path.isdir(args.root_directory):
         raise ValueError(f'Error: root_directory {args.root_directory} is not a valid directory.')
         
-    if args.make_thumbs and not args.thumbs_path is None:
-        raise ValueError('If --make-thumbs is set, --thumbs-path must be None (default to <root_directory>/_thumbs).')
-    
-    if args.thumbs_path is not None and args.make_thumbs:
-        raise ValueError('If --thumbs-path is set, --make-thumbs must be set.')
+    if args.thumbs_path is not None and not args.make_thumbs:
+        raise ValueError('If --thumbs-path is set, --make-thumbs must also be set.')
 
     mdir = mediatools.scan_directory(args.root_directory)
     print(mdir.path)
