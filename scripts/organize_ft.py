@@ -3,17 +3,20 @@ import re
 import dataclasses
 import pathlib
 import typing
-
+import pydantic_settings
 import sys
-sys.path.append('../src')
-sys.path.append('src')
+
 import mediatools
 import util
 
 
+class Settings(pydantic_settings.BaseSettings):
+    model_config = pydantic_settings.SettingsConfigDict(env_file='.env', extra='ignore')
+    ft_path: pathlib.Path
+settings = Settings()
 
 @dataclasses.dataclass
-class FTVPath:
+class FTPath:
     name: str
     album_id: str
     video_id: str
@@ -37,14 +40,14 @@ class FTVPath:
 
 if __name__ == "__main__":
     # List of filenames from the image
-    root_path = pathlib.Path('/mnt/HugeHDD/dwhelper/ftv_website')
+    root_path = settings.ft_path
     mdir = mediatools.scan_directory(root_path=root_path)
     video_files = mdir.all_video_files()
     print(len(video_files))
 
     for vf in mdir.all_video_files():
         try:
-            ftv_path = FTVPath.from_filename(vf.path.name)
+            ftv_path = FTPath.from_filename(vf.path.name)
         except ValueError as e:
             print(e)
         else:
