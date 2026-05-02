@@ -15,13 +15,20 @@ import pathlib
 import multiprocessing
 import hashlib
 import sys
+import asyncio
+import pymongo
+import pydantic_settings
 
-sys.path.append('../src/')
-sys.path.append('src/')
 import mediatools
 from util import get_hash_hex, parallel_starmap, parallel_map
 
+class Settings(pydantic_settings.BaseSettings):
+    model_config = pydantic_settings.SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
+    site_root_path: Path
+    site_thumb_path: Path
+    site_mongodb_url: str
+    site_database_name: str
 
 
 def make_thumbs(
@@ -147,6 +154,15 @@ def probe_or_delete(vf: mediatools.VideoFile, safety: bool = True) -> None:
             if not safety: vf.path.unlink(missing_ok=True)
 
 
+async def reindex(root_path: Path, mongodb_url: str, database_name: str) -> None:
+    '''Rescan and update the media index database for the given root path.'''
+    async with pymongo.AsyncMongoClient(mongodb_url, serverSelectionTimeoutMS=2000) as client:
+        mindex = await mediatools.MediaIndexDB.from_client(client[database_name])
+        await mindex.update_directory_index(root_path, verbose=True)
+        print(f'Dirs indexed:   {await mindex.dirs.count(root_path)}')
+        print(f'Videos indexed: {await mindex.videos.count(root_path)}')
+
+
 def delete_duplicates_thisdir(mdir: mediatools.MediaDir, safety: bool = True) -> None:
     '''Deletes duplicate video files in the given media directory.'''
     hash_to_paths: dict[str, set[pathlib.Path]] = collections.defaultdict(set)
@@ -175,34 +191,44 @@ if __name__ == '__main__':
         description="Scan videos in the directory and clean them up.",
         epilog="Example: ./create_montage_v2.py ./my_videos 5 my_montage.mp4 --random_seed 42 --clip_ratio 30"
     )
-    parser.add_argument("root_directory", help="Directory containing the video files.")
+    parser.add_argument("root_directory", nargs='?', default=None, help="Directory containing the video files (default: site_root_path from .env).")
+    parser.add_argument("-r", "--reindex", action='store_true', help="Rescan and update the media index database.")
     parser.add_argument("-t", "--make-thumbs", action='store_true', help="Generate thumbnails for the videos.")
-    parser.add_argument("-p", "--thumbs-path", type=str, default=None, help="Directory to save thumbnails (default: <root_directory>/_thumbs).")
+    parser.add_argument("-p", "--thumbs-path", type=str, default=None, help="Directory to save thumbnails (default: site_thumb_path from .env).")
     parser.add_argument("-c", "--num_cores", type=int, default=1, help="Number of CPU cores to use for thumbnail generation (default: 1).")
     parser.add_argument("-m", "--convert-to-mp4", action='store_true', help="Convert non-MP4 videos to MP4 format.")
     parser.add_argument("-e", "--delete-empty-videos", action='store_true', help="Delete empty video files.")
     parser.add_argument("-u", "--delete-unprobable-videos", action='store_true', help="Delete unprobable video files that cannot be probed.")
     parser.add_argument("-d", "--delete-duplicates", action='store_true', help="Delete duplicate video files based on hash.")
     parser.add_argument("-s", "--no-safety", action='store_true', help="Disable safety checks (actually delete files).")
-    #parser.add_argument("-c", "--num_cores", type=int, default=15, help="Number of CPU cores to use (default: 15).")
-    #parser.add_argument("-s", "--random_seed", type=int, default=0, help="Random seed for selecting clips (default: 0).")
-    #parser.add_argument("-v", "--verbose", action='store_true', help="Enable verbose output.")
-    #parser.add_argument("--width", type=int, default=1920, help="Width of the output video (default: 1920).")
-    #parser.add_argument("--height", type=int, default=1080, help="Height of the output video (default: 1080).")
-    #parser.add_argument("--fps", type=int, default=60, help="Frames per second of the output video (default: 30).")
     args = parser.parse_args()
-    
-    if not os.path.isdir(args.root_directory):
-        raise ValueError(f'Error: root_directory {args.root_directory} is not a valid directory.')
-        
+
+    # Load base settings from .env / environment variables
+    settings = Settings()
+
+    # Override with any explicitly provided CLI args
+    if args.root_directory is not None:
+        settings = settings.model_copy(update={'site_root_path': Path(args.root_directory)})
+    if args.thumbs_path is not None:
+        settings = settings.model_copy(update={'site_thumb_path': Path(args.thumbs_path)})
+
+    root_path = settings.site_root_path
+    thumbs_path = settings.site_thumb_path
+
     if args.thumbs_path is not None and not args.make_thumbs:
         raise ValueError('If --thumbs-path is set, --make-thumbs must also be set.')
 
-    mdir = mediatools.scan_directory(args.root_directory)
+    if not root_path.is_dir():
+        raise ValueError(f'Error: root_directory {root_path} is not a valid directory.')
+
+    mdir = mediatools.scan_directory(root_path)
     print(mdir.path)
     print(f'{len(mdir.all_dirs())=}')
     print(f'{len(mdir.all_video_files())=}')
 
+    if args.reindex:
+        asyncio.run(reindex(root_path, settings.site_mongodb_url, settings.site_database_name))
+    
     scan_media_dir(
         mdir=mdir,
         convert_to_mp4=args.convert_to_mp4,
@@ -213,8 +239,8 @@ if __name__ == '__main__':
     )
 
     if args.make_thumbs:
-        thumbs_path = Path(args.thumbs_path) if args.thumbs_path is not None else Path(args.root_directory) / '_thumbs'
         make_thumbs(mdir=mdir, thumbs_path=thumbs_path, cores=args.num_cores)
+
 
 
 
