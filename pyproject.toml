@@ -52,8 +52,11 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.2.0",
+    "ipynb>=0.5.1",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.6",
     "nbconvert>=7.17.1",
+    "pydantic-settings>=2.14.0",
     "pytest>=9.0.3",
 ]
