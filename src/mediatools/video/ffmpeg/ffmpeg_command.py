@@ -154,21 +154,18 @@ class FFMPEG:
         timeout: float|None = None,
         cwd: str|Path|None = None,
         env: str|Path|None = None,
+        check_output_exists: bool = False,
     ) -> FFMPEGResult:
         '''Run the FFMPEG command with the provided parameters.'''
-        # Check if any output files exist when overwrite is disabled
-        for output in self.outputs:
-            if output.args.y is not None and not output.args.y and Path(output.path).exists():
-                raise FileExistsError(f'The output file {output.path} exists and y=False.')
-        
         result = FFMPEGResult(
             command=self, 
             result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
         )
-
-        for opath in result.output_files:
-            if Path(opath).exists() and Path(opath).stat().st_size == 0: #if file does not exist, the output may not have been a path
-                raise OutputFileIsEmptyError(f"FFMPEG command completed but output file is empty: {opath}")
+    
+        if check_output_exists:
+            for opath in result.output_files:
+                if Path(opath).exists() and Path(opath).stat().st_size == 0: #if file does not exist, the output may not have been a path
+                    raise OutputFileIsEmptyError(f"FFMPEG command completed but output file is empty: {opath}")
             
         return result
     
@@ -676,7 +673,7 @@ class FFOutputArgs:
             >>> output = FFOutput("video.mp4", c_v="libx264", 
             ...                   metadata={"title": "My Video", "artist": "Author"}, overwrite=True)
     """
-    y: bool|None = dataclasses.field(default=None, metadata={"flag": "y", "desc": 'Overwrite output file if it exists'})
+    y: bool|None = dataclasses.field(default=None, metadata={"desc": 'Overwrite output file if it exists (-y). When False or None, -n is used instead.'})
     
     # Stream Selection & Mapping
     maps: list[Stream] = dataclasses.field(default_factory=list, metadata={"desc": 'Stream mapping specifications'})
@@ -761,6 +758,12 @@ class FFOutputArgs:
     def to_args(self) -> CmdArgs:
         '''Convert the FFOutput to arguments for FFMPEG command.'''
         args = CmdArgs.from_field_metadatas(self)
+
+        # Always pass -y or -n to prevent interactive prompts
+        if self.y:
+            args.add_flag('y')
+        else:
+            args.add_flag('n')
         
         # Handle maps separately since it's a list
         for map_spec in self.maps:
