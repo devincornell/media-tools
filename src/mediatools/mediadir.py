@@ -28,6 +28,16 @@ def scan_directory(
         ignore_path=ignore_path,
     )
 
+def display_directory_tree(
+    path: pathlib.Path | str,
+    show_files: bool = True,
+    show_file_types: bool = True,
+) -> str:
+    '''Return a visual tree representation of the directory structure.'''
+    mdir = scan_directory(path)
+    return mdir.display(show_files=show_files, show_file_types=show_file_types)
+
+
 @dataclasses.dataclass(repr=False)
 class MediaDir:
     '''Stores information about a directory of media files (recursive data structure).

@@ -5,6 +5,7 @@ from .images import *
 from .mediadir import (
     MediaDir, 
     scan_directory,
+    display_directory_tree,
     DirectoryNotFoundError,
     VideoNotFoundError,
     ImageNotFoundError,
