@@ -10,6 +10,7 @@ from fastapi import FastAPI, Header, Response, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, PlainTextResponse
 import jinja2
 import pymongo
+import pydantic_settings
 
 import sys
 sys.path.append('../src')
@@ -17,6 +18,19 @@ sys.path.append('src')
 import mediatools
 from mediatools.index_db import MediaIndexDB, MediaDirIndexDoc, VideoIndexDoc, MediaDirIndexNotFoundError
 from mediatools.index_db.mediadir_index_collection import IndexVideoFile, IndexImageFile
+
+
+class Settings(pydantic_settings.BaseSettings):
+    model_config = pydantic_settings.SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
+    root_path: Path
+    template_path: Path
+    thumb_path: Path
+    mongodb_url: str = "mongodb://127.0.0.1:27017/?directConnection=true"
+    database_name: str = "dwhost"
+    port: int = 8000
+    sort_by_name: bool = False
+    max_clip_duration: float = 0.0
 
 
 @dataclasses.dataclass
@@ -30,26 +44,17 @@ class ServerConfig:
     database_name: str
 
     @classmethod
-    def from_config_args(
-        cls,
-        root_path: Path | str,
-        thumb_path: Path | str,
-        template_path: Path | str,
-        sort_by_name: bool,
-        max_clip_duration: float,
-        mongodb_url: str,
-        database_name: str,
-    ) -> typing.Self:
-        '''Create config after validating that all paths exist.'''
-        root_path = Path(root_path).resolve()
+    def from_settings(cls, settings: Settings) -> typing.Self:
+        '''Create config from a Settings instance, validating that all paths exist.'''
+        root_path = settings.root_path.resolve()
         if not root_path.exists():
             raise FileNotFoundError(f"Root path not found: {root_path}")
 
-        thumb_path = Path(thumb_path).resolve()
+        thumb_path = settings.thumb_path.resolve()
         if not thumb_path.exists():
             raise FileNotFoundError(f"Thumbnail path not found: {thumb_path}")
 
-        template_path = Path(template_path).resolve()
+        template_path = settings.template_path.resolve()
         if not template_path.exists():
             raise FileNotFoundError(f"Template path not found: {template_path}")
 
@@ -57,13 +62,11 @@ class ServerConfig:
             root_path=root_path,
             thumb_path=thumb_path,
             template_path=template_path,
-            sort_by_name=sort_by_name,
-            max_clip_duration=max_clip_duration,
-            mongodb_url=mongodb_url,
-            database_name=database_name,
+            sort_by_name=settings.sort_by_name,
+            max_clip_duration=settings.max_clip_duration,
+            mongodb_url=settings.mongodb_url,
+            database_name=settings.database_name,
         )
-
-
 def create_app(config: ServerConfig) -> FastAPI:
     """Create a FastAPI application with the given configuration."""
 
@@ -354,30 +357,32 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Start a video streaming server')
-    parser.add_argument('root_path', type=Path, help='Root directory containing video files')
-    parser.add_argument('template_path', type=Path, help='Path to the HTML template file')
-    parser.add_argument('thumb_path', type=Path, help='Directory for thumbnail images')
-    parser.add_argument('mongodb_url', help='MongoDB connection URL')
-    parser.add_argument('-d', '--database-name', type=str, default='dwhost', help='MongoDB database name (default: dwhost)')
-    parser.add_argument('-p', '--port', type=int, default=8000, help='Port to run the server on (default: 8000)')
-    parser.add_argument('-s', '--sort-by-name', action='store_true', help='Sort directories by name')
-    parser.add_argument('-m', '--max-clip-duration', type=float, default=0, help='Max duration (seconds) to treat a video as a clip (default: 0)')
+    parser.add_argument('--root-path', type=Path, default=None, help='Root directory containing video files')
+    parser.add_argument('--template-path', type=Path, default=None, help='Path to the HTML template file')
+    parser.add_argument('--thumb-path', type=Path, default=None, help='Directory for thumbnail images')
+    parser.add_argument('--mongodb-url', type=str, default=None, help='MongoDB connection URL')
+    parser.add_argument('-d', '--database-name', type=str, default=None, help='MongoDB database name')
+    parser.add_argument('-p', '--port', type=int, default=None, help='Port to run the server on')
+    parser.add_argument('-s', '--sort-by-name', action='store_true', default=None, help='Sort directories by name')
+    parser.add_argument('-m', '--max-clip-duration', type=float, default=None, help='Max duration (seconds) to treat a video as a clip')
     args = parser.parse_args()
 
-    config = ServerConfig.from_config_args(
-        root_path=args.root_path,
-        template_path=args.template_path,
-        thumb_path=args.thumb_path,
-        mongodb_url=args.mongodb_url,
-        sort_by_name=args.sort_by_name,
-        max_clip_duration=args.max_clip_duration,
-        database_name=args.database_name,
-    )
+    # Load base settings from .env / environment variables
+    settings = Settings()
 
+    # Override with any explicitly provided CLI args
+    overrides = {k: v for k, v in vars(args).items() if v is not None}
+    if overrides:
+        settings = settings.model_copy(update={
+            k.replace('-', '_'): v for k, v in overrides.items()
+        })
+
+    port = settings.port
+    config = ServerConfig.from_settings(settings)
     app = create_app(config)
 
     print(f"\nStarting server: {config.root_path}")
-    print(f"Server will be available at: http://0.0.0.0:{args.port}")
-    print(f"Visit http://0.0.0.0:{args.port}/page/ to browse videos")
+    print(f"Server will be available at: http://0.0.0.0:{port}")
+    print(f"Visit http://0.0.0.0:{port}/page/ to browse videos")
 
-    uvicorn.run(app, host="0.0.0.0", port=args.port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
