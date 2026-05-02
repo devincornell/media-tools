@@ -100,8 +100,6 @@ class VideoFile(FileBase):
         hide_banner: bool = True,
         nostats: bool = True,
         progress: str|None = None,
-        passlogfile: str|None = None,
-        pass_num: int|None = None,
         # Generic extensibility
         other_args: list[tuple[str,str]]|None = None,
         other_flags: list[str]|None = None,
@@ -126,8 +124,7 @@ class VideoFile(FileBase):
             hide_banner: Whether to hide the FFmpeg banner (default: True).
             nostats: Whether to disable statistics output (default: True).
             progress: File path for writing progress reports.
-            passlogfile: Logfile for two-pass encoding.
-            pass_num: Encoding pass number for multi-pass encoding.
+            pass_: Encoding pass number for multi-pass encoding (use ffoutput(pass_=1/2)).
             
             # Generic Extensibility
             other_args: Additional command arguments as (name, value) tuples.
@@ -175,17 +172,15 @@ class VideoFile(FileBase):
             Two-pass encoding:
                 >>> # Pass 1
                 >>> cmd1 = vf.ffmpeg(
-                ...     outputs=[ffoutput("/dev/null", c_v="libx264", b_v="1000k", f="mp4", an=True)],
-                ...     pass_num=1,
-                ...     passlogfile="logfile"
+                ...     outputs=[ffoutput("/dev/null", c_v="libx264", b_v="1000k", f="mp4", an=True,
+                ...                       pass_=1, passlogfile="logfile")],
                 ... )
                 >>> result1 = cmd1.run()
                 >>> 
                 >>> # Pass 2  
                 >>> cmd2 = vf.ffmpeg(
-                ...     outputs=[ffoutput("output.mp4", c_v="libx264", b_v="1000k", y=True)],
-                ...     pass_num=2,
-                ...     passlogfile="logfile"
+                ...     outputs=[ffoutput("output.mp4", c_v="libx264", b_v="1000k", y=True,
+                ...                       pass_=2, passlogfile="logfile")],
                 ... )
                 >>> result2 = cmd2.run()
             
@@ -225,8 +220,6 @@ class VideoFile(FileBase):
             hide_banner=hide_banner,
             nostats=nostats,
             progress=progress,
-            passlogfile=passlogfile,
-            pass_num=pass_num,
             other_args=other_args or [],
             other_flags=other_flags or [],
         )

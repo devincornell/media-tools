@@ -136,8 +136,6 @@ class FFMPEG:
     hide_banner: bool = dataclasses.field(default=True, metadata={"flag": "hide_banner", 'desc': 'Hide banner'})
     nostats: bool = dataclasses.field(default=True, metadata={"flag": "nostats", 'desc': 'Disable stats'})
     progress: str|None = dataclasses.field(default=None, metadata={"arg": "progress", 'desc': 'Write progress report to file'})
-    passlogfile: str|None = dataclasses.field(default=None, metadata={"arg": "passlogfile", 'desc': 'Logfile for two-pass encoding'})
-    pass_num: int|None = dataclasses.field(default=None, metadata={"arg": "pass", 'desc': 'Encoding pass number'})
 
     # Generic extensibility
     other_args: list[tuple[str,str]] = dataclasses.field(default_factory=list, metadata={'desc': 'Additional output arguments'})
@@ -157,6 +155,10 @@ class FFMPEG:
         check_output_exists: bool = False,
     ) -> FFMPEGResult:
         '''Run the FFMPEG command with the provided parameters.'''
+        for output in self.outputs:
+            if output.args.y is not True and Path(output.path).exists():
+                raise FileExistsError(f'Output file already exists: {output.path}. Pass y=True to overwrite.')
+
         result = FFMPEGResult(
             command=self, 
             result=run_ffmpeg_subprocess(self.build_command(), timeout=timeout, cwd=cwd, env=env)
@@ -210,8 +212,6 @@ def ffmpeg(
     hide_banner: bool = True,
     nostats: bool = True,
     progress: str|None = None,
-    passlogfile: str|None = None,
-    pass_num: int|None = None,
 
     # Generic extensibility
     other_args: list[tuple[str,str]]|None = None,
@@ -227,8 +227,6 @@ def ffmpeg(
         hide_banner=hide_banner,
         nostats=nostats,
         progress=progress,
-        passlogfile=passlogfile,
-        pass_num=pass_num,
         other_args=other_args if other_args is not None else [],
         other_flags=other_flags if other_flags is not None else []
     )
@@ -736,6 +734,10 @@ class FFOutputArgs:
     x264_params: str|None = dataclasses.field(default=None, metadata={"arg": "x264_params", "desc": "x264 specific parameters"})
     x265_params: str|None = dataclasses.field(default=None, metadata={"arg": "x265_params", "desc": "x265 specific parameters"})
 
+    # Two-pass encoding
+    pass_: int|None = dataclasses.field(default=None, metadata={"arg": "pass", "desc": "Encoding pass number (1 or 2)"})
+    passlogfile: str|None = dataclasses.field(default=None, metadata={"arg": "passlogfile", "desc": "Logfile prefix for two-pass encoding"})
+
     # Stream Control
     an: bool = dataclasses.field(default=False, metadata={"flag": "an", "desc": "Disable audio streams (an)"})
     vn: bool = dataclasses.field(default=False, metadata={"flag": "vn", "desc": "Disable video streams (vn)"})
@@ -851,6 +853,9 @@ def ffoutput(
     preset: str|None = None,
     x264_params: str|None = None,
     x265_params: str|None = None,
+    # Two-pass encoding
+    pass_: int|None = None,
+    passlogfile: str|None = None,
     # Stream Control
     an: bool = False,
     vn: bool = False,
@@ -1040,6 +1045,8 @@ def ffoutput(
             preset=preset,
             x264_params=x264_params,
             x265_params=x265_params,
+            pass_=pass_,
+            passlogfile=passlogfile,
             an=an,
             vn=vn,
             sn=sn,

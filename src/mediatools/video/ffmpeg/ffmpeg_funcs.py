@@ -195,10 +195,10 @@ def compress_video_by_bitrate(
                 b_v=target_av_bitrate,
                 an=True,
                 f='mp4',
+                pass_=1,
+                passlogfile=str(tmp_log_dir),
                 #y=overwrite,
             ),
-            pass_num=1,
-            passlogfile=str(tmp_log_dir),
         ).run()
 
         result2 = ffmpeg(
@@ -209,9 +209,9 @@ def compress_video_by_bitrate(
                 b_v=target_av_bitrate,
                 c_a='copy',
                 y=overwrite,
+                passlogfile=str(tmp_log_dir),
+                pass_=2,
             ),
-            passlogfile=str(tmp_log_dir),
-            pass_num=2,
         ).run()
         return result2
     
