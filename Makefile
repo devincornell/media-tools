@@ -15,7 +15,7 @@ uninstall:
 ################################## Compiling Examples ##################################
 EXAMPLE_NOTEBOOK_FOLDER = examples
 
-examples_compile:
+examples:
 	-jupyter nbconvert --to markdown $(EXAMPLE_NOTEBOOK_FOLDER)/*.ipynb
 	-mv $(EXAMPLE_NOTEBOOK_FOLDER)/*.md $(MKDOCS_FOLDER)
 
