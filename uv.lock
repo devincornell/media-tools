@@ -926,7 +926,6 @@ dev = [
     { name = "pydantic-settings", specifier = ">=2.14.0" },
     { name = "pytest", specifier = ">=9.0.3" },
 ]
-optional = []
 site = [
     { name = "fastapi", specifier = ">=0.136.1" },
     { name = "uvicorn", specifier = ">=0.46.0" },
