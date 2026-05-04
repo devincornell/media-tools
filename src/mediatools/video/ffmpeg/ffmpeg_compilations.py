@@ -17,9 +17,9 @@ import multiprocessing
 import dataclasses
 
 
-from .ffmpeg_command import (FFMPEG, FFMPEGResult, FFInput, FFOutput, ffinput, ffoutput)
-from .probe import probe
-from .errors import FFMPEGExecutionError
+from .core.command import (FFMPEG, FFMPEGResult, FFInput, FFOutput, ffinput, ffoutput)
+from .core.probe import probe
+from .core.errors import FFMPEGExecutionError
 
 def create_montage(
     video_files: typing.List[Path], 

@@ -6,7 +6,7 @@ from pathlib import Path
 import ffmpeg
 import datetime
 
-from .errors import FFMPEGError
+from .core.errors import FFMPEGError
 
 if typing.TYPE_CHECKING:
     from ..video_file import VideoFile

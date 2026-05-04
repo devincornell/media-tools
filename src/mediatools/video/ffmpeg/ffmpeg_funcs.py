@@ -10,11 +10,11 @@ import json
 import datetime
 from pathlib import Path
 
-from .ffmpeg_command import FFMPEG, ffmpeg, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, run_ffmpeg_subprocess
-from .filters import filter_link, filterchain, filtergraph_link, filtergraph
-from .errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
-from .probe_info import ProbeInfo
-from .probe import probe
+from .core.command import FFMPEG, ffmpeg, FFInput, FFOutput, ffinput, ffoutput, FFMPEGResult, run_ffmpeg_subprocess
+from .core.filters import filter_link, filterchain, filtergraph_link, filtergraph
+from .core.errors import FFMPEGError, FFMPEGCommandTimeoutError, FFMPEGExecutionError, FFMPEGNotFoundError
+from .core.probe_info import ProbeInfo
+from .core.probe import probe
 
 XCoord = int
 YCoord = int

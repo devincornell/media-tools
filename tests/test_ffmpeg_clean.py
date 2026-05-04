@@ -9,10 +9,8 @@ import sys
 sys.path.append('../src')
 
 import mediatools
-from mediatools.video import VideoFiles
-from mediatools.video.ffmpeg.probe import probe
-from mediatools.video.ffmpeg.ffmpeg import FFMPEG, ffinput, ffoutput
-
+from mediatools import VideoFiles
+from mediatools.ffmpeg import probe, FFMPEG, ffinput, ffoutput
 
 @pytest.fixture(scope="module")
 def test_video():

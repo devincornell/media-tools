@@ -14,7 +14,7 @@ import pydantic
 from ..file_stat_result import FileStatResult
 from ..util import format_memory, format_time, fname_to_title, fname_to_id
 
-from .ffmpeg.probe_info import ProbeInfo
+from .ffmpeg import ProbeInfo
 
 if typing.TYPE_CHECKING:
     from .video_file import VideoFile

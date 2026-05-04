@@ -1,5 +1,5 @@
 
-from .filters import filtergraph_link, filter_link, filterchain, filtergraph
+from .core.filters import filtergraph_link, filter_link, filterchain, filtergraph
 
 
 def filtergraph_animated_thumb(
