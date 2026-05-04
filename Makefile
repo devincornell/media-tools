@@ -22,10 +22,10 @@ examples:
 ################################## Testing ##################################
 
 test:
-	uv run pytest tests/test_ffmpeg_clean.py
-	uv run pytest tests/test_ffmpeg_tools.py
-	uv run pytest tests/test_image_tools.py
-	uv run pytest tests/test_media_files.py
+	#uv run pytest tests/test_ffmpeg_clean.py
+	uv run pytest tests/test_ffmpeg_interface.py
+	uv run pytest tests/test_image_processing.py
+	uv run pytest tests/test_media_management.py
 	
 
 

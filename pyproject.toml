@@ -35,6 +35,7 @@ transcribe = [
 ]
 
 [tool.pytest.ini_options]
+env_files = [".env"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -64,6 +65,7 @@ dev = [
     "nbconvert>=7.17.1",
     "pydantic-settings>=2.14.0",
     "pytest>=9.0.3",
+    "pytest-dotenv>=0.5.2",
 ]
 site = [
     "fastapi>=0.136.1",
