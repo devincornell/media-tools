@@ -10,8 +10,7 @@ sys.path.append('../src')
 
 import mediatools
 from mediatools.video import VideoFiles
-from mediatools.video.ffmpeg.probe import probe
-from mediatools.video.ffmpeg.ffmpeg import FFMPEG, ffinput, ffoutput
+from mediatools.ffmpeg import probe, ffinput, ffoutput, FFMPEG
 
 
 def test_ffmpeg_tools():
