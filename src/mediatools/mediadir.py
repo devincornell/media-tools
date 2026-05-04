@@ -195,10 +195,15 @@ class MediaDir:
         '''Compare this MediaDir to another and return a list of MediaDir instances that have changes.
         Changes include added or removed files in the directory or any of its subdirectories.
         '''
-        this_fps = {fp.relative_to(self.path).parent for fp in self.all_file_paths()}
-        other_fps = {fp.relative_to(other.path).parent for fp in other.all_file_paths()}
-        diff = this_fps.symmetric_difference(other_fps)
-        return [self._subdir(d) for d in diff if d in this_fps]
+        removed, _ = self.file_diff(other)
+        changed_rel = {fp.relative_to(self.path).parent for fp in removed}
+        result = []
+        for rel_path in changed_rel:
+            try:
+                result.append(self._subdir(rel_path))
+            except DirectoryNotFoundError:
+                pass
+        return result
 
     def file_diff(self,
         other: typing.Self,
