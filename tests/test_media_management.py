@@ -1,10 +1,10 @@
 """Tests for MediaDir functionality, mirroring the examples/0-managing_media_files.ipynb notebook."""
+import os
 import shutil
 import tempfile
 import zipfile
 from pathlib import Path
 
-import pydantic_settings
 import pytest
 import requests
 
@@ -22,26 +22,20 @@ from mediatools.file_stat_result import FileStatResult
 
 
 # ---------------------------------------------------------------------------
-# Settings (reads TEST_ZIP_FILE_URL from environment / .env file)
-# ---------------------------------------------------------------------------
-
-class Settings(pydantic_settings.BaseSettings):
-    test_zip_file_url: str
-
-
-# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def temp_path():
     """Download the test dataset zip and yield the root temp directory."""
-    settings = Settings()
+    url = os.environ.get("TEST_ZIP_FILE_URL")
+    if not url:
+        pytest.skip("TEST_ZIP_FILE_URL environment variable not set")
     td = tempfile.TemporaryDirectory()
     root = Path(td.name)
     zip_path = root / "archive.zip"
 
-    response = requests.get(settings.test_zip_file_url)
+    response = requests.get(url)
     zip_path.write_bytes(response.content)
     with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(root)

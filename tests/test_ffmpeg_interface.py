@@ -1,10 +1,10 @@
 """Tests for the ffmpeg interface, mirroring the examples/3-ffmpeg_interface.ipynb notebook."""
+import os
 import shutil
 import tempfile
 import zipfile
 from pathlib import Path
 
-import pydantic_settings
 import pytest
 import requests
 
@@ -24,26 +24,20 @@ from mediatools.ffmpeg import (
 
 
 # ---------------------------------------------------------------------------
-# Settings (reads TEST_ZIP_FILE_URL from environment / .env file)
-# ---------------------------------------------------------------------------
-
-class Settings(pydantic_settings.BaseSettings):
-    test_zip_file_url: str
-
-
-# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def video_data():
     """Download the test dataset zip and yield the path to op_builds.mp4."""
-    settings = Settings()
+    url = os.environ.get("TEST_ZIP_FILE_URL")
+    if not url:
+        pytest.skip("TEST_ZIP_FILE_URL environment variable not set")
     td = tempfile.TemporaryDirectory()
     temp_path = Path(td.name)
     zip_path = temp_path / "archive.zip"
 
-    response = requests.get(settings.test_zip_file_url)
+    response = requests.get(url)
     zip_path.write_bytes(response.content)
     with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(temp_path)
