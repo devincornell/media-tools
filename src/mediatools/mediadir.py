@@ -217,7 +217,10 @@ class MediaDir:
     def all_file_paths(self) -> list[pathlib.Path]:
         '''Get a list of all files in the directory, including subdirectories.
         '''
-        return self.all_video_paths() + self.all_image_paths() + [of.path for of in self.other_files]
+        paths = self.video_paths() + self.image_paths() + [of.path for of in self.other_files]
+        for subdir in self.subdirs.values():
+            paths.extend(subdir.all_file_paths())
+        return paths
     
     def all_media_paths(self) -> list[pathlib.Path]:
         '''Get a list of all media files in the directory, including subdirectories.
