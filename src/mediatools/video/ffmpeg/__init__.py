@@ -17,6 +17,10 @@ from .filters import (
     filterchain,
     filtergraph,
 )
+from .filter_funcs import (
+    filtergraph_animated_thumb,
+    filtergraph_blurred_padding,
+)
 
 from .ffmpeg_funcs import (
     run_ffmpeg_subprocess,

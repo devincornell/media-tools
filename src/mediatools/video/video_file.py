@@ -16,6 +16,7 @@ import pydantic
 from .video_meta import VideoMeta
 from .errors import VideoFileDoesNotExistError
 from .ffmpeg import (
+    ffmpeg,
     FFMPEG, 
     FFInput, 
     FFOutput, 
@@ -92,8 +93,9 @@ class VideoFile(FileBase):
     ############################# file operations #############################
     def ffmpeg(
         self,
-        outputs: list[FFOutput],
         input_args: FFInputArgs|None = None,
+        output: FFOutput|None = None,
+        outputs: list[FFOutput]|None = None,
         # Global command options (matching FFMPEG class exactly)
         filter_complex: str|list[str]|None = None,
         loglevel: LOGLEVEL_OPTIONS|None = None,
@@ -209,11 +211,12 @@ class VideoFile(FileBase):
                 ... )
                 >>> result = cmd.run()
         """
-        return FFMPEG(
+        return ffmpeg(
             inputs=[FFInput(
                 path = self.path,
                 args = input_args or FFInputArgs(),
             )],
+            output=output,
             outputs=outputs,
             filter_complex=filter_complex,
             loglevel=loglevel,

@@ -9,12 +9,18 @@ from .video.ffmpeg import (
     FFMPEG, 
     FFMPEGResult,
     ffinput, 
+    FFInput,
+    FFInputArgs,
     ffoutput,
+    FFOutput,
+    FFOutputArgs,
     run_ffmpeg_subprocess,
     filtergraph_link,
     filter_link,
     filterchain,
     filtergraph,
+    filtergraph_animated_thumb,
+    filtergraph_blurred_padding,
 
     compress,
     splice,
@@ -44,6 +50,9 @@ __all__ = [
     "filter_link",
     "filterchain",
     "filtergraph",
-
+    "FFInputArgs",
+    "FFOutputArgs",
+    "FFInput",
+    "FFOutput",
 ]
 
