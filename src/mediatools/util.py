@@ -99,10 +99,10 @@ def multi_extension_glob(
     exts = list(extensions)
     extensions = [e.lower() for e in exts] + [e.upper() for e in exts]
 
-    all_paths = list()
+    all_paths = set()
     for ext in extensions:
         pattern = f'{base_name_pattern}{ext}' if ext.startswith('.') else f'{base_name_pattern}.{ext}'
-        all_paths += list(glob_func(pattern))
+        all_paths.update(glob_func(pattern))
     return list(sorted(all_paths))
     
 
