@@ -67,6 +67,9 @@ dev = [
     "pytest>=9.0.3",
     "pytest-dotenv>=0.5.2",
 ]
+optional = [
+    "librosa>=0.11.0",
+]
 site = [
     "fastapi>=0.136.1",
     "uvicorn>=0.46.0",
