@@ -35,18 +35,21 @@ if __name__ == '__main__':
             continue
 
         print(f"  Creating montage: {len(video_paths)} videos from {md.path}")
-        result = mediatools.ffmpeg.create_montage(
-            video_files=video_paths,
-            output_filename=output_path,
-            clip_ratio=10,
-            clip_duration=0.75,
-            random_seed=0,
-            width=1920,
-            height=1080,
-            fps=30,
-            verbose=True,
-            shuffle_clips=True,
-            overwrite=True,
-        )
-        print(f"  Done: {result}")
+        try:
+            result = mediatools.ffmpeg.create_montage(
+                video_files=video_paths,
+                output_filename=output_path,
+                clip_ratio=10,
+                clip_duration=0.75,
+                random_seed=0,
+                width=1920,
+                height=1080,
+                fps=30,
+                verbose=True,
+                shuffle_clips=True,
+                overwrite=True,
+            )
+            print(f"  Done: {result}")
+        except mediatools.ffmpeg.FFMPEGExecutionError as e:
+            print(f"  Error creating montage for {md.path}: {e}")
 
