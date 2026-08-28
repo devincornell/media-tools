@@ -1,6 +1,7 @@
 *.env*
 
 scripts/Makefile_hidden
+scripts/test_media
 
 *.jpg
 *.mp4
