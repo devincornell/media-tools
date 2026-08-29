@@ -1188,10 +1188,10 @@
                 <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
                     <i class="fas fa-eye"></i>
                 </button>
-                <button class="view-btn active" onclick="setViewMode('grid')">
+                <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')">
                     <i class="fas fa-th"></i>
                 </button>
-                <button class="view-btn" onclick="setViewMode('list')">
+                <button class="view-btn" data-mode="list" onclick="setViewMode('list')">
                     <i class="fas fa-list"></i>
                 </button>
             </div>
@@ -1486,11 +1486,18 @@
         // View Mode Toggle
         function setViewMode(mode) {
             currentViewMode = mode;
+            localStorage.setItem('viewMode', mode);
+
             const galleries = document.querySelectorAll('.gallery');
             const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
             
-            viewBtns.forEach(btn => btn.classList.remove('active'));
-            event.target.closest('.view-btn').classList.add('active');
+            viewBtns.forEach(btn => {
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
             
             galleries.forEach(gallery => {
                 if (mode === 'list') {
@@ -1499,6 +1506,14 @@
                     gallery.classList.remove('list-view');
                 }
             });
+
+            // Restore/apply slider value for the active view mode
+            const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
+            const slider = document.getElementById('cardSizeSlider');
+            if (slider) {
+                slider.value = savedSize;
+            }
+            updateCardSize(savedSize);
         }
 
         // Toggle Card Overlays (names, info button, duration)
@@ -1521,14 +1536,18 @@
 
         // Update Card Size
         function updateCardSize(value) {
-            document.documentElement.style.setProperty('--card-min-width', `${value}px`);
-            document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(value * 0.9)}px`);
-            
-            // Scaled proportional size for list view thumbnails (e.g. at 220px slider value -> 100px width, 65px height)
-            const listWidth = Math.floor(value * 0.45);
-            const listHeight = Math.floor(value * 0.3);
-            document.documentElement.style.setProperty('--list-thumb-width', `${listWidth}px`);
-            document.documentElement.style.setProperty('--list-thumb-height', `${listHeight}px`);
+            const numValue = parseFloat(value);
+            if (currentViewMode === 'list') {
+                localStorage.setItem('listCardSize', numValue);
+                const listWidth = Math.floor(numValue * 0.45);
+                const listHeight = Math.floor(numValue * 0.3);
+                document.documentElement.style.setProperty('--list-thumb-width', `${listWidth}px`);
+                document.documentElement.style.setProperty('--list-thumb-height', `${listHeight}px`);
+            } else {
+                localStorage.setItem('gridCardSize', numValue);
+                document.documentElement.style.setProperty('--card-min-width', `${numValue}px`);
+                document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(numValue * 0.9)}px`);
+            }
         }
 
         // Search and Filter
@@ -2043,6 +2062,18 @@
             if (localStorage.getItem('hideCardOverlays') === 'true') {
                 toggleCardOverlays();
             }
+
+            // Restore sizes for both grid and list views
+            const savedGridSize = localStorage.getItem('gridCardSize') || '220';
+            const savedListSize = localStorage.getItem('listCardSize') || '220';
+            document.documentElement.style.setProperty('--card-min-width', `${savedGridSize}px`);
+            document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(parseFloat(savedGridSize) * 0.9)}px`);
+            document.documentElement.style.setProperty('--list-thumb-width', `${Math.floor(parseFloat(savedListSize) * 0.45)}px`);
+            document.documentElement.style.setProperty('--list-thumb-height', `${Math.floor(parseFloat(savedListSize) * 0.3)}px`);
+
+            // Restore saved view mode (grid or list)
+            const savedViewMode = localStorage.getItem('viewMode') || 'grid';
+            setViewMode(savedViewMode);
         });
 
         // Handle missing/broken image thumbnails gracefully
