@@ -258,6 +258,13 @@
             transform: scale(1.2);
         }
 
+        /* Overlay toggles */
+        body.hide-card-overlays .thumbnail-overlay-top-right,
+        body.hide-card-overlays .thumbnail-overlay-bottom,
+        body.hide-card-overlays .thumbnail-info-btn {
+            display: none !important;
+        }
+
         .view-toggle {
             display: flex;
             background: var(--bg-tertiary);
@@ -298,7 +305,7 @@
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
-            gap: 0.75rem;
+            gap: 0.375rem;
             margin-bottom: 2rem;
         }
 
@@ -318,6 +325,7 @@
             height: 80px;
             flex-shrink: 0;
             position: relative;
+            background-color: #000;
         }
 
         /* Images in list view preserve aspect ratio */
@@ -338,7 +346,7 @@
 
         /* Thumbnail Cards */
         .thumbnail {
-            background: linear-gradient(135deg, var(--glass-bg), rgba(0, 0, 0, 0.3));
+            background: #000;
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 16px;
@@ -359,6 +367,7 @@
             width: 100%;
             height: var(--thumbnail-height);
             overflow: hidden;
+            background-color: #000;
         }
 
         .thumbnail-image-wrapper img,
@@ -382,18 +391,69 @@
 
         .thumbnail-overlay-top-right {
             position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
+            top: 0.35rem;
+            right: 0.35rem;
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(4px);
-            color: #fff;
-            padding: 0.2rem 0.4rem;
+            color: #94a3b8;
+            padding: 0.15rem 0.35rem;
             border-radius: 6px;
             font-size: 0.75rem;
-            font-weight: 600;
+            font-weight: 500;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
             pointer-events: none;
             z-index: 2;
+            transition: opacity 0.2s ease;
+        }
+
+        .thumbnail-info-btn {
+            position: absolute;
+            top: 0.35rem;
+            left: 0.35rem;
+            right: auto;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: #94a3b8;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            cursor: pointer;
+            z-index: 3;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .thumbnail-info-btn:hover {
+            background: var(--accent-primary);
+            color: #fff;
+            transform: scale(1.1);
+        }
+
+        .thumbnail-info-popover {
+            display: none;
+            position: absolute;
+            top: 2rem;
+            left: 0.35rem;
+            right: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            box-shadow: var(--shadow-heavy);
+            z-index: 10;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.5;
+            min-width: 150px;
+            backdrop-filter: blur(10px);
+        }
+
+        .thumbnail-info-popover.show {
+            display: block;
         }
 
         .thumbnail-overlay-bottom {
@@ -401,17 +461,18 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
-            color: #fff;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+            color: #94a3b8;
             padding: 1.5rem 0.5rem 0.5rem 0.5rem;
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.85rem;
+            font-weight: 500;
             text-shadow: 0 1px 3px rgba(0,0,0,0.9);
             pointer-events: none;
             z-index: 2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            transition: opacity 0.2s ease;
         }
 
         .thumbnail-content {
@@ -426,11 +487,9 @@
             line-height: 1.4;
         }
 
+        /* Hide regular metadata info in card content */
         .thumbnail-info {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
+            display: none;
         }
 
         .thumbnail-actions {
@@ -587,7 +646,7 @@
             padding: 1rem;
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.75rem;
+            gap: 0.375rem;
         }
 
         .playlist-item {
@@ -615,6 +674,7 @@
             width: 100%;
             height: 120px;
             object-fit: cover;
+            background-color: #000;
         }
 
         .playlist-info {
@@ -1085,6 +1145,9 @@
                 <i class="fas fa-expand" style="color: var(--text-secondary); font-size: 1rem;"></i>
             </div>
             <div class="view-toggle">
+                <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
+                    <i class="fas fa-eye"></i>
+                </button>
                 <button class="view-btn active" onclick="setViewMode('grid')">
                     <i class="fas fa-th"></i>
                 </button>
@@ -1105,6 +1168,14 @@
                         <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
                                 <div class="thumbnail-image-wrapper">
+                                    <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                        <i class="fas fa-info"></i>
+                                    </button>
+                                    <div class="thumbnail-info-popover">
+                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
+                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
+                                        <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
+                                    </div>
                                     <img src="/file/{{ cp.subfolder_thumb }}" 
                                          loading="lazy"
                                          data-subfolder-name="{{ cp.name }}"
@@ -1144,6 +1215,14 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <div class="thumbnail-image-wrapper">
+                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                                <div class="thumbnail-info-popover">
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-calendar-alt"></i> {{ vid.created }}
+                                </div>
                                 <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
@@ -1179,6 +1258,14 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <div class="thumbnail-image-wrapper">
+                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                                <div class="thumbnail-info-popover">
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-calendar-alt"></i> {{ vid.created }}
+                                </div>
                                 <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
@@ -1357,10 +1444,10 @@
         function setViewMode(mode) {
             currentViewMode = mode;
             const galleries = document.querySelectorAll('.gallery');
-            const viewBtns = document.querySelectorAll('.view-btn');
+            const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
             
             viewBtns.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            event.target.closest('.view-btn').classList.add('active');
             
             galleries.forEach(gallery => {
                 if (mode === 'list') {
@@ -1369,6 +1456,24 @@
                     gallery.classList.remove('list-view');
                 }
             });
+        }
+
+        // Toggle Card Overlays (names, info button, duration)
+        function toggleCardOverlays() {
+            document.body.classList.toggle('hide-card-overlays');
+            const isHidden = document.body.classList.contains('hide-card-overlays');
+            const toggleBtn = document.getElementById('overlayToggleBtn');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (isHidden) {
+                    icon.className = 'fas fa-eye-slash';
+                    toggleBtn.classList.add('active');
+                } else {
+                    icon.className = 'fas fa-eye';
+                    toggleBtn.classList.remove('active');
+                }
+            }
+            localStorage.setItem('hideCardOverlays', isHidden);
         }
 
         // Update Card Size
@@ -1580,13 +1685,32 @@
             dropdown.classList.toggle('show');
         }
 
-        // Close dropdown when clicking outside
+        // Info Popover Toggle
+        function toggleInfoPopover(event, btnElement) {
+            event.stopPropagation();
+            event.preventDefault();
+            const popover = btnElement.nextElementSibling;
+            const isShowing = popover.classList.contains('show');
+            
+            // Close all open popovers first
+            document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
+            
+            if (!isShowing) {
+                popover.classList.add('show');
+            }
+        }
+
+        // Close dropdowns and popovers when clicking outside
         window.addEventListener('click', function(e) {
             const dropdown = document.getElementById('actionMenuDropdown');
             if (dropdown && dropdown.classList.contains('show')) {
                 if (!e.target.closest('.dropdown-menu-container')) {
                     dropdown.classList.remove('show');
                 }
+            }
+            
+            if (!e.target.closest('.thumbnail-info-popover') && !e.target.closest('.thumbnail-info-btn')) {
+                document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
             }
         });
 
@@ -1869,7 +1993,19 @@
             autoplayCheckbox.addEventListener('change', function() {
                 localStorage.setItem('videoAutoplay', this.checked);
             });
+
+            // Restore overlay visibility state
+            if (localStorage.getItem('hideCardOverlays') === 'true') {
+                toggleCardOverlays();
+            }
         });
+
+        // Handle missing/broken image thumbnails gracefully
+        document.addEventListener('error', function(e) {
+            if (e.target && e.target.tagName && e.target.tagName.toLowerCase() === 'img') {
+                e.target.style.opacity = '0';
+            }
+        }, true);
 
         // Lazy loading for images
         if ('IntersectionObserver' in window) {
