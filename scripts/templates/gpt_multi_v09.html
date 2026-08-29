@@ -383,6 +383,105 @@
             display: none;
         }
 
+        /* Reels Mode */
+        body.reels-mode {
+            overflow: hidden;
+        }
+        body.reels-mode .sidebar {
+            display: none;
+        }
+        body.reels-mode .main-container {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+        body.reels-mode .header,
+        body.reels-mode .section-title,
+        body.reels-mode #foldersGallery,
+        body.reels-mode #imagesGallery,
+        body.reels-mode #clipsGallery,
+        body.reels-mode #folders,
+        body.reels-mode #images,
+        body.reels-mode #clips {
+            display: none !important;
+        }
+        body.reels-mode .search-filter-bar {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            margin: 0;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-color);
+            padding: 0.25rem;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            width: auto;
+        }
+        body.reels-mode .search-box,
+        body.reels-mode .sort-controls,
+        body.reels-mode .size-slider-container {
+            display: none !important;
+        }
+        body.reels-mode .gallery {
+            display: block;
+            margin: 0;
+        }
+        body.reels-mode .thumbnail {
+            height: 100vh;
+            width: 100vw;
+            scroll-snap-align: start;
+            border-radius: 0;
+            border: none;
+            margin: 0;
+            padding: 0;
+            transform: none !important;
+            box-shadow: none !important;
+            display: flex;
+        }
+        body.reels-mode .thumbnail-image-wrapper {
+            height: 100vh;
+            width: 100vw;
+            border-radius: 0;
+        }
+        body.reels-mode .thumbnail-content {
+            display: none;
+        }
+        body.reels-mode .thumbnail-reels-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: 1;
+            background: #000;
+        }
+        body.reels-mode .thumbnail-overlay-bottom {
+            z-index: 5;
+            padding: 4rem 1rem 1.5rem 1rem;
+            font-size: 1.1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+        body.reels-mode .thumbnail-overlay-top-right,
+        body.reels-mode .thumbnail-info-btn,
+        body.reels-mode .thumbnail-info-popover {
+            z-index: 5;
+        }
+        /* Mobile adjustments for reels */
+        @media (max-width: 1024px) {
+            body.reels-mode .mobile-menu-toggle {
+                display: none;
+            }
+        }
+
         /* Thumbnail Cards */
         .thumbnail {
             background: #000;
@@ -1074,6 +1173,10 @@
             to { transform: translateX(0); }
         }
 
+        #lightboxImage {
+            cursor: pointer;
+        }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -1188,11 +1291,14 @@
                 <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
                     <i class="fas fa-eye"></i>
                 </button>
-                <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')">
+                <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')" title="Grid View">
                     <i class="fas fa-th"></i>
                 </button>
-                <button class="view-btn" data-mode="list" onclick="setViewMode('list')">
+                <button class="view-btn" data-mode="list" onclick="setViewMode('list')" title="List View">
                     <i class="fas fa-list"></i>
+                </button>
+                <button class="view-btn" data-mode="reels" onclick="setViewMode('reels')" title="Reels Mode">
+                    <i class="fas fa-mobile-alt"></i>
                 </button>
             </div>
         </div>
@@ -1484,9 +1590,19 @@
         }
 
         // View Mode Toggle
+        let reelsObserver = null;
+
         function setViewMode(mode) {
             currentViewMode = mode;
             localStorage.setItem('viewMode', mode);
+
+            if (mode === 'reels') {
+                document.body.classList.add('reels-mode');
+                setupReelsMode();
+            } else {
+                document.body.classList.remove('reels-mode');
+                teardownReelsMode();
+            }
 
             const galleries = document.querySelectorAll('.gallery');
             const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
@@ -1508,12 +1624,82 @@
             });
 
             // Restore/apply slider value for the active view mode
-            const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
-            const slider = document.getElementById('cardSizeSlider');
-            if (slider) {
-                slider.value = savedSize;
+            if (mode !== 'reels') {
+                const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
+                const slider = document.getElementById('cardSizeSlider');
+                if (slider) {
+                    slider.value = savedSize;
+                }
+                updateCardSize(savedSize);
             }
-            updateCardSize(savedSize);
+        }
+
+        function setupReelsMode() {
+            if (!reelsObserver) {
+                reelsObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            playReelVideo(entry.target);
+                        } else {
+                            stopReelVideo(entry.target);
+                        }
+                    });
+                }, { threshold: 0.6 });
+            }
+            
+            // Only observe videos for reels mode
+            document.querySelectorAll('#videosGallery .thumbnail[data-video-src]').forEach(thumb => {
+                reelsObserver.observe(thumb);
+            });
+        }
+
+        function teardownReelsMode() {
+            if (reelsObserver) {
+                reelsObserver.disconnect();
+            }
+            document.querySelectorAll('.thumbnail-reels-video').forEach(vid => {
+                vid.pause();
+                vid.removeAttribute('src');
+                vid.load();
+                vid.remove();
+            });
+        }
+
+        function playReelVideo(thumbnail) {
+            if (!thumbnail.querySelector('.thumbnail-reels-video')) {
+                const videoSrc = thumbnail.dataset.videoSrc;
+                const video = document.createElement('video');
+                video.src = videoSrc;
+                video.className = 'thumbnail-reels-video';
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true; // start muted to ensure autoplay works reliably
+                video.playsInline = true;
+                
+                // click to toggle mute/play/pause
+                video.onclick = (e) => {
+                    e.stopPropagation();
+                    if (video.muted) {
+                        video.muted = false;
+                    } else if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                };
+                
+                thumbnail.querySelector('.thumbnail-image-wrapper').appendChild(video);
+            }
+        }
+
+        function stopReelVideo(thumbnail) {
+            const video = thumbnail.querySelector('.thumbnail-reels-video');
+            if (video) {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+                video.remove();
+            }
         }
 
         // Toggle Card Overlays (names, info button, duration)
@@ -1638,6 +1824,8 @@
 
         // Video Player Functions
         function openPlayer(thumbnailElement) {
+            if (currentViewMode === 'reels') return; // let reels handle playback
+
             currentThumbnail = thumbnailElement;
             const videoSrc = thumbnailElement.dataset.videoSrc;
             const videoTitle = thumbnailElement.dataset.videoTitle;
@@ -2021,6 +2209,76 @@
             video.playbackRate = parseFloat(e.target.value);
         });
 
+        // Click video to toggle play/pause (no navigation)
+        video.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (this.paused) {
+                this.play();
+            } else {
+                this.pause();
+            }
+        });
+
+        // Click left/right side of image to navigate previous/next
+        const lightboxImage = document.getElementById('lightboxImage');
+        lightboxImage.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const rect = this.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            if (clickX < rect.width / 2) {
+                navigateImage(-1);
+            } else {
+                navigateImage(1);
+            }
+        });
+
+        // Touch Swipe Gestures (up / down) for player & lightbox
+        function setupSwipeGestures() {
+            let touchStartY = 0;
+            let touchStartX = 0;
+            let touchStartTime = 0;
+
+            ['videoPlayer', 'imageLightbox'].forEach(id => {
+                const modal = document.getElementById(id);
+                if (!modal) return;
+
+                modal.addEventListener('touchstart', function(e) {
+                    if (e.touches.length === 1) {
+                        touchStartY = e.touches[0].clientY;
+                        touchStartX = e.touches[0].clientX;
+                        touchStartTime = Date.now();
+                    }
+                }, { passive: true });
+
+                modal.addEventListener('touchend', function(e) {
+                    if (e.changedTouches.length === 1) {
+                        const deltaY = e.changedTouches[0].clientY - touchStartY;
+                        const deltaX = e.changedTouches[0].clientX - touchStartX;
+                        const elapsedTime = Date.now() - touchStartTime;
+
+                        // Ignore if swipe started inside the playlist or controls
+                        if (e.target.closest('#videoPlaylist') || e.target.closest('.player-controls')) return;
+
+                        if (elapsedTime < 800 && Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
+                            if (id === 'videoPlayer' && modal.style.display === 'block') {
+                                if (deltaY < 0) {
+                                    navigateVideo(1); // Swipe Up -> Next
+                                } else {
+                                    navigateVideo(-1); // Swipe Down -> Prev
+                                }
+                            } else if (id === 'imageLightbox' && modal.style.display === 'block') {
+                                if (deltaY < 0) {
+                                    navigateImage(1); // Swipe Up -> Next
+                                } else {
+                                    navigateImage(-1); // Swipe Down -> Prev
+                                }
+                            }
+                        }
+                    }
+                }, { passive: true });
+            });
+        }
+
         // Close modals when clicking outside
         document.getElementById('videoPlayer').addEventListener('click', function(e) {
             // Close if clicking on the video player background or player container
@@ -2074,6 +2332,9 @@
             // Restore saved view mode (grid or list)
             const savedViewMode = localStorage.getItem('viewMode') || 'grid';
             setViewMode(savedViewMode);
+
+            // Initialize swipe gestures
+            setupSwipeGestures();
         });
 
         // Handle missing/broken image thumbnails gracefully
