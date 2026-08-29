@@ -311,21 +311,33 @@
 
         .gallery.list-view {
             grid-template-columns: 1fr;
+            gap: 0.25rem;
         }
 
         .gallery.list-view .thumbnail {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.5rem;
-            padding: 0.5rem;
+            padding: 0.2rem;
+            border-radius: 8px;
+        }
+
+        .gallery.list-view .thumbnail > a {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            width: 100%;
+            text-decoration: none;
+            color: inherit;
         }
 
         .gallery.list-view .thumbnail-image-wrapper {
-            width: 120px;
-            height: 80px;
+            width: 100px;
+            height: 65px;
             flex-shrink: 0;
             position: relative;
             background-color: #000;
+            border-radius: 4px;
         }
 
         /* Images in list view preserve aspect ratio */
@@ -334,13 +346,38 @@
             object-fit: contain;
         }
 
-        /* Hide overlay title in list view */
-        .gallery.list-view .thumbnail-overlay-bottom {
-            display: none;
+        .gallery.list-view .thumbnail-content {
+            padding: 0.1rem 0;
+            flex: 1;
+            min-width: 0;
         }
 
-        /* Hide regular title in grid view */
-        .gallery:not(.list-view) .thumbnail-title {
+        .gallery.list-view .thumbnail-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .gallery.list-view .thumbnail-info {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        /* Hide overlay elements in list view */
+        .gallery.list-view .thumbnail-overlay-bottom,
+        .gallery.list-view .thumbnail-overlay-top-right,
+        .gallery.list-view .thumbnail-info-btn {
+            display: none !important;
+        }
+
+        /* Hide regular title and info in grid view */
+        .gallery:not(.list-view) .thumbnail-title,
+        .gallery:not(.list-view) .thumbnail-info {
             display: none;
         }
 
@@ -1188,7 +1225,8 @@
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
                                     <div class="thumbnail-info">
-                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
+                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos &bull;
+                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders &bull;
                                         <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
                                     </div>
                                 </div>
@@ -1231,7 +1269,8 @@
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-clock"></i> {{ vid.duration_str }} &bull;
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }} &bull;
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
                                 </div>
@@ -1274,7 +1313,8 @@
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-clock"></i> {{ vid.duration_str }} &bull;
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }} &bull;
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
                                 </div>
