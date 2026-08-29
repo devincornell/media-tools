@@ -24,6 +24,8 @@
             --glass-border: rgba(255, 255, 255, 0.1);
             --card-min-width: 220px;
             --thumbnail-height: 200px;
+            --list-thumb-width: 100px;
+            --list-thumb-height: 65px;
         }
 
         * {
@@ -332,8 +334,8 @@
         }
 
         .gallery.list-view .thumbnail-image-wrapper {
-            width: 100px;
-            height: 65px;
+            width: var(--list-thumb-width);
+            height: var(--list-thumb-height);
             flex-shrink: 0;
             position: relative;
             background-color: #000;
@@ -1271,7 +1273,7 @@
                                 <div class="thumbnail-info">
                                     <i class="fas fa-clock"></i> {{ vid.duration_str }} &bull;
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }} &bull;
-                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }} &bull;
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
                                 </div>
                             </div>
@@ -1521,6 +1523,12 @@
         function updateCardSize(value) {
             document.documentElement.style.setProperty('--card-min-width', `${value}px`);
             document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(value * 0.9)}px`);
+            
+            // Scaled proportional size for list view thumbnails (e.g. at 220px slider value -> 100px width, 65px height)
+            const listWidth = Math.floor(value * 0.45);
+            const listHeight = Math.floor(value * 0.3);
+            document.documentElement.style.setProperty('--list-thumb-width', `${listWidth}px`);
+            document.documentElement.style.setProperty('--list-thumb-height', `${listHeight}px`);
         }
 
         // Search and Filter
