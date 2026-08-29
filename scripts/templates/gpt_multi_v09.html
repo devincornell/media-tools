@@ -383,103 +383,162 @@
             display: none;
         }
 
-        /* Reels Mode */
-        body.reels-mode {
+        /* Player Reels Mode (internal to player) */
+        .reels-container {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 100;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .reels-track {
+            width: 100%; height: 100%;
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            will-change: transform;
+        }
+        .reel-item {
+            width: 100%; height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             overflow: hidden;
         }
-        body.reels-mode .sidebar {
-            display: none;
-        }
-        body.reels-mode .main-container {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            width: 100vw;
-            overflow-y: auto;
-            scroll-snap-type: y mandatory;
-            scroll-behavior: smooth;
-        }
-        body.reels-mode .header,
-        body.reels-mode .section-title,
-        body.reels-mode #foldersGallery,
-        body.reels-mode #imagesGallery,
-        body.reels-mode #clipsGallery,
-        body.reels-mode #folders,
-        body.reels-mode #images,
-        body.reels-mode #clips {
-            display: none !important;
-        }
-        body.reels-mode .search-filter-bar {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 1000;
-            margin: 0;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid var(--border-color);
-            padding: 0.25rem;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            width: auto;
-        }
-        body.reels-mode .search-box,
-        body.reels-mode .sort-controls,
-        body.reels-mode .size-slider-container {
-            display: none !important;
-        }
-        body.reels-mode .gallery {
-            display: block;
-            margin: 0;
-        }
-        body.reels-mode .thumbnail {
-            height: 100vh;
-            width: 100vw;
-            scroll-snap-align: start;
-            border-radius: 0;
-            border: none;
-            margin: 0;
-            padding: 0;
-            transform: none !important;
-            box-shadow: none !important;
-            display: flex;
-        }
-        body.reels-mode .thumbnail-image-wrapper {
-            height: 100vh;
-            width: 100vw;
-            border-radius: 0;
-        }
-        body.reels-mode .thumbnail-content {
-            display: none;
-        }
-        body.reels-mode .thumbnail-reels-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        .reel-video {
+            width: 100%; height: 100%;
             object-fit: contain;
-            z-index: 1;
             background: #000;
+            cursor: pointer;
         }
-        body.reels-mode .thumbnail-overlay-bottom {
+        .reel-overlay {
+            position: absolute;
+            bottom: 55px; left: 0; right: 0;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            pointer-events: none;
             z-index: 5;
-            padding: 4rem 1rem 1.5rem 1rem;
+        }
+        .reel-meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+        }
+        .reel-title {
             font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            max-width: 60%;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            text-align: center;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            margin: 0;
+            text-align: left;
         }
-        body.reels-mode .thumbnail-overlay-top-right,
-        body.reels-mode .thumbnail-info-btn,
-        body.reels-mode .thumbnail-info-popover {
-            z-index: 5;
+        .reel-meta {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.75);
+            text-align: right;
+            max-width: 38%;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            line-height: 1.3;
         }
-        /* Mobile adjustments for reels */
-        @media (max-width: 1024px) {
-            body.reels-mode .mobile-menu-toggle {
-                display: none;
-            }
+        .reel-progress-container {
+            pointer-events: auto;
+            width: 100%;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .reel-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+            transition: height 0.1s ease;
+        }
+        .reel-progress-container:hover .reel-progress-bar {
+            height: 6px;
+        }
+        .reel-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-primary);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+        .reel-mute-btn {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: auto;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+            transition: all 0.2s;
+            z-index: 10;
+        }
+        .reel-mute-btn:hover {
+            transform: translateY(-50%) scale(1.1);
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+        .reel-close-btn {
+            position: absolute;
+            top: 2rem; right: 2rem;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 48px; height: 48px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 105;
+        }
+        .reel-close-btn:hover {
+            transform: scale(1.1);
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        .reel-switch-btn {
+            position: absolute;
+            top: 2rem; right: 6rem;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 24px;
+            padding: 0 1rem;
+            height: 48px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            gap: 0.5rem;
+            z-index: 105;
+            pointer-events: auto;
+        }
+        .reel-switch-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
         }
 
         /* Thumbnail Cards */
@@ -1291,14 +1350,19 @@
                 <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
                     <i class="fas fa-eye"></i>
                 </button>
+                <div class="global-autoplay-container" style="display: flex; align-items: center; padding: 0 0.5rem; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); margin: 0 0.25rem;">
+                    <label class="autoplay-label" style="margin: 0;">
+                        <input type="checkbox" id="globalAutoplayCheckbox" class="autoplay-checkbox">
+                        <span class="autoplay-text" style="font-size: 0.9rem;">
+                            <i class="fas fa-play-circle"></i> Auto
+                        </span>
+                    </label>
+                </div>
                 <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')" title="Grid View">
                     <i class="fas fa-th"></i>
                 </button>
                 <button class="view-btn" data-mode="list" onclick="setViewMode('list')" title="List View">
                     <i class="fas fa-list"></i>
-                </button>
-                <button class="view-btn" data-mode="reels" onclick="setViewMode('reels')" title="Reels Mode">
-                    <i class="fas fa-mobile-alt"></i>
                 </button>
             </div>
         </div>
@@ -1533,6 +1597,9 @@
                         </a>
                     </div>
                 </div>
+                <button class="nav-btn" onclick="togglePlayerMode()" title="Reels Mode" style="margin-left: 0.5rem;">
+                    <i class="fas fa-mobile-alt"></i>
+                </button>
                     </div>
                 </div>
                 
@@ -1548,6 +1615,19 @@
                         <!-- Playlist items will be populated by JavaScript -->
                     </div>
                 </div>
+            </div>
+
+            <!-- Player Reels Mode Container -->
+            <div id="reelsContainer" class="reels-container">
+                <div id="reelsTrack" class="reels-track">
+                    <!-- dynamically populated -->
+                </div>
+                <button class="reel-close-btn" onclick="closePlayer()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button class="reel-switch-btn" onclick="togglePlayerMode()" title="Standard Mode">
+                    <i class="fas fa-tv"></i> Standard View
+                </button>
             </div>
         </div>
     </div>
@@ -1590,19 +1670,14 @@
         }
 
         // View Mode Toggle
-        let reelsObserver = null;
+        let currentReelIndex = 0;
+        let reelsPlaylist = [];
+        let isPlayerReelsMode = false;
+        let isReelsMuted = localStorage.getItem('reelsMuted') === 'true'; // default false (unmuted)
 
         function setViewMode(mode) {
             currentViewMode = mode;
             localStorage.setItem('viewMode', mode);
-
-            if (mode === 'reels') {
-                document.body.classList.add('reels-mode');
-                setupReelsMode();
-            } else {
-                document.body.classList.remove('reels-mode');
-                teardownReelsMode();
-            }
 
             const galleries = document.querySelectorAll('.gallery');
             const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
@@ -1624,82 +1699,279 @@
             });
 
             // Restore/apply slider value for the active view mode
-            if (mode !== 'reels') {
-                const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
-                const slider = document.getElementById('cardSizeSlider');
-                if (slider) {
-                    slider.value = savedSize;
-                }
-                updateCardSize(savedSize);
+            const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
+            const slider = document.getElementById('cardSizeSlider');
+            if (slider) {
+                slider.value = savedSize;
             }
+            updateCardSize(savedSize);
         }
 
-        function setupReelsMode() {
-            if (!reelsObserver) {
-                reelsObserver = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            playReelVideo(entry.target);
-                        } else {
-                            stopReelVideo(entry.target);
-                        }
-                    });
-                }, { threshold: 0.6 });
-            }
-            
-            // Only observe videos for reels mode
-            document.querySelectorAll('#videosGallery .thumbnail[data-video-src]').forEach(thumb => {
-                reelsObserver.observe(thumb);
-            });
-        }
+        function togglePlayerMode() {
+            isPlayerReelsMode = !isPlayerReelsMode;
+            const reelsContainer = document.getElementById('reelsContainer');
+            const playerMain = document.querySelector('.player-main');
+            const playerInfo = document.querySelector('.player-info');
 
-        function teardownReelsMode() {
-            if (reelsObserver) {
-                reelsObserver.disconnect();
-            }
-            document.querySelectorAll('.thumbnail-reels-video').forEach(vid => {
-                vid.pause();
-                vid.removeAttribute('src');
-                vid.load();
-                vid.remove();
-            });
-        }
+            if (isPlayerReelsMode) {
+                // Switch to Reels Mode
+                playerMain.style.display = 'none';
+                playerInfo.style.display = 'none';
+                reelsContainer.style.display = 'block';
 
-        function playReelVideo(thumbnail) {
-            if (!thumbnail.querySelector('.thumbnail-reels-video')) {
-                const videoSrc = thumbnail.dataset.videoSrc;
-                const video = document.createElement('video');
-                video.src = videoSrc;
-                video.className = 'thumbnail-reels-video';
-                video.autoplay = true;
-                video.loop = true;
-                video.muted = true; // start muted to ensure autoplay works reliably
-                video.playsInline = true;
+                // Pause the standard video player
+                const standardVideo = document.getElementById('videoElement');
+                if (!standardVideo.paused) standardVideo.pause();
+
+                buildReels();
                 
-                // click to toggle mute/play/pause
-                video.onclick = (e) => {
-                    e.stopPropagation();
-                    if (video.muted) {
-                        video.muted = false;
-                    } else if (video.paused) {
-                        video.play();
-                    } else {
-                        video.pause();
+                // Determine current reel index from standard player's active thumb
+                const allVideoThumbnails = Array.from(document.querySelectorAll('.thumbnail[data-video-src]'));
+                currentReelIndex = allVideoThumbnails.indexOf(currentThumbnail);
+                if (currentReelIndex < 0) currentReelIndex = 0;
+
+                scrollToReel(currentReelIndex, false);
+                setupReelsEvents();
+            } else {
+                // Switch to Standard Mode
+                playerMain.style.display = 'flex';
+                playerInfo.style.display = 'block';
+                reelsContainer.style.display = 'none';
+
+                teardownReelsEvents();
+
+                // Open the standard player on the currently selected reel
+                if (reelsPlaylist[currentReelIndex]) {
+                    openPlayer(reelsPlaylist[currentReelIndex]);
+                }
+            }
+        }
+
+        function buildReels() {
+            const track = document.getElementById('reelsTrack');
+            track.innerHTML = '';
+            reelsPlaylist = Array.from(document.querySelectorAll('.thumbnail[data-video-src]'));
+
+            reelsPlaylist.forEach((thumb, index) => {
+                const item = document.createElement('div');
+                item.className = 'reel-item';
+                item.dataset.index = index;
+                
+                const title = thumb.dataset.videoTitle || 'Unknown Video';
+                const info = thumb.dataset.videoInfo || '';
+                
+                item.innerHTML = `
+                    <div class="reel-video-container" style="width:100%; height:100%; position:relative;">
+                        <!-- video element injected dynamically -->
+                    </div>
+                    <button class="reel-mute-btn" onclick="toggleReelMute(event)" title="Toggle Mute">
+                        <i class="fas ${isReelsMuted ? 'fa-volume-mute' : 'fa-volume-up'}"></i>
+                    </button>
+                    <div class="reel-overlay">
+                        <div class="reel-meta-row">
+                            <div class="reel-title">${title}</div>
+                            <div class="reel-meta">${info.replace(/ \| /g, ' &bull; ')}</div>
+                        </div>
+                        <div class="reel-progress-container" onclick="seekReelVideo(event, this)">
+                            <div class="reel-progress-bar">
+                                <div class="reel-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                track.appendChild(item);
+            });
+        }
+
+        function toggleReelMute(event) {
+            if (event) event.stopPropagation();
+            isReelsMuted = !isReelsMuted;
+            localStorage.setItem('reelsMuted', isReelsMuted);
+            
+            // Update all buttons
+            document.querySelectorAll('.reel-mute-btn i').forEach(icon => {
+                icon.className = `fas ${isReelsMuted ? 'fa-volume-mute' : 'fa-volume-up'}`;
+            });
+            
+            // Apply to active video immediately
+            const activeVideo = document.querySelector('.reel-item.active .reel-video');
+            if (activeVideo) activeVideo.muted = isReelsMuted;
+        }
+
+        function scrollToReel(index, animate = true) {
+            if (index < 0 || index >= reelsPlaylist.length) return;
+            currentReelIndex = index;
+            
+            const track = document.getElementById('reelsTrack');
+            track.style.transition = animate ? 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' : 'none';
+            track.style.transform = `translateY(-${index * 100}vh)`;
+            
+            document.querySelectorAll('.reel-item').forEach((item, i) => {
+                if (i === index) {
+                    item.classList.add('active');
+                    playActiveReel(item, reelsPlaylist[i].dataset.videoSrc);
+                } else {
+                    item.classList.remove('active');
+                    cleanupReel(item);
+                }
+            });
+        }
+
+        function seekReelVideo(event, progressContainer) {
+            event.stopPropagation();
+            const activeItem = document.querySelector('.reel-item.active');
+            if (!activeItem) return;
+            const video = activeItem.querySelector('.reel-video');
+            if (!video || !video.duration) return;
+
+            const rect = progressContainer.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+            video.currentTime = percentage * video.duration;
+        }
+
+        function playActiveReel(item, src) {
+            let container = item.querySelector('.reel-video-container');
+            let video = container.querySelector('video');
+            if (!video) {
+                video = document.createElement('video');
+                video.className = 'reel-video';
+                video.controls = true;
+                video.src = src;
+                video.loop = localStorage.getItem('videoAutoplay') !== 'true';
+                video.muted = isReelsMuted;
+                video.playsInline = true;
+
+                video.ontimeupdate = () => {
+                    if (video.duration) {
+                        const progressFill = item.querySelector('.reel-progress-fill');
+                        if (progressFill) {
+                            const pct = (video.currentTime / video.duration) * 100;
+                            progressFill.style.width = `${pct}%`;
+                        }
                     }
                 };
                 
-                thumbnail.querySelector('.thumbnail-image-wrapper').appendChild(video);
+                video.onended = () => {
+                    if (localStorage.getItem('videoAutoplay') === 'true') {
+                        if (currentReelIndex < reelsPlaylist.length - 1) {
+                            scrollToReel(currentReelIndex + 1);
+                        }
+                    }
+                };
+                
+                container.appendChild(video);
             }
+            video.play().catch(e => {
+                console.log('Autoplay blocked unmuted, trying muted fallback:', e);
+                video.muted = true;
+                video.play();
+            });
         }
 
-        function stopReelVideo(thumbnail) {
-            const video = thumbnail.querySelector('.thumbnail-reels-video');
+        function cleanupReel(item) {
+            const video = item.querySelector('video');
             if (video) {
                 video.pause();
                 video.removeAttribute('src');
                 video.load();
                 video.remove();
             }
+        }
+
+        let reelsDragHandlers = null;
+        let isWheelCooldown = false;
+
+        function setupReelsEvents() {
+            const container = document.getElementById('reelsContainer');
+            
+            let isDown = false;
+            let startY;
+            let currentTranslateY = 0;
+
+            const handleDragStart = (e) => {
+                if (e.target.closest('.reel-mute-btn') || e.target.closest('.reel-switch-btn') || e.target.closest('.reel-close-btn')) return;
+                isDown = true;
+                startY = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+                currentTranslateY = -currentReelIndex * window.innerHeight;
+                document.getElementById('reelsTrack').style.transition = 'none';
+            };
+
+            const handleDragMove = (e) => {
+                if (!isDown) return;
+                const y = e.type.includes('mouse') ? e.pageY : e.touches[0].clientY;
+                const walk = y - startY;
+                document.getElementById('reelsTrack').style.transform = `translateY(${currentTranslateY + walk}px)`;
+            };
+
+            const handleDragEnd = (e) => {
+                if (!isDown) return;
+                isDown = false;
+                const y = e.type.includes('mouse') ? e.pageY : e.changedTouches[0].clientY;
+                const walk = y - startY;
+                
+                if (Math.abs(walk) > 50) {
+                    if (walk < 0 && currentReelIndex < reelsPlaylist.length - 1) {
+                        scrollToReel(currentReelIndex + 1);
+                    } else if (walk > 0 && currentReelIndex > 0) {
+                        scrollToReel(currentReelIndex - 1);
+                    } else {
+                        const track = document.getElementById('reelsTrack');
+                        if (track) {
+                            track.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+                            track.style.transform = `translateY(-${currentReelIndex * 100}vh)`;
+                        }
+                    }
+                } else if (Math.abs(walk) > 0) {
+                    const track = document.getElementById('reelsTrack');
+                    if (track) {
+                        track.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+                        track.style.transform = `translateY(-${currentReelIndex * 100}vh)`;
+                    }
+                }
+            };
+
+            const handleWheel = (e) => {
+                if (isWheelCooldown) return;
+                isWheelCooldown = true;
+                setTimeout(() => isWheelCooldown = false, 800); // 800ms cooldown
+                
+                if (e.deltaY > 0 && currentReelIndex < reelsPlaylist.length - 1) {
+                    scrollToReel(currentReelIndex + 1);
+                } else if (e.deltaY < 0 && currentReelIndex > 0) {
+                    scrollToReel(currentReelIndex - 1);
+                }
+            };
+
+            container.addEventListener('mousedown', handleDragStart);
+            container.addEventListener('mousemove', handleDragMove);
+            window.addEventListener('mouseup', handleDragEnd);
+            
+            container.addEventListener('touchstart', handleDragStart, { passive: true });
+            container.addEventListener('touchmove', handleDragMove, { passive: false });
+            window.addEventListener('touchend', handleDragEnd);
+
+            container.addEventListener('wheel', handleWheel, { passive: true });
+
+            reelsDragHandlers = { handleDragStart, handleDragMove, handleDragEnd, handleWheel };
+        }
+
+        function teardownReelsEvents() {
+            const container = document.getElementById('reelsContainer');
+            if (reelsDragHandlers) {
+                const { handleDragStart, handleDragMove, handleDragEnd, handleWheel } = reelsDragHandlers;
+                container.removeEventListener('mousedown', handleDragStart);
+                container.removeEventListener('mousemove', handleDragMove);
+                window.removeEventListener('mouseup', handleDragEnd);
+                
+                container.removeEventListener('touchstart', handleDragStart);
+                container.removeEventListener('touchmove', handleDragMove);
+                window.removeEventListener('touchend', handleDragEnd);
+
+                container.removeEventListener('wheel', handleWheel);
+            }
+            
+            document.querySelectorAll('.reel-item').forEach(item => cleanupReel(item));
         }
 
         // Toggle Card Overlays (names, info button, duration)
@@ -1824,8 +2096,6 @@
 
         // Video Player Functions
         function openPlayer(thumbnailElement) {
-            if (currentViewMode === 'reels') return; // let reels handle playback
-
             currentThumbnail = thumbnailElement;
             const videoSrc = thumbnailElement.dataset.videoSrc;
             const videoTitle = thumbnailElement.dataset.videoTitle;
@@ -1931,6 +2201,16 @@
             const dropdown = document.getElementById('actionMenuDropdown');
             if (dropdown) dropdown.classList.remove('show');
             document.body.style.overflow = 'auto';
+            
+            // Cleanup reels mode if it was active
+            if (isPlayerReelsMode) {
+                isPlayerReelsMode = false;
+                teardownReelsEvents();
+                document.getElementById('reelsContainer').style.display = 'none';
+                document.querySelector('.player-main').style.display = 'flex';
+                document.querySelector('.player-info').style.display = 'block';
+            }
+            
             currentThumbnail = null;
         }
 
@@ -2115,6 +2395,18 @@
             const videoPlayer = document.getElementById('videoPlayer');
             const imageLightbox = document.getElementById('imageLightbox');
             
+            // Inside Reels mode arrow keys
+            if (videoPlayer.style.display === 'block' && isPlayerReelsMode) {
+                if (e.key === "ArrowUp") {
+                    scrollToReel(currentReelIndex - 1);
+                    e.preventDefault();
+                } else if (e.key === "ArrowDown") {
+                    scrollToReel(currentReelIndex + 1);
+                    e.preventDefault();
+                }
+                return;
+            }
+
             // Handle image navigation
             if (imageLightbox.style.display === 'block' && currentImageThumbnail) {
                 if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -2306,15 +2598,27 @@
             
             // Restore autoplay checkbox state
             const autoplayCheckbox = document.getElementById('autoplayCheckbox');
-            const savedAutoplayState = localStorage.getItem('videoAutoplay');
-            if (savedAutoplayState === 'true') {
-                autoplayCheckbox.checked = true;
-            }
+            const globalAutoplayCheckbox = document.getElementById('globalAutoplayCheckbox');
+            const savedAutoplayState = localStorage.getItem('videoAutoplay') === 'true';
+            
+            if (autoplayCheckbox) autoplayCheckbox.checked = savedAutoplayState;
+            if (globalAutoplayCheckbox) globalAutoplayCheckbox.checked = savedAutoplayState;
             
             // Save autoplay state when changed
-            autoplayCheckbox.addEventListener('change', function() {
-                localStorage.setItem('videoAutoplay', this.checked);
-            });
+            const handleAutoplayChange = function(e) {
+                const isChecked = e.target.checked;
+                localStorage.setItem('videoAutoplay', isChecked);
+                if (autoplayCheckbox) autoplayCheckbox.checked = isChecked;
+                if (globalAutoplayCheckbox) globalAutoplayCheckbox.checked = isChecked;
+                
+                // Update active reels videos loop attribute
+                document.querySelectorAll('.thumbnail-reels-video').forEach(vid => {
+                    vid.loop = !isChecked;
+                });
+            };
+            
+            if (autoplayCheckbox) autoplayCheckbox.addEventListener('change', handleAutoplayChange);
+            if (globalAutoplayCheckbox) globalAutoplayCheckbox.addEventListener('change', handleAutoplayChange);
 
             // Restore overlay visibility state
             if (localStorage.getItem('hideCardOverlays') === 'true') {
