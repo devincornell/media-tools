@@ -22,6 +22,8 @@
             --shadow-heavy: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.1);
+            --card-min-width: 220px;
+            --thumbnail-height: 200px;
         }
 
         * {
@@ -222,6 +224,40 @@
             border-color: var(--accent-primary);
         }
 
+        .size-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.5rem 1rem;
+        }
+
+        .size-slider {
+            -webkit-appearance: none;
+            width: 100px;
+            height: 4px;
+            background: var(--bg-secondary);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .size-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
         .view-toggle {
             display: flex;
             background: var(--bg-tertiary);
@@ -261,7 +297,7 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
             gap: 0.75rem;
             margin-bottom: 2rem;
         }
@@ -312,7 +348,7 @@
         .thumbnail img,
         .thumbnail video {
             width: 100%;
-            height: 200px;
+            height: var(--thumbnail-height);
             object-fit: cover;
             transition: all 0.3s ease;
         }
@@ -846,317 +882,10 @@
             background: var(--accent-secondary);
         }
     </style>
-    <style>
-        :root {
-            --bg-primary: #111315;
-            --bg-secondary: #191c1f;
-            --bg-tertiary: #24292d;
-            --accent-primary: #f0b35b;
-            --accent-secondary: #d77b4d;
-            --text-primary: #f4f1eb;
-            --text-secondary: #a9adae;
-            --text-muted: #747b7d;
-            --border-color: rgba(244, 241, 235, 0.12);
-            --glass-bg: rgba(255, 255, 255, 0.045);
-            --glass-border: rgba(244, 241, 235, 0.12);
-            --shadow-medium: 0 18px 45px rgba(0, 0, 0, 0.22);
-            --shadow-heavy: 0 24px 65px rgba(0, 0, 0, 0.42);
-        }
-
-        body {
-            background: radial-gradient(circle at 85% 0%, rgba(240, 179, 91, 0.09), transparent 32rem),
-                linear-gradient(145deg, #111315 0%, #191c1f 58%, #101213 100%);
-            font-family: 'Inter', sans-serif;
-        }
-
-        .sidebar {
-            width: 76px;
-            padding: 1.25rem 0.75rem;
-            background: rgba(17, 19, 21, 0.88);
-            border-right-color: rgba(240, 179, 91, 0.18);
-        }
-
-        .sidebar-header {
-            margin-bottom: 2.5rem;
-            padding-bottom: 1.25rem;
-            text-align: center;
-        }
-
-        .sidebar-header h2 {
-            font-size: 1.35rem;
-            color: var(--accent-primary);
-            background: none;
-            -webkit-text-fill-color: initial;
-        }
-
-        .nav-item { margin: 0.45rem 0; }
-
-        .nav-link {
-            justify-content: center;
-            min-height: 44px;
-            padding: 0.65rem;
-            border-radius: 10px;
-        }
-
-        .nav-link:hover {
-            background: rgba(240, 179, 91, 0.12);
-            color: var(--accent-primary);
-            transform: none;
-        }
-
-        .nav-link i { width: auto; }
-
-        .main-container {
-            margin-left: 76px;
-            max-width: 1800px;
-            padding: 2.5rem clamp(1.25rem, 4vw, 4rem);
-        }
-
-        .header {
-            display: flex;
-            align-items: end;
-            min-height: 150px;
-            padding: 2rem 2.25rem;
-            margin-bottom: 1rem;
-            text-align: left;
-            background: linear-gradient(115deg, rgba(240, 179, 91, 0.14), rgba(255, 255, 255, 0.035) 52%, rgba(0, 0, 0, 0.18));
-            border-radius: 14px;
-            box-shadow: var(--shadow-medium);
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: clamp(2rem, 4vw, 3.6rem);
-            letter-spacing: -0.03em;
-            color: var(--text-primary);
-            background: none;
-            -webkit-text-fill-color: initial;
-        }
-
-        .search-filter-bar {
-            position: sticky;
-            top: 1rem;
-            z-index: 20;
-            padding: 0.65rem;
-            margin-bottom: 2.75rem;
-            background: rgba(25, 28, 31, 0.86);
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
-        }
-
-        .search-box { min-width: 220px; }
-
-        .search-input, .sort-select {
-            background: rgba(10, 12, 13, 0.55);
-            border-color: rgba(244, 241, 235, 0.14);
-            border-radius: 8px;
-        }
-
-        .search-input:focus, .sort-select:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(240, 179, 91, 0.14);
-        }
-
-        .view-toggle { border-radius: 8px; background: rgba(10, 12, 13, 0.55); }
-        .view-btn { min-width: 42px; min-height: 38px; padding: 0.5rem 0.75rem; }
-        .view-btn.active { background: var(--accent-primary); color: #18130d; }
-
-        .gallery-section { margin-bottom: 3.5rem; }
-
-        .section-title {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            margin-bottom: 1.1rem;
-            padding: 0 0 0.8rem;
-            border-bottom: 1px solid rgba(240, 179, 91, 0.35);
-            color: var(--text-primary);
-            font-size: 1.05rem;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-        }
-
-        .section-title i { color: var(--accent-primary); font-size: 0.9rem; }
-
-        .gallery {
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 1rem;
-        }
-
-        .thumbnail {
-            background: rgba(255, 255, 255, 0.045);
-            border-color: rgba(244, 241, 235, 0.1);
-            border-radius: 10px;
-        }
-
-        .thumbnail:hover {
-            transform: translateY(-4px);
-            border-color: rgba(240, 179, 91, 0.7);
-            box-shadow: var(--shadow-heavy);
-        }
-
-        .thumbnail img, .thumbnail video { height: 210px; }
-        .thumbnail-content { padding: 0.9rem 1rem 1rem; }
-        .thumbnail-title { font-size: 0.98rem; margin-bottom: 0.5rem; }
-        .thumbnail-info { font-size: 0.82rem; line-height: 1.7; }
-        .thumbnail-info i { width: 1rem; color: var(--accent-primary); }
-
-        .video-player { padding: 1.25rem; background: rgba(6, 7, 8, 0.94); }
-        .player-close { top: 1rem; right: 1rem; width: 42px; height: 42px; background: #b95745; }
-        .video-container, .video-playlist { border-radius: 10px; }
-        .video-container { background: #15181a; }
-        .player-controls { padding: 0.8rem; gap: 0.7rem; }
-        .nav-btn { width: 42px; height: 38px; }
-        .nav-btn:hover { background: var(--accent-primary); color: #18130d; }
-        .action-btn { padding: 0.55rem 0.9rem; border-radius: 7px; background: var(--accent-primary); color: #18130d; }
-        .action-btn.secondary { background: transparent; }
-        .playlist-item { border-radius: 8px; }
-
-        /* New Components CSS */
-        .category-filters {
-            display: flex;
-            gap: 0.5rem;
-            background: rgba(10, 12, 13, 0.55);
-            padding: 0.35rem;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            flex-wrap: wrap;
-        }
-        .filter-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .filter-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
-        .filter-btn.active { background: var(--accent-primary); color: #18130d; }
-
-        .zoom-slider { width: 100px; accent-color: var(--accent-primary); cursor: pointer; }
-
-        .thumbnail { position: relative; }
-        .thumbnail-actions-overlay {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            display: flex;
-            gap: 0.5rem;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            z-index: 10;
-        }
-        .thumbnail:hover .thumbnail-actions-overlay { opacity: 1; }
-        .icon-btn {
-            background: rgba(0, 0, 0, 0.65);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s ease;
-        }
-        .icon-btn:hover { background: var(--accent-primary); color: #18130d; transform: scale(1.1); }
-        .fav-btn.active { color: #ef4444; }
-
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--accent-primary);
-            color: #18130d;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            box-shadow: var(--shadow-heavy);
-            opacity: 0;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 3000;
-        }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-        .scroll-to-top {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: var(--accent-primary);
-            color: #18130d;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            border: none;
-            box-shadow: var(--shadow-medium);
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            z-index: 900;
-            transition: all 0.3s ease;
-        }
-        .scroll-to-top:hover { transform: translateY(-5px); box-shadow: var(--shadow-heavy); }
-
-        kbd {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 0.2rem 0.5rem;
-            font-family: monospace;
-            font-size: 0.9em;
-            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
-            color: var(--accent-primary);
-        }
-
-        .mobile-menu-toggle { display: none; }
-
-        @media (max-width: 1024px) {
-            .sidebar { width: 76px; }
-            .main-container { margin-left: 0; padding-top: 5rem; }
-            .mobile-menu-toggle {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                top: 1rem;
-                left: 1rem;
-                width: 42px;
-                height: 42px;
-                border-radius: 9px;
-                background: var(--accent-primary);
-                color: #18130d;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .main-container { padding: 4.75rem 1rem 1.5rem; }
-            .header { min-height: 120px; padding: 1.4rem; }
-            .search-filter-bar { position: static; flex-direction: column; align-items: stretch; }
-            .gallery { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.7rem; }
-            .thumbnail img, .thumbnail video { height: 150px; }
-            .video-player { padding: 0.75rem; }
-            .player-main { flex-direction: column; overflow-y: auto; }
-            .video-container { max-width: 100%; max-height: none; flex-shrink: 0; }
-            .video-playlist { width: 100%; min-height: 180px; }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-        }
-    </style>
 </head>
 <body>
     <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">
+    <button class="mobile-menu-toggle" onclick="toggleSidebar()">
         <i class="fas fa-bars"></i>
     </button>
 
@@ -1167,50 +896,50 @@
         </div>
         <nav class="sidebar-nav">
             <div class="nav-item">
-                <a href="../{{page_name}}" class="nav-link" title="Go up" aria-label="Go up">
+                <a href="../{{page_name}}" class="nav-link">
                     <i class="fas fa-level-up-alt"></i>
                     <!-- <span>Go Up</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="/" class="nav-link" title="Home" aria-label="Home">
+                <a href="/" class="nav-link">
                     <i class="fas fa-home"></i>
                     <!-- <span>Root</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="/list_directories" class="nav-link" title="List directories" aria-label="List directories">
+                <a href="/list_directories" class="nav-link">
                     <i class="fas fa-list"></i>
                     <!-- <span>List Directories</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="/list_videos" class="nav-link" title="List videos" aria-label="List videos">
+                <a href="/list_videos" class="nav-link">
                     <i class="fas fa-play-circle"></i>
                     <!-- <span>List Videos</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="/update" class="nav-link" title="Update library" aria-label="Update library">
+                <a href="/update" class="nav-link">
                     <i class="fas fa-sync-alt"></i>
                     <!-- <span>Update</span> -->
                 </a>
             </div>
 
             <div class="nav-item">
-                <a href="#folders" class="nav-link" title="Folders" aria-label="Folders">
+                <a href="#folders" class="nav-link">
                     <i class="fas fa-folder"></i>
                     <!-- <span>Folders</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#videos" class="nav-link" title="Videos" aria-label="Videos">
+                <a href="#videos" class="nav-link">
                     <i class="fas fa-video"></i>
                     <!-- <span>Videos</span> -->
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#images" class="nav-link" title="Images" aria-label="Images">
+                <a href="#images" class="nav-link">
                     <i class="fas fa-image"></i>
                     <!-- <span>Images</span> -->
                 </a>
@@ -1229,18 +958,8 @@
         <div class="search-filter-bar fade-in">
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
-                <input type="search" class="search-input" id="searchInput" placeholder="Search media files..." aria-label="Search media files" oninput="filterMedia()">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search media files..." onkeyup="filterMedia()">
             </div>
-            
-            <div class="category-filters">
-                <button class="filter-btn active" data-filter="all" onclick="filterByCategory('all')">All</button>
-                <button class="filter-btn" data-filter="favorites" onclick="filterByCategory('favorites')"><i class="fas fa-heart"></i></button>
-                <button class="filter-btn" data-filter="folder" onclick="filterByCategory('folder')"><i class="fas fa-folder"></i></button>
-                <button class="filter-btn" data-filter="video" onclick="filterByCategory('video')"><i class="fas fa-video"></i></button>
-                <button class="filter-btn" data-filter="clip" onclick="filterByCategory('clip')"><i class="fas fa-cut"></i></button>
-                <button class="filter-btn" data-filter="image" onclick="filterByCategory('image')"><i class="fas fa-image"></i></button>
-            </div>
-
             <div class="sort-controls">
                 <select id="sortSelect" class="sort-select" onchange="sortMedia()">
                     <option value="">Sort by...</option>
@@ -1250,25 +969,19 @@
                     <option value="duration-desc">Duration (Long-Short)</option>
                 </select>
             </div>
-            
-            <div class="zoom-controls" style="display: flex; align-items: center; gap: 0.5rem; margin-left: auto;">
-                <i class="fas fa-image" style="color: var(--text-muted); font-size: 0.8rem;"></i>
-                <input type="range" id="zoomSlider" min="150" max="400" value="250" class="zoom-slider" title="Thumbnail Size">
-                <i class="fas fa-image" style="color: var(--text-muted); font-size: 1.2rem;"></i>
+            <div class="size-slider-container">
+                <i class="fas fa-compress" style="color: var(--text-secondary); font-size: 0.8rem;"></i>
+                <input type="range" id="cardSizeSlider" class="size-slider" min="120" max="400" value="220" oninput="updateCardSize(this.value)">
+                <i class="fas fa-expand" style="color: var(--text-secondary); font-size: 1rem;"></i>
             </div>
-
             <div class="view-toggle">
-                <button class="view-btn active" onclick="setViewMode('grid', this)" aria-label="Grid view" title="Grid view">
+                <button class="view-btn active" onclick="setViewMode('grid')">
                     <i class="fas fa-th"></i>
                 </button>
-                <button class="view-btn" onclick="setViewMode('list', this)" aria-label="List view" title="List view">
+                <button class="view-btn" onclick="setViewMode('list')">
                     <i class="fas fa-list"></i>
                 </button>
             </div>
-            
-            <button class="view-btn" onclick="document.getElementById('helpModal').style.display='flex'" aria-label="Keyboard Shortcuts" title="Keyboard Shortcuts" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; min-width: 42px; min-height: 38px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                <i class="fas fa-keyboard" style="color: var(--text-secondary)"></i>
-            </button>
         </div>
 
         <!-- Folders Section -->
@@ -1279,17 +992,12 @@
                 </h2>
                 <div class="gallery" id="foldersGallery">
                     {% for cp in subpages %}
-                        <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}" data-path="page/{{cp.page_path_rel}}">
-                            <div class="thumbnail-actions-overlay">
-                                <button class="icon-btn fav-btn" onclick="toggleFavorite(event, 'page/{{cp.page_path_rel}}', this)" title="Favorite"><i class="far fa-heart"></i></button>
-                                <button class="icon-btn" onclick="copyLink(event, 'page/{{cp.page_path_rel}}')" title="Copy Link"><i class="fas fa-link"></i></button>
-                            </div>
+                        <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
                                 <img src="/file/{{ cp.subfolder_thumb }}" 
                                      loading="lazy"
                                      data-subfolder-name="{{ cp.name }}"
                                      class="subfolder-thumb"
-                                     alt="{{ cp.name }} folder thumbnail"
                                      id="subfolder-{{ loop.index0 }}">
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
@@ -1317,17 +1025,12 @@
                         <div class="thumbnail" 
                              data-type="video"
                              data-name="{{ vid.vid_title|lower }}"
-                             data-path="video/{{vid.vid_path_rel}}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <div class="thumbnail-actions-overlay">
-                                <button class="icon-btn fav-btn" onclick="toggleFavorite(event, 'video/{{vid.vid_path_rel}}', this)" title="Favorite"><i class="far fa-heart"></i></button>
-                                <button class="icon-btn" onclick="copyLink(event, 'video/{{vid.vid_path_rel}}')" title="Copy Link"><i class="fas fa-link"></i></button>
-                            </div>
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy" alt="Preview of {{ vid.vid_title }}"/>
+                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
@@ -1354,17 +1057,12 @@
                         <div class="thumbnail" 
                              data-type="clip"
                              data-name="{{ vid.vid_title|lower }}"
-                             data-path="video/{{vid.vid_path_rel}}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <div class="thumbnail-actions-overlay">
-                                <button class="icon-btn fav-btn" onclick="toggleFavorite(event, 'video/{{vid.vid_path_rel}}', this)" title="Favorite"><i class="far fa-heart"></i></button>
-                                <button class="icon-btn" onclick="copyLink(event, 'video/{{vid.vid_path_rel}}')" title="Copy Link"><i class="fas fa-link"></i></button>
-                            </div>
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy" alt="Preview of {{ vid.vid_title }}"/>
+                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
@@ -1388,13 +1086,9 @@
                 </h2>
                 <div class="gallery" id="imagesGallery">
                     {% for img in images %}
-                        <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}" data-path="file/{{img.img_path_rel}}">
-                            <div class="thumbnail-actions-overlay">
-                                <button class="icon-btn fav-btn" onclick="toggleFavorite(event, 'file/{{img.img_path_rel}}', this)" title="Favorite"><i class="far fa-heart"></i></button>
-                                <button class="icon-btn" onclick="copyLink(event, 'file/{{img.img_path_rel}}')" title="Copy Link"><i class="fas fa-link"></i></button>
-                            </div>
+                        <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}">
                             <a href="/file/{{img.img_path_rel}}" onclick="openImageLightbox(event, this)">
-                                <img src="/file/{{img.img_path_rel}}" loading="lazy" alt="{{ img.title if img.title else 'Image' }}"/>
+                                <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
                             </a>
                         </div>
                     {% endfor %}
@@ -1404,7 +1098,7 @@
     </div>
 
     <!-- Video Player Modal -->
-    <div class="video-player" id="videoPlayer" role="dialog" aria-modal="true" aria-label="Video player">
+    <div class="video-player" id="videoPlayer">
         <div class="player-container">
             <button class="player-close" onclick="closePlayer()">
                 <i class="fas fa-times"></i>
@@ -1462,14 +1156,6 @@
                     <i class="fas fa-chevron-right"></i>
                 </button>
                 
-                <button class="nav-btn" onclick="toggleFullScreen()" title="Fullscreen">
-                    <i class="fas fa-expand"></i>
-                </button>
-                
-                <button class="nav-btn" onclick="togglePiP()" title="Picture in Picture">
-                    <i class="fas fa-external-link-square-alt"></i>
-                </button>
-                
                 <a id="downloadLink" href="" download class="action-btn">
                     <i class="fas fa-download"></i> Download
                 </a>
@@ -1497,7 +1183,7 @@
     </div>
 
     <!-- Image Lightbox Modal -->
-    <div class="video-player" id="imageLightbox" style="display: none;" role="dialog" aria-modal="true" aria-label="Image viewer">
+    <div class="video-player" id="imageLightbox" style="display: none;">
         <div class="player-container">
             <button class="player-close" onclick="closeImageLightbox()">
                 <i class="fas fa-times"></i>
@@ -1516,42 +1202,6 @@
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div class="video-player" id="helpModal" role="dialog" aria-modal="true" aria-label="Keyboard Shortcuts" style="display: none; align-items: center; justify-content: center;">
-        <div class="player-container" style="max-width: 600px; max-height: 80vh; background: var(--bg-secondary); border-radius: 16px; padding: 2rem; border: 1px solid var(--border-color); box-shadow: var(--shadow-heavy);">
-            <button class="player-close" onclick="document.getElementById('helpModal').style.display='none'" style="position: absolute; top: 1rem; right: 1rem;">
-                <i class="fas fa-times"></i>
-            </button>
-            <h2 style="margin-bottom: 1.5rem; color: var(--accent-primary);"><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h2>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; color: var(--text-primary);">
-                <div style="font-weight: 600;">General</div><div></div>
-                <div><kbd>Esc</kbd></div><div>Close Modals</div>
-                <div><kbd>?</kbd></div><div>Show this help</div>
-                
-                <div style="font-weight: 600; margin-top: 1rem;">Video Player</div><div></div>
-                <div><kbd>Space</kbd></div><div>Play/Pause</div>
-                <div><kbd>←</kbd> / <kbd>→</kbd></div><div>Previous/Next Video</div>
-                <div><kbd>↑</kbd> / <kbd>↓</kbd></div><div>Volume Up/Down</div>
-                <div><kbd>Shift</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd></div><div>Playback Speed Up/Down</div>
-                <div><kbd>F</kbd></div><div>Toggle Fullscreen</div>
-                <div><kbd>P</kbd></div><div>Toggle Picture-in-Picture</div>
-                <div><kbd>M</kbd></div><div>Mute/Unmute</div>
-                
-                <div style="font-weight: 600; margin-top: 1rem;">Image Viewer</div><div></div>
-                <div><kbd>←</kbd> / <kbd>→</kbd></div><div>Previous/Next Image</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast">Action successful!</div>
-
-    <!-- Scroll to Top -->
-    <button id="scrollToTopBtn" class="scroll-to-top" onclick="scrollToTop()" title="Go to top">
-        <i class="fas fa-arrow-up"></i>
-    </button>
-
     <script>
         // Subfolder thumbnails data
         const subfolderThumbs = {
@@ -1560,143 +1210,8 @@
             {% endfor %}
         };
 
-                let currentThumbnail = null;
+        let currentThumbnail = null;
         let currentViewMode = 'grid';
-        let currentCategory = 'all';
-        let favorites = JSON.parse(localStorage.getItem('mediaFavorites') || '[]');
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-        function copyLink(event, path) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            const url = window.location.origin + '/' + path;
-            navigator.clipboard.writeText(url).then(() => {
-                showToast('Link copied to clipboard!');
-            });
-        }
-
-        function isFavorite(path) {
-            return favorites.includes(path);
-        }
-
-        function toggleFavorite(event, path, buttonElement) {
-            event.preventDefault();
-            event.stopPropagation();
-            
-            const index = favorites.indexOf(path);
-            if (index > -1) {
-                favorites.splice(index, 1);
-                buttonElement.innerHTML = '<i class="far fa-heart"></i>';
-                buttonElement.classList.remove('active');
-                showToast('Removed from favorites');
-            } else {
-                favorites.push(path);
-                buttonElement.innerHTML = '<i class="fas fa-heart"></i>';
-                buttonElement.classList.add('active');
-                showToast('Added to favorites');
-            }
-            localStorage.setItem('mediaFavorites', JSON.stringify(favorites));
-            
-            if (currentCategory === 'favorites') {
-                filterMedia();
-            }
-        }
-
-        // View Mode Toggle
-        function setViewMode(mode, selectedButton) {
-            currentViewMode = mode;
-            const galleries = document.querySelectorAll('.gallery');
-            const viewBtns = document.querySelectorAll('.view-btn');
-            
-            viewBtns.forEach(btn => btn.classList.remove('active'));
-            selectedButton.classList.add('active');
-            
-            galleries.forEach(gallery => {
-                if (mode === 'list') {
-                    gallery.classList.add('list-view');
-                    gallery.style.gridTemplateColumns = ''; // reset zoom for list
-                } else {
-                    gallery.classList.remove('list-view');
-                    const zoomVal = document.getElementById('zoomSlider').value;
-                    gallery.style.gridTemplateColumns = `repeat(auto-fill, minmax(${zoomVal}px, 1fr))`;
-                }
-            });
-        }
-
-        document.getElementById('zoomSlider').addEventListener('input', function(e) {
-            if(currentViewMode === 'grid') {
-                document.querySelectorAll('.gallery').forEach(gallery => {
-                    gallery.style.gridTemplateColumns = `repeat(auto-fill, minmax(${e.target.value}px, 1fr))`;
-                });
-            }
-        });
-
-        function filterByCategory(category) {
-            currentCategory = category;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                if(btn.dataset.filter === category) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-            filterMedia();
-        }
-
-        // Search and Filter
-        function filterMedia() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const thumbnails = document.querySelectorAll('.thumbnail');
-            
-            thumbnails.forEach(thumbnail => {
-                const name = thumbnail.dataset.name || '';
-                const type = thumbnail.dataset.type || '';
-                const path = thumbnail.dataset.path || '';
-                const isFav = isFavorite(path);
-                
-                const matchesSearch = name.includes(searchTerm) || type.includes(searchTerm);
-                const matchesCategory = currentCategory === 'all' || 
-                                       (currentCategory === 'favorites' ? isFav : type === currentCategory);
-                
-                if (matchesSearch && matchesCategory) {
-                    thumbnail.style.display = 'block';
-                    thumbnail.classList.add('fade-in');
-                } else {
-                    thumbnail.style.display = 'none';
-                }
-            });
-
-            document.querySelectorAll('.gallery-section').forEach(section => {
-                const thumbs = Array.from(section.querySelectorAll('.thumbnail'));
-                const hasVisible = thumbs.some(t => t.style.display !== 'none');
-                section.style.display = hasVisible ? 'block' : 'none';
-            });
-        }
-
-        async function togglePiP() {
-            const video = document.getElementById('videoElement');
-            if (document.pictureInPictureElement) {
-                await document.exitPictureInPicture();
-            } else if (video.requestPictureInPicture) {
-                await video.requestPictureInPicture();
-            }
-        }
-
-        function toggleFullScreen() {
-            const videoContainer = document.querySelector('.video-container');
-            if (!document.fullscreenElement) {
-                videoContainer.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
 
         // Sidebar Toggle for Mobile
         function toggleSidebar() {
@@ -1705,13 +1220,13 @@
         }
 
         // View Mode Toggle
-        function setViewMode(mode, selectedButton) {
+        function setViewMode(mode) {
             currentViewMode = mode;
             const galleries = document.querySelectorAll('.gallery');
             const viewBtns = document.querySelectorAll('.view-btn');
             
             viewBtns.forEach(btn => btn.classList.remove('active'));
-            selectedButton.classList.add('active');
+            event.target.classList.add('active');
             
             galleries.forEach(gallery => {
                 if (mode === 'list') {
@@ -1720,6 +1235,12 @@
                     gallery.classList.remove('list-view');
                 }
             });
+        }
+
+        // Update Card Size
+        function updateCardSize(value) {
+            document.documentElement.style.setProperty('--card-min-width', `${value}px`);
+            document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(value * 0.9)}px`);
         }
 
         // Search and Filter
@@ -1810,7 +1331,6 @@
 
         // Video Player Functions
         function openPlayer(thumbnailElement) {
-            cancelAutoplay();
             currentThumbnail = thumbnailElement;
             const videoSrc = thumbnailElement.dataset.videoSrc;
             const videoTitle = thumbnailElement.dataset.videoTitle;
@@ -1869,17 +1389,18 @@
             const countdownOverlay = document.getElementById('autoplayCountdown');
             const countdownNumber = document.getElementById('countdownNumber');
             
-            autoplayCountdownTimeLeft = 3;
+            autoplayCountdownTimeLeft = 0; // 5 second countdown
             countdownNumber.textContent = autoplayCountdownTimeLeft;
             countdownOverlay.style.display = 'block';
             
             autoplayCountdownInterval = setInterval(() => {
-                autoplayCountdownTimeLeft--;
-                countdownNumber.textContent = autoplayCountdownTimeLeft;
                 if (autoplayCountdownTimeLeft <= 0) {
                     clearInterval(autoplayCountdownInterval);
                     proceedToNextVideo();
                 }
+                autoplayCountdownTimeLeft--;
+                countdownNumber.textContent = autoplayCountdownTimeLeft;
+                
             }, 1000);
         }
 
@@ -2048,17 +1569,6 @@
 
         // Enhanced Keyboard Controls
         document.body.addEventListener('keydown', function(e) {
-            // Ignore if typing in an input field
-            if (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea') {
-                return;
-            }
-
-            if (e.key === "?") {
-                document.getElementById('helpModal').style.display = 'flex';
-                e.preventDefault();
-                return;
-            }
-
             if (e.key === "Escape") {
                 // Cancel autoplay countdown if active
                 const countdownOverlay = document.getElementById('autoplayCountdown');
@@ -2067,7 +1577,6 @@
                     return;
                 }
                 
-                document.getElementById('helpModal').style.display = 'none';
                 closePlayer();
                 closeImageLightbox();
                 return;
@@ -2114,55 +1623,36 @@
                 e.preventDefault();
             } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                 const video = document.getElementById('videoElement');
-                if (e.shiftKey) {
-                    const speedSelect = document.getElementById('speedSelect');
-                    const currentSpeed = video.playbackRate;
-                    let newSpeed;
+                const speedSelect = document.getElementById('speedSelect');
+                const currentSpeed = video.playbackRate;
+                let newSpeed;
 
-                    if (e.key === "ArrowUp") {
-                        newSpeed = Math.min(currentSpeed + 0.25, 4);
-                    } else {
-                        newSpeed = Math.max(currentSpeed - 0.25, 0.25);
-                    }
-
-                    video.playbackRate = newSpeed;
-                    
-                    // Update speed selector
-                    let optionFound = false;
-                    for (let option of speedSelect.options) {
-                        if (parseFloat(option.value) === newSpeed) {
-                            option.selected = true;
-                            optionFound = true;
-                            break;
-                        }
-                    }
-
-                    if (!optionFound) {
-                        let newOption = new Option(newSpeed.toFixed(2) + '×', newSpeed, true, true);
-                        speedSelect.add(newOption);
-                        // Sort options
-                        Array.from(speedSelect.options)
-                            .sort((a, b) => parseFloat(a.value) - parseFloat(b.value))
-                            .forEach(option => speedSelect.add(option));
-                    }
-                    showToast(`Playback Speed: ${newSpeed}x`);
+                if (e.key === "ArrowUp") {
+                    newSpeed = Math.min(currentSpeed + 0.25, 4);
                 } else {
-                    let currentVol = video.volume;
-                    let newVol = e.key === "ArrowUp" ? Math.min(currentVol + 0.1, 1) : Math.max(currentVol - 0.1, 0);
-                    video.volume = newVol;
-                    showToast(`Volume: ${Math.round(newVol * 100)}%`);
+                    newSpeed = Math.max(currentSpeed - 0.25, 0.25);
                 }
-                e.preventDefault();
-            } else if (e.key === "f" || e.key === "F") {
-                toggleFullScreen();
-                e.preventDefault();
-            } else if (e.key === "p" || e.key === "P") {
-                togglePiP();
-                e.preventDefault();
-            } else if (e.key === "m" || e.key === "M") {
-                const video = document.getElementById('videoElement');
-                video.muted = !video.muted;
-                showToast(video.muted ? 'Muted' : 'Unmuted');
+
+                video.playbackRate = newSpeed;
+                
+                // Update speed selector
+                let optionFound = false;
+                for (let option of speedSelect.options) {
+                    if (parseFloat(option.value) === newSpeed) {
+                        option.selected = true;
+                        optionFound = true;
+                        break;
+                    }
+                }
+
+                if (!optionFound) {
+                    let newOption = new Option(newSpeed.toFixed(2) + '×', newSpeed, true, true);
+                    speedSelect.add(newOption);
+                    // Sort options
+                    Array.from(speedSelect.options)
+                        .sort((a, b) => parseFloat(a.value) - parseFloat(b.value))
+                        .forEach(option => speedSelect.add(option));
+                }
                 e.preventDefault();
             } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
                 if (!currentThumbnail) return;
@@ -2213,16 +1703,6 @@
             
             // Randomize subfolder thumbnails on page load
             randomizeSubfolderThumbnails();
-
-            // Initialize favorite icons
-            document.querySelectorAll('.thumbnail').forEach(thumb => {
-                const path = thumb.dataset.path;
-                const favBtn = thumb.querySelector('.fav-btn');
-                if (favBtn && isFavorite(path)) {
-                    favBtn.innerHTML = '<i class="fas fa-heart"></i>';
-                    favBtn.classList.add('active');
-                }
-            });
             
             // Restore autoplay checkbox state
             const autoplayCheckbox = document.getElementById('autoplayCheckbox');
@@ -2236,20 +1716,6 @@
                 localStorage.setItem('videoAutoplay', this.checked);
             });
         });
-
-        // Scroll to Top Logic
-        window.addEventListener('scroll', () => {
-            const btn = document.getElementById('scrollToTopBtn');
-            if (window.scrollY > 300) {
-                btn.style.display = 'flex';
-            } else {
-                btn.style.display = 'none';
-            }
-        });
-
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
 
         // Lazy loading for images
         if ('IntersectionObserver' in window) {
