@@ -313,18 +313,27 @@
             padding: 0.5rem;
         }
 
-        .gallery.list-view .thumbnail img,
-        .gallery.list-view .thumbnail video {
+        .gallery.list-view .thumbnail-image-wrapper {
             width: 120px;
             height: 80px;
-            object-fit: cover;
+            flex-shrink: 0;
+            position: relative;
         }
 
         /* Images in list view preserve aspect ratio */
-        .gallery.list-view #imagesGallery .thumbnail img {
-            height: auto;
-            max-height: 80px;
+        .gallery.list-view #imagesGallery .thumbnail-image-wrapper img {
+            height: 100%;
             object-fit: contain;
+        }
+
+        /* Hide overlay title in list view */
+        .gallery.list-view .thumbnail-overlay-bottom {
+            display: none;
+        }
+
+        /* Hide regular title in grid view */
+        .gallery:not(.list-view) .thumbnail-title {
+            display: none;
         }
 
         /* Thumbnail Cards */
@@ -345,23 +354,64 @@
             border-color: var(--accent-primary);
         }
 
-        .thumbnail img,
-        .thumbnail video {
+        .thumbnail-image-wrapper {
+            position: relative;
             width: 100%;
             height: var(--thumbnail-height);
+            overflow: hidden;
+        }
+
+        .thumbnail-image-wrapper img,
+        .thumbnail-image-wrapper video {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             transition: all 0.3s ease;
+            display: block;
         }
 
         /* Images preserve their aspect ratio */
-        #imagesGallery .thumbnail img {
-            height: auto;
+        #imagesGallery .thumbnail-image-wrapper img {
             object-fit: contain;
         }
 
-        .thumbnail:hover img,
-        .thumbnail:hover video {
+        .thumbnail:hover .thumbnail-image-wrapper img,
+        .thumbnail:hover .thumbnail-image-wrapper video {
             transform: scale(1.05);
+        }
+
+        .thumbnail-overlay-top-right {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: #fff;
+            padding: 0.2rem 0.4rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .thumbnail-overlay-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 100%);
+            color: #fff;
+            padding: 1.5rem 0.5rem 0.5rem 0.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            pointer-events: none;
+            z-index: 2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .thumbnail-content {
@@ -1054,15 +1104,18 @@
                     {% for cp in subpages %}
                         <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
-                                <img src="/file/{{ cp.subfolder_thumb }}" 
-                                     loading="lazy"
-                                     data-subfolder-name="{{ cp.name }}"
-                                     class="subfolder-thumb"
-                                     id="subfolder-{{ loop.index0 }}">
+                                <div class="thumbnail-image-wrapper">
+                                    <img src="/file/{{ cp.subfolder_thumb }}" 
+                                         loading="lazy"
+                                         data-subfolder-name="{{ cp.name }}"
+                                         class="subfolder-thumb"
+                                         id="subfolder-{{ loop.index0 }}">
+                                    <div class="thumbnail-overlay-top-right"><i class="fas fa-video"></i> {{cp.num_vids}}</div>
+                                    <div class="thumbnail-overlay-bottom">{{cp.name}}</div>
+                                </div>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
                                     <div class="thumbnail-info">
-                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
                                         <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
                                         <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
                                     </div>
@@ -1090,11 +1143,14 @@
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                            <div class="thumbnail-image-wrapper">
+                                <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                                <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
+                                <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
+                            </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-clock"></i> {{ vid.duration_str }}<br>
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
@@ -1122,11 +1178,14 @@
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                            <div class="thumbnail-image-wrapper">
+                                <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                                <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
+                                <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
+                            </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-clock"></i> {{ vid.duration_str }}<br>
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
@@ -1148,7 +1207,17 @@
                     {% for img in images %}
                         <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}">
                             <a href="/file/{{img.img_path_rel}}" onclick="openImageLightbox(event, this)">
-                                <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
+                                <div class="thumbnail-image-wrapper">
+                                    <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
+                                    {% if img.title %}
+                                    <div class="thumbnail-overlay-bottom">{{ img.title }}</div>
+                                    {% endif %}
+                                </div>
+                                {% if img.title %}
+                                <div class="thumbnail-content">
+                                    <div class="thumbnail-title">{{ img.title }}</div>
+                                </div>
+                                {% endif %}
                             </a>
                         </div>
                     {% endfor %}
