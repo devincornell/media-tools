@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{name}} — Reels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Vertical, snap-scrolling feed (Instagram Reels style) */
+        .reels-feed {
+            height: 100vh;
+            width: 100vw;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .reels-feed::-webkit-scrollbar {
+            display: none;
+        }
+
+        .reel-item {
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .reel-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+            cursor: pointer;
+        }
+
+        /* Central play indicator shown while paused */
+        .reel-play-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: #fff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 6;
+        }
+
+        .reel-item.paused .reel-play-indicator {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Top overlay: title + info button */
+        .reel-top-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1.25rem 1.25rem 2.5rem 1.25rem;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .reel-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            line-height: 1.3;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+            word-break: break-word;
+            max-width: 80%;
+        }
+
+        .reel-info-btn {
+            pointer-events: auto;
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .reel-info-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .reel-info-popover {
+            display: none;
+            position: absolute;
+            top: 4rem;
+            right: 1.25rem;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #d4d4d4;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            z-index: 8;
+            min-width: 180px;
+            pointer-events: auto;
+        }
+
+        .reel-info-popover.show {
+            display: block;
+        }
+
+        .reel-info-popover i {
+            width: 16px;
+            color: var(--accent-primary);
+        }
+
+        /* Right-hand action rail (mute) */
+        .reel-actions {
+            position: absolute;
+            right: 0.85rem;
+            bottom: 5.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 6;
+        }
+
+        .reel-action-btn {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .reel-action-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            transform: scale(1.08);
+        }
+
+        /* Bottom progress bar */
+        .reel-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 0 0 1.5rem 0;
+            z-index: 5;
+        }
+
+        .reel-meta {
+            padding: 0 1.25rem 0.75rem 1.25rem;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+        }
+
+        .reel-progress-container {
+            padding: 0.6rem 1.25rem;
+            cursor: pointer;
+        }
+
+        .reel-progress-bar {
+            position: relative;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.28);
+            border-radius: 2px;
+            overflow: hidden;
+            transition: height 0.15s ease;
+        }
+
+        .reel-progress-container:hover .reel-progress-bar {
+            height: 6px;
+        }
+
+        .reel-progress-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: var(--accent-primary);
+            border-radius: 2px;
+        }
+
+        /* Fixed top-left controls */
+        .reel-nav-controls {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            display: flex;
+            gap: 0.6rem;
+            z-index: 20;
+        }
+
+        .reel-nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            height: 42px;
+            padding: 0 0.9rem;
+            border-radius: 21px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .reel-nav-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .reel-empty {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #a3a3a3;
+        }
+
+        .reel-empty i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Fixed navigation back to the standard page view -->
+    <div class="reel-nav-controls">
+        <a class="reel-nav-btn" href="/page/{{ page_path_rel }}" title="Back to gallery">
+            <i class="fas fa-th"></i> Gallery
+        </a>
+    </div>
+
+    {% set reels = vids + clips %}
+    {% if reels|length > 0 %}
+        <div class="reels-feed" id="reelsFeed">
+            {% for vid in reels %}
+                <div class="reel-item"
+                     data-index="{{ loop.index0 }}"
+                     data-src="/video/{{ vid.vid_path_rel }}">
+                    <video class="reel-video" loop playsinline preload="none"></video>
+
+                    <div class="reel-play-indicator">
+                        <i class="fas fa-play"></i>
+                    </div>
+
+                    <div class="reel-top-overlay">
+                        <div class="reel-title">{{ vid.vid_title }}</div>
+                        <button class="reel-info-btn" onclick="toggleInfo(event, this)" title="Info">
+                            <i class="fas fa-info"></i>
+                        </button>
+                    </div>
+                    <div class="reel-info-popover">
+                        <i class="fas fa-clock"></i> {{ vid.duration_str }}<br>
+                        <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                        <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                        {% if vid.created %}<i class="fas fa-calendar-alt"></i> {{ vid.created }}{% endif %}
+                    </div>
+
+                    <div class="reel-actions">
+                        <button class="reel-action-btn reel-mute-btn" onclick="toggleMute(event)" title="Toggle sound">
+                            <i class="fas fa-volume-mute"></i>
+                        </button>
+                    </div>
+
+                    <div class="reel-bottom">
+                        <div class="reel-meta">{{ vid.duration_str }} &bull; {{ vid.res_str }}</div>
+                        <div class="reel-progress-container" onclick="seek(event, this)">
+                            <div class="reel-progress-bar">
+                                <div class="reel-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="reel-empty">
+            <i class="fas fa-film"></i>
+            <h2>No videos here</h2>
+            <p>This folder has no videos to play as reels.</p>
+        </div>
+    {% endif %}
+
+    <script>
+        let isMuted = localStorage.getItem('reelsMuted') !== 'false'; // default muted
+        const items = Array.from(document.querySelectorAll('.reel-item'));
+
+        // Ensure a reel's <video> has its source loaded.
+        function ensureLoaded(item) {
+            const video = item.querySelector('.reel-video');
+            if (!video.src) {
+                video.src = item.dataset.src;
+                video.load();
+            }
+            return video;
+        }
+
+        function updateMuteIcons() {
+            document.querySelectorAll('.reel-mute-btn i').forEach(icon => {
+                icon.className = isMuted ? 'fas fa-volume-mute' : 'fas fa-volume-up';
+            });
+        }
+
+        function toggleMute(event) {
+            event.stopPropagation();
+            isMuted = !isMuted;
+            localStorage.setItem('reelsMuted', isMuted);
+            updateMuteIcons();
+            const active = document.querySelector('.reel-item.active .reel-video');
+            if (active) active.muted = isMuted;
+        }
+
+        // Tap on the video toggles play/pause for the active reel.
+        function togglePlayback(item) {
+            const video = ensureLoaded(item);
+            if (video.paused) {
+                video.play();
+                item.classList.remove('paused');
+            } else {
+                video.pause();
+                item.classList.add('paused');
+            }
+        }
+
+        function seek(event, container) {
+            event.stopPropagation();
+            const item = container.closest('.reel-item');
+            const video = item.querySelector('.reel-video');
+            if (!video || !video.duration) return;
+            const rect = container.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+            video.currentTime = pct * video.duration;
+        }
+
+        function toggleInfo(event, btn) {
+            event.stopPropagation();
+            const item = btn.closest('.reel-item');
+            const popover = item.querySelector('.reel-info-popover');
+            const showing = popover.classList.contains('show');
+            document.querySelectorAll('.reel-info-popover.show').forEach(p => p.classList.remove('show'));
+            if (!showing) popover.classList.add('show');
+        }
+
+        // Wire each reel's video events once.
+        items.forEach(item => {
+            const video = item.querySelector('.reel-video');
+            const fill = item.querySelector('.reel-progress-fill');
+
+            video.addEventListener('timeupdate', () => {
+                if (video.duration) {
+                    fill.style.width = `${(video.currentTime / video.duration) * 100}%`;
+                }
+            });
+            video.addEventListener('click', () => togglePlayback(item));
+            video.addEventListener('play', () => item.classList.remove('paused'));
+            video.addEventListener('pause', () => {
+                if (item.classList.contains('active')) item.classList.add('paused');
+            });
+        });
+
+        // Play the reel in view, pause the rest (Instagram-style autoplay).
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const item = entry.target;
+                const video = item.querySelector('.reel-video');
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                    ensureLoaded(item);
+                    video.muted = isMuted;
+                    item.classList.add('active');
+                    item.classList.remove('paused');
+                    video.play().catch(() => {
+                        video.muted = true;
+                        video.play().catch(() => {});
+                    });
+                } else {
+                    item.classList.remove('active');
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            });
+        }, { threshold: [0, 0.6, 1] });
+
+        items.forEach(item => observer.observe(item));
+
+        // Keyboard navigation: arrows to move between reels, space to toggle.
+        document.addEventListener('keydown', (e) => {
+            const active = document.querySelector('.reel-item.active');
+            if (!active) return;
+            const idx = items.indexOf(active);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                if (idx < items.length - 1) items[idx + 1].scrollIntoView({ behavior: 'smooth' });
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                if (idx > 0) items[idx - 1].scrollIntoView({ behavior: 'smooth' });
+                e.preventDefault();
+            } else if (e.code === 'Space') {
+                togglePlayback(active);
+                e.preventDefault();
+            }
+        });
+
+        // Close any open info popover when tapping elsewhere.
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.reel-info-popover') && !e.target.closest('.reel-info-btn')) {
+                document.querySelectorAll('.reel-info-popover.show').forEach(p => p.classList.remove('show'));
+            }
+        });
+
+        updateMuteIcons();
+        // Kick off the first reel.
+        if (items.length) {
+            ensureLoaded(items[0]);
+            items[0].classList.add('active');
+            const first = items[0].querySelector('.reel-video');
+            first.muted = isMuted;
+            first.play().catch(() => { first.muted = true; first.play().catch(() => {}); });
+        }
+    </script>
+</body>
+</html>

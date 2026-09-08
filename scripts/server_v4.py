@@ -25,6 +25,7 @@ class Settings(pydantic_settings.BaseSettings):
 
     site_root_path: Path
     site_template_path: Path
+    site_reels_template_path: Path | None = None
     site_thumb_path: Path
     site_mongodb_url: str
     site_database_name: str
@@ -38,6 +39,7 @@ class ServerConfig:
     root_path: Path
     thumb_path: Path
     template_path: Path
+    reels_template_path: Path
     sort_by_name: bool
     max_clip_duration: float
     mongodb_url: str
@@ -58,10 +60,18 @@ class ServerConfig:
         if not template_path.exists():
             raise FileNotFoundError(f"Template path not found: {template_path}")
 
+        if settings.site_reels_template_path is not None:
+            reels_template_path = settings.site_reels_template_path.resolve()
+        else:
+            reels_template_path = (template_path.parent / 'reels.html').resolve()
+        if not reels_template_path.exists():
+            raise FileNotFoundError(f"Reels template path not found: {reels_template_path}")
+
         return cls(
             root_path=root_path,
             thumb_path=thumb_path,
             template_path=template_path,
+            reels_template_path=reels_template_path,
             sort_by_name=settings.site_sort_by_name,
             max_clip_duration=settings.site_max_clip_duration,
             mongodb_url=settings.site_mongodb_url,
@@ -159,6 +169,48 @@ def create_app(config: ServerConfig) -> FastAPI:
         page_data = await build_page_dict(dir_doc, subdirs, db, config)
 
         with config.template_path.open('r') as f:
+            template_str = f.read()
+        environment = jinja2.Environment()
+        template = environment.from_string(template_str)
+        return template.render(**page_data)
+
+    @app.get('/reel')
+    async def reel_redirect():
+        return RedirectResponse(url='/reel/')
+
+    @app.get('/reel/', response_class=HTMLResponse)
+    async def reel_root(
+        config: ServerConfig = Depends(get_config),
+        db: MediaIndexDB = Depends(get_db),
+    ):
+        return await render_reels('.', config, db)
+
+    @app.get('/reel/{page_path:path}', response_class=HTMLResponse)
+    async def reel_with_path(
+        page_path: str,
+        config: ServerConfig = Depends(get_config),
+        db: MediaIndexDB = Depends(get_db),
+    ):
+        return await render_reels(page_path, config, db)
+
+    async def render_reels(
+        page_path: str,
+        config: ServerConfig,
+        db: MediaIndexDB,
+    ) -> str:
+        if page_path == '':
+            page_path = '.'
+        page_path_full = config.root_path / page_path
+
+        try:
+            dir_doc = await db.dirs.find_by_path(page_path_full)
+        except MediaDirIndexNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Page not found: {page_path}")
+
+        subdirs = await db.dirs.find_direct_subdirs(page_path_full)
+        page_data = await build_page_dict(dir_doc, subdirs, db, config)
+
+        with config.reels_template_path.open('r') as f:
             template_str = f.read()
         environment = jinja2.Environment()
         template = environment.from_string(template_str)
@@ -367,6 +419,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start a video streaming server')
     parser.add_argument('--root-path', type=Path, default=None, help='Root directory containing video files')
     parser.add_argument('--template-path', type=Path, default=None, help='Path to the HTML template file')
+    parser.add_argument('--reels-template-path', type=Path, default=None, help='Path to the reels HTML template file')
     parser.add_argument('--thumb-path', type=Path, default=None, help='Directory for thumbnail images')
     parser.add_argument('--mongodb-url', type=str, default=None, help='MongoDB connection URL')
     parser.add_argument('-d', '--database-name', type=str, default=None, help='MongoDB database name')
