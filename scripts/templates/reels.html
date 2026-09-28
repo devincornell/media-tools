@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{{name}} — Reels</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -29,6 +29,7 @@
         /* Vertical, snap-scrolling feed (Instagram Reels style) */
         .reels-feed {
             height: 100vh;
+            height: 100dvh; /* dynamic viewport avoids mobile toolbar overlap */
             width: 100vw;
             overflow-y: scroll;
             scroll-snap-type: y mandatory;
@@ -43,6 +44,7 @@
         .reel-item {
             position: relative;
             height: 100vh;
+            height: 100dvh; /* match feed so bottom overlay stays on-screen */
             width: 100vw;
             scroll-snap-align: start;
             scroll-snap-stop: always;
@@ -168,7 +170,7 @@
         .reel-actions {
             position: absolute;
             right: 0.85rem;
-            bottom: 5.5rem;
+            bottom: calc(5.5rem + env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             gap: 1rem;
@@ -203,7 +205,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 0 0 1.5rem 0;
+            padding: 0 0 calc(1.5rem + env(safe-area-inset-bottom)) 0;
             z-index: 5;
         }
 
