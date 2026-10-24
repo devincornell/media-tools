@@ -54,32 +54,13 @@
         .target { font-family: ui-monospace, monospace; font-size: 0.82rem; }
         .field { display: flex; gap: 0.4rem; }
         .field input { flex: 1; }
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10; }
-        .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: min(760px, 94vw); height: min(620px, 88vh); display: flex; flex-direction: column; }
-        .modal-head, .modal-foot { padding: 0.75rem 1rem; display: flex; gap: 0.6rem; align-items: center; }
-        .modal-head { border-bottom: 1px solid var(--border); }
-        .modal-foot { border-top: 1px solid var(--border); justify-content: flex-end; }
-        .modal-head .title { font-weight: 600; flex: 1; }
-        .crumbs { padding: 0.5rem 1rem; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.2rem; border-bottom: 1px solid var(--border); }
-        .crumbs a { color: var(--text); text-decoration: none; cursor: pointer; }
-        .crumbs a:hover { text-decoration: underline; }
-        .plist { flex: 1; overflow: auto; }
-        .prow { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 1rem; cursor: pointer; font-size: 0.9rem; }
-        .prow:nth-child(even) { background: #1b1b1b; }
-        .prow:hover { background: #2a2a40; }
-        .prow .ico { color: #5aa9f6; width: 1.1rem; text-align: center; }
-        .prow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .prow .meta { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
-        .prow.hidden-dir .nm { color: var(--muted); }
-        .prow.locked .ico { color: var(--canceled); }
-        .modal-foot .sel { flex: 1; font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
 <main>
     <header>
         <h1>Jobs</h1>
-        <span><a href="/browse">Browse files</a> &nbsp; <a id="backLink" href="/page/">&larr; Back to gallery</a></span>
+        <span><a href="/upload">Upload files</a> &nbsp; <a href="/browse">Browse files</a> &nbsp; <a id="backLink" href="/page/">&larr; Back to gallery</a></span>
     </header>
 
     <section class="panel">
@@ -156,24 +137,7 @@
     </section>
 </main>
 
-<div id="picker" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-box">
-        <div class="modal-head">
-            <span class="title" id="pickerTitle">Choose a folder</span>
-            <select id="pickerRoot"></select>
-            <button type="button" class="small" id="pickerClose" title="Close"><i class="fas fa-xmark"></i></button>
-        </div>
-        <div class="crumbs" id="pickerCrumbs"></div>
-        <div class="plist" id="pickerList"></div>
-        <div class="modal-foot">
-            <span class="sel" id="pickerSel"></span>
-            <button type="button" id="pickerUp"><i class="fas fa-arrow-up"></i> Up</button>
-            <button type="button" id="pickerCancel">Cancel</button>
-            <button type="button" class="primary" id="pickerChoose">Choose this folder</button>
-        </div>
-    </div>
-</div>
-
+<script src="/static/picker.js"></script>
 <script>
 const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan' };
 const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move' };
@@ -200,90 +164,33 @@ function errorText(body, fallback) {
 
 // ---------------------------------------------------------------- folder picker
 let copyRoots = [];
-let galleryRoot = null;
-const picker = { field: null, scope: 'gallery', listing: null };
 const baseName = (p) => p.replace(/\/+$/, '').split('/').pop();
-
-function absFromRel(rel) {
-    if (!galleryRoot) return null;
-    return !rel || rel === '.' ? galleryRoot : `${galleryRoot}/${rel.replace(/^\.?\/+/, '')}`;
-}
-
-async function openPicker(field) {
-    picker.field = field;
-    picker.scope = field === 'source' ? 'source' : 'gallery';
-    const roots = picker.scope === 'source' ? copyRoots : [galleryRoot];
-    if (!roots.length || !roots[0]) { alert('Move jobs are disabled: set SITE_COPY_SOURCE_ROOTS on the server.'); return; }
-    $('pickerTitle').textContent = { path: 'Choose a folder', source: 'Choose the folder to move', dest: 'Choose where to move it' }[field];
-    $('pickerRoot').replaceChildren(...roots.map(r => el('option', { value: r }, r)));
-    $('pickerRoot').classList.toggle('hidden', roots.length < 2);
-    $('picker').classList.remove('hidden');
-    const current = $(field).value.trim();
-    const start = field === 'source' ? (current || roots[0]) : absFromRel(field === 'dest' ? current.split('/').slice(0, -1).join('/') : current);
-    if (!(await pickerGo(start))) await pickerGo(roots[0]);
-}
-
-function closePicker() { $('picker').classList.add('hidden'); }
-
-async function pickerGo(path) {
-    const params = new URLSearchParams({ scope: picker.scope });
-    if (path) params.set('path', path);
-    const res = await fetch(`/api/fs/dirs?${params}`);
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-        $('pickerSel').textContent = errorText(data, `HTTP ${res.status}`);
-        return false;
-    }
-    picker.listing = data;
-    renderPicker();
-    return true;
-}
-
-function dirMeta(d) {
-    const files = d.readable ? `${d.num_files.toLocaleString()}${d.more_files ? '+' : ''} files` : 'no access';
-    const link = d.is_symlink ? `\u2192 ${d.link_target} \u00b7 ` : '';
-    return link + (d.writable ? files : `${files} \u00b7 read-only (owner: ${d.owner})`);
-}
-
-function renderPicker() {
-    const L = picker.listing;
-    $('pickerRoot').value = L.root;
-    const crumbs = [el('a', { onclick: () => pickerGo(L.root) }, L.root)];
-    const rest = L.path.slice(L.root.length).split('/').filter(Boolean);
-    rest.forEach((part, i) => {
-        const target = L.root.replace(/\/$/, '') + '/' + rest.slice(0, i + 1).join('/');
-        crumbs.push(' / ', el('a', { onclick: () => pickerGo(target) }, part));
-    });
-    $('pickerCrumbs').replaceChildren(...crumbs);
-    const rows = L.dirs.map(d => el('div', {
-        class: `prow${d.name.startsWith('.') ? ' hidden-dir' : ''}${d.writable ? '' : ' locked'}`,
-        title: d.path, onclick: () => d.readable && pickerGo(d.path),
-    }, el('i', { class: `fas ${d.is_symlink ? 'fa-link' : d.writable ? 'fa-folder' : 'fa-folder-closed'} ico` }),
-       el('span', { class: 'nm' }, d.name),
-       el('span', { class: 'meta' }, dirMeta(d)),
-       d.has_subdirs ? el('i', { class: 'fas fa-chevron-right meta' }) : null));
-    $('pickerList').replaceChildren(...(rows.length ? rows : [el('div', { class: 'prow meta' }, `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`)]));
-    $('pickerUp').disabled = !L.parent;
-    let note = `Selected: ${picker.field === 'source' ? L.path : (L.rel || '.')}`;
-    if (!L.writable) note += picker.scope === 'source'
-        ? ` \u00b7 \u26a0 the server can't delete files here (owner: ${L.owner}); the move would be refused`
-        : ` \u00b7 \u26a0 read-only for the server (owner: ${L.owner})`;
-    if (picker.field === 'dest' && $('source').value) note += ` \u00b7 will move into ${destFor(L.rel)}`;
-    $('pickerSel').textContent = note;
-}
 
 function destFor(rel) {
     const name = baseName($('source').value.trim());
     return [rel && rel !== '.' ? rel : '', name].filter(Boolean).join('/');
 }
 
-function choosePicked() {
-    const L = picker.listing;
-    if (!L) return;
-    if (picker.field === 'source') $('source').value = L.path;
-    else if (picker.field === 'dest') $('dest').value = $('source').value.trim() ? destFor(L.rel) : (L.rel || '.');
-    else $('path').value = L.rel || '.';
-    closePicker();
+function openPicker(field) {
+    const current = $(field).value.trim();
+    const hasSource = () => $('source').value.trim() !== '';
+    if (field === 'source') {
+        FolderPicker.open({
+            scope: 'source', title: 'Choose the folder to move', start: current || null,
+            onChoose: (L) => { $('source').value = L.path; },
+        });
+    } else if (field === 'dest') {
+        FolderPicker.open({
+            scope: 'gallery', title: 'Choose where to move it', startRel: current.split('/').slice(0, -1).join('/'),
+            note: (L) => (hasSource() ? `will move into ${destFor(L.rel)}` : ''),
+            onChoose: (L) => { $('dest').value = hasSource() ? destFor(L.rel) : (L.rel || '.'); },
+        });
+    } else {
+        FolderPicker.open({
+            scope: 'gallery', title: 'Choose a folder', startRel: current,
+            onChoose: (L) => { $('path').value = L.rel || '.'; },
+        });
+    }
 }
 
 // ---------------------------------------------------------------- form
@@ -498,17 +405,8 @@ async function init() {
         const cfg = await (await fetch('/api/job-config')).json();
         copyRoots = cfg.copy_source_roots;
         $('workerOff').classList.toggle('hidden', cfg.worker_enabled);
-        const roots = await (await fetch('/api/fs/roots')).json();
-        galleryRoot = roots.find(r => r.scope === 'gallery')?.path ?? null;
     } catch (e) { /* config is optional for rendering */ }
     document.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => openPicker(b.dataset.pick)));
-    $('pickerClose').addEventListener('click', closePicker);
-    $('pickerCancel').addEventListener('click', closePicker);
-    $('pickerChoose').addEventListener('click', choosePicked);
-    $('pickerUp').addEventListener('click', () => picker.listing?.parent && pickerGo(picker.listing.parent));
-    $('pickerRoot').addEventListener('change', () => pickerGo($('pickerRoot').value));
-    $('picker').addEventListener('click', (e) => { if (e.target === $('picker')) closePicker(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePicker(); });
     $('kind').addEventListener('change', () => { $('workers').value = $('kind').value === 'move' ? 4 : 2; updateForm(); });
     $('dryRun').addEventListener('change', updateForm);
     $('jobForm').addEventListener('submit', submitJob);

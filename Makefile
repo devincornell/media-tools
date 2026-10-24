@@ -51,7 +51,7 @@ serve_dwhost: SERVE_DB = dwhost
 serve_dwhost: SERVE_TEMPLATE = scripts/templates/gpt_multi_v09.html
 serve_dwhost: SERVE_PORT = 6969
 serve_dwhost: SERVE_COPY_ROOTS = /mnt/hdd-b/
-serve_dwhost: SERVE_SUDO = sudo
+serve_dwhost: SERVE_SUDO = 
 
 serve_gopro: SERVE_ROOT = /mnt/hdd-a/gopro/gopro_raw_organized
 serve_gopro: SERVE_THUMBS = /mnt/hdd-a/gopro/gopro_raw_organized_thumbs

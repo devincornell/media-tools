@@ -14,7 +14,11 @@ from fastapi.testclient import TestClient
 
 from apps.api.dependencies import get_uploads
 from apps.api.main import create_app
-from mediatools.application import InvalidUploadError, UploadConflictError, UploadIncompleteError
+from mediatools.application import (
+    InvalidUploadError,
+    UploadConflictError,
+    UploadIncompleteError,
+)
 from mediatools.application.uploads import UploadService, clean_relative_path
 from mediatools.contracts.uploads import UploadFileSpec
 

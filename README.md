@@ -56,6 +56,16 @@ with GalleryClient("http://localhost:8000") as client:
 
 Tests: `uv run --group api --extra client pytest tests/test_api.py tests/test_fileops.py`.
 
+### Uploading
+
+`/upload` sends files or whole folders from your browser into the gallery. Choose or drop one or more folders (or individual files); each file is stored at `<destination>/<its relative path>`, so folder structure is preserved exactly. Folders are created as needed, but empty folders are not (browsers don't expose them).
+
+- **Large batches:** files are sent one request each with a few in parallel, streamed straight to disk under a temporary name and renamed into place only when complete, so a cancelled or dropped upload never leaves a partial file. Modification times are kept.
+- **Resuming:** before uploading, the page asks the server which files already exist. Files with the same size are skipped, so repeating an interrupted upload picks up where it stopped. Files that exist with a different size are skipped or replaced, as you choose.
+- **After uploading:** optionally queues a rescan (and thumbnail generation) of the destination.
+- Paths are validated on the server (no absolute paths, `..`, or control characters) and can only land inside the gallery root. API: `POST /api/uploads/check` and `PUT /api/uploads/file?dest=…&path=…`.
+- Like everything else, uploads are unauthenticated: anyone who can reach the server can write files into the gallery.
+
 ### Jobs
 
 Long-running maintenance runs as background jobs, tracked in MongoDB, viewable and startable at `/jobs` (the sync icon in the gallery sidebar opens it for the current folder). Each job targets one directory, so subdirectories can be processed independently:

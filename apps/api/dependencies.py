@@ -6,8 +6,8 @@ from fastapi import Depends, Request
 
 from mediatools.application import BrowserService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
-from mediatools.application.uploads import UploadService
 from mediatools.application.media_jobs import MediaJobService
+from mediatools.application.uploads import UploadService
 from mediatools.contracts import JobConfigView
 from mediatools.jobs import JobManager
 

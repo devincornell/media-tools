@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a; --panel: #161616; --panel-2: #202020; --border: rgba(255,255,255,0.1);
+            --text: #fff; --muted: #a3a3a3; --accent: #6366f1; --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b; --run: #3b82f6;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        main { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        h1 { font-size: 1.5rem; margin: 0; }
+        h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+        a { color: var(--accent); }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+        .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+        label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+        label.check { flex-direction: row; align-items: center; gap: 0.4rem; color: var(--text); font-size: 0.9rem; }
+        input, select, button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.7rem; }
+        input[type=text] { min-width: 24rem; }
+        input[type=number] { width: 5rem; }
+        button { cursor: pointer; }
+        button:disabled { opacity: 0.4; cursor: default; }
+        button.primary { background: var(--accent); border-color: var(--accent); }
+        .muted { color: var(--muted); font-size: 0.85rem; }
+        .hidden { display: none !important; }
+        .field { display: flex; gap: 0.4rem; }
+        .field input { flex: 1; }
+        .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; transition: border-color .15s, background .15s; }
+        .drop.over { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+        .drop .big { font-size: 1rem; margin-bottom: 0.25rem; }
+        .drop .buttons { display: flex; gap: 0.6rem; justify-content: center; margin-top: 0.9rem; flex-wrap: wrap; }
+        .groups { margin-top: 0.9rem; font-size: 0.88rem; }
+        .groups div { display: flex; gap: 0.75rem; padding: 0.15rem 0; }
+        .groups .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .groups .meta { color: var(--muted); white-space: nowrap; }
+        .bar { height: 10px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
+        .bar > div { height: 100%; background: var(--run); width: 0; transition: width .2s; }
+        .bar.done > div { background: var(--ok); }
+        .stats { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0.6rem 0; font-size: 0.88rem; }
+        .stats b { font-weight: 600; }
+        .active { font-size: 0.82rem; font-family: ui-monospace, monospace; }
+        .active > div { display: flex; gap: 0.6rem; align-items: center; padding: 0.15rem 0; }
+        .active .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .active .mini { width: 90px; height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; flex: none; }
+        .active .mini > div { height: 100%; background: var(--run); }
+        .fails { max-height: 14rem; overflow: auto; font-size: 0.82rem; margin-top: 0.5rem; }
+        .fails div { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }
+        .fails .why { color: var(--bad); }
+        .msg { margin-top: 0.6rem; font-size: 0.9rem; }
+        .msg.error { color: var(--bad); } .msg.ok { color: var(--ok); }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Upload</h1>
+        <span><a href="/jobs">Jobs</a> &nbsp; <a href="/browse">Browse files</a> &nbsp; <a href="/page/">&larr; Back to gallery</a></span>
+    </header>
+
+    <section class="panel">
+        <h2>Destination</h2>
+        <label>Folder (relative to the gallery root; created if it doesn't exist)
+            <span class="field"><input type="text" id="dest" value="." spellcheck="false"><button type="button" id="pickDest">Browse&hellip;</button></span>
+        </label>
+        <p class="muted" id="destHint" style="margin: 0.6rem 0 0"></p>
+    </section>
+
+    <section class="panel">
+        <h2>Files</h2>
+        <div class="drop" id="drop">
+            <div class="big"><i class="fas fa-cloud-arrow-up"></i> Drop folders or files here</div>
+            <div class="muted">Folders are uploaded recursively and keep their structure. Empty folders are not created.</div>
+            <div class="buttons">
+                <button type="button" id="pickFolder"><i class="fas fa-folder-plus"></i> Choose folder&hellip;</button>
+                <button type="button" id="pickFiles"><i class="fas fa-file-circle-plus"></i> Choose files&hellip;</button>
+                <button type="button" id="clearAll">Clear</button>
+            </div>
+            <input type="file" id="folderInput" class="hidden" webkitdirectory>
+            <input type="file" id="fileInput" class="hidden" multiple>
+            <div class="muted" style="margin-top: 0.6rem">To add several folders, choose them one after another or drop them together.</div>
+        </div>
+        <div class="groups" id="groups"></div>
+        <div class="muted" id="staged" style="margin-top: 0.6rem"></div>
+    </section>
+
+    <section class="panel">
+        <h2>Options</h2>
+        <div class="row">
+            <label>Parallel uploads
+                <input type="number" id="parallel" min="1" max="8" value="3">
+            </label>
+            <label>If a file exists with a different size
+                <select id="conflict"><option value="skip">Skip it</option><option value="replace">Replace it</option></select>
+            </label>
+            <label class="check"><input type="checkbox" id="skipJunk" checked> Ignore .DS_Store, Thumbs.db, desktop.ini</label>
+        </div>
+        <div class="row" style="margin-top: 0.75rem">
+            <label class="check"><input type="checkbox" id="doRescan" checked> Rescan the destination when finished</label>
+            <label class="check"><input type="checkbox" id="doThumbs"> Also generate thumbnails</label>
+        </div>
+        <p class="muted" style="margin: 0.6rem 0 0">Files that already exist with the same size are skipped, so an interrupted upload can be repeated to resume.</p>
+        <div class="row" style="margin-top: 0.9rem">
+            <button type="button" class="primary" id="start" disabled><i class="fas fa-upload"></i> Upload</button>
+            <button type="button" id="cancel" class="hidden">Cancel</button>
+            <button type="button" id="retry" class="hidden">Retry failed</button>
+        </div>
+        <div id="formMsg" class="msg"></div>
+    </section>
+
+    <section class="panel hidden" id="progressPanel">
+        <h2 id="progressTitle">Uploading</h2>
+        <div class="bar" id="bar"><div></div></div>
+        <div class="stats" id="stats"></div>
+        <div class="active" id="active"></div>
+        <div class="fails" id="fails"></div>
+    </section>
+</main>
+
+<script src="/static/picker.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const JUNK = /^(\.DS_Store|Thumbs\.db|desktop\.ini|\._.*)$/i;
+const PARALLEL_MAX = 8, CHECK_BATCH = 1000, ATTEMPTS = 3;
+
+const items = new Map();           // relative path -> item
+let ignored = { dupes: 0, junk: 0 };
+let run = null;                    // state of the upload in progress, if any
+
+function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') n.className = v; else n.setAttribute(k, v);
+    }
+    for (const c of kids) if (c != null) n.append(c instanceof Node ? c : String(c));
+    return n;
+}
+
+function errorText(body, fallback) {
+    if (!body || body.detail == null) return fallback;
+    if (typeof body.detail === 'string') return body.detail;
+    return body.detail.map(d => `${(d.loc || []).slice(1).join('.') || 'request'}: ${d.msg}`).join('; ');
+}
+
+function fmtSize(bytes) {
+    if (bytes < 1000) return `${bytes} B`;
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let v = bytes, i = -1;
+    do { v /= 1000; i++; } while (v >= 1000 && i < units.length - 1);
+    return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
+}
+
+function fmtDuration(sec) {
+    if (!isFinite(sec) || sec < 0) return '';
+    sec = Math.round(sec);
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`;
+}
+
+const destValue = () => ($('dest').value.trim().replace(/^\.\/+/, '').replace(/\/+$/, '')) || '.';
+
+// ---------------------------------------------------------------- staging
+function addEntries(list) {
+    for (const { rel, file } of list) {
+        const path = rel.replace(/^\/+/, '');
+        if (!path) continue;
+        if ($('skipJunk').checked && JUNK.test(path.split('/').pop())) { ignored.junk++; continue; }
+        if (items.has(path)) { ignored.dupes++; continue; }
+        items.set(path, { rel: path, file, size: file.size, status: 'pending', state: null, note: null, error: null, sent: 0 });
+    }
+    renderStaged();
+}
+
+function renderStaged() {
+    const groups = new Map();
+    let total = 0;
+    for (const it of items.values()) {
+        total += it.size;
+        const top = it.rel.includes('/') ? it.rel.split('/')[0] + '/' : '(loose files)';
+        const g = groups.get(top) || { n: 0, bytes: 0 };
+        g.n++; g.bytes += it.size; groups.set(top, g);
+    }
+    const rows = [...groups].sort((a, b) => b[1].bytes - a[1].bytes);
+    $('groups').replaceChildren(...rows.slice(0, 10).map(([name, g]) =>
+        el('div', {}, el('span', { class: 'nm' }, name), el('span', { class: 'meta' }, `${g.n.toLocaleString()} files \u00b7 ${fmtSize(g.bytes)}`))));
+    if (rows.length > 10) $('groups').append(el('div', { class: 'meta' }, `\u2026 and ${rows.length - 10} more`));
+    const notes = [];
+    if (ignored.dupes) notes.push(`${ignored.dupes.toLocaleString()} duplicate path(s) ignored`);
+    if (ignored.junk) notes.push(`${ignored.junk.toLocaleString()} system file(s) ignored`);
+    $('staged').textContent = items.size
+        ? `${items.size.toLocaleString()} files \u00b7 ${fmtSize(total)} selected` + (notes.length ? ` \u00b7 ${notes.join(', ')}` : '')
+        : 'Nothing selected yet.';
+    $('start').disabled = !items.size || !!run?.running;
+    updateHint();
+}
+
+function updateHint() {
+    const first = items.values().next().value;
+    $('destHint').textContent = first
+        ? `For example, ${first.rel} will be stored as ${destValue() === '.' ? '' : destValue() + '/'}${first.rel}`
+        : 'A folder you add keeps its name and structure inside the destination.';
+}
+
+function clearAll() {
+    if (run?.running) return;
+    items.clear(); ignored = { dupes: 0, junk: 0 };
+    $('progressPanel').classList.add('hidden'); $('retry').classList.add('hidden'); $('formMsg').textContent = '';
+    renderStaged();
+}
+
+// input elements
+$('pickFolder').addEventListener('click', () => $('folderInput').click());
+$('pickFiles').addEventListener('click', () => $('fileInput').click());
+$('folderInput').addEventListener('change', (e) => {
+    addEntries([...e.target.files].map(f => ({ rel: f.webkitRelativePath || f.name, file: f })));
+    e.target.value = '';
+});
+$('fileInput').addEventListener('change', (e) => {
+    addEntries([...e.target.files].map(f => ({ rel: f.name, file: f })));
+    e.target.value = '';
+});
+$('clearAll').addEventListener('click', clearAll);
+$('dest').addEventListener('input', updateHint);
+$('pickDest').addEventListener('click', () => FolderPicker.open({
+    scope: 'gallery', title: 'Choose where to upload', startRel: destValue() === '.' ? '' : destValue(),
+    onChoose: (L) => { $('dest').value = L.rel || '.'; updateHint(); },
+}));
+
+// drag and drop (folders included)
+const readEntries = (reader) => new Promise((res, rej) => reader.readEntries(res, rej));
+const fileOf = (entry) => new Promise((res, rej) => entry.file(res, rej));
+
+async function walk(entry, out) {
+    if (entry.isFile) {
+        out.push({ rel: entry.fullPath, file: await fileOf(entry) });
+    } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        for (;;) {
+            const batch = await readEntries(reader);
+            if (!batch.length) break;
+            for (const child of batch) await walk(child, out);
+        }
+    }
+}
+
+const drop = $('drop');
+for (const ev of ['dragenter', 'dragover']) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+for (const ev of ['dragover', 'drop']) window.addEventListener(ev, (e) => e.preventDefault());  // don't navigate away on a stray drop
+drop.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    drop.classList.remove('over');
+    if (run?.running) return;
+    // Entries must be grabbed synchronously; the list is cleared after this handler yields.
+    const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+    $('formMsg').className = 'msg'; $('formMsg').textContent = 'Reading folders...';
+    const out = [];
+    try {
+        for (const entry of entries) await walk(entry, out);
+        $('formMsg').textContent = '';
+        addEntries(out);
+    } catch (err) {
+        $('formMsg').className = 'msg error'; $('formMsg').textContent = `Could not read the dropped items: ${err}`;
+    }
+});
+
+// ---------------------------------------------------------------- uploading
+function sendOnce(item, dest, overwrite) {
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        const q = new URLSearchParams({ dest, path: item.rel });
+        if (overwrite) q.set('overwrite', 'true');
+        if (item.file.lastModified) q.set('mtime', String(item.file.lastModified));
+        const finish = (status) => {
+            run.xhrs.delete(xhr);
+            let body = null;
+            try { body = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+            resolve({ status, body });
+        };
+        xhr.open('PUT', `/api/uploads/file?${q}`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.upload.onprogress = (e) => { item.sent = e.loaded; };
+        xhr.onload = () => finish(xhr.status);
+        xhr.onerror = () => finish(0);
+        xhr.onabort = () => finish(-1);
+        run.xhrs.add(xhr);
+        xhr.send(item.file);
+    });
+}
+
+async function uploadOne(item, dest) {
+    const overwrite = item.state === 'conflict';
+    item.status = 'uploading';
+    const fail = (why) => { item.status = 'failed'; item.error = why; item.sent = 0; };
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        item.sent = 0;
+        const r = await sendOnce(item, dest, overwrite);
+        if (r.status === -1 || run.cancelled) { item.status = 'pending'; item.sent = 0; return; }
+        if (r.status === 200) { item.status = 'done'; item.sent = item.size; return; }
+        if (r.status === 409 && !overwrite) { item.status = 'skipped'; item.note = 'already exists'; item.sent = 0; return; }
+        if (r.status >= 400 && r.status < 500 || r.status === 507) { fail(errorText(r.body, `HTTP ${r.status}`)); return; }
+        if (attempt < ATTEMPTS) await new Promise(res => setTimeout(res, attempt * 1500));
+        else fail(r.status === 0 ? 'Network error' : errorText(r.body, `Server error (HTTP ${r.status})`));
+    }
+}
+
+async function checkAll(list, dest) {
+    for (let i = 0; i < list.length; i += CHECK_BATCH) {
+        if (run.cancelled) return;
+        const batch = list.slice(i, i + CHECK_BATCH);
+        const res = await fetch('/api/uploads/check', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dest, files: batch.map(b => ({ path: b.rel, size: b.size })) }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(errorText(data, `HTTP ${res.status}`));
+        data.items.forEach((r, j) => {
+            const it = batch[j];
+            it.state = r.state; it.detail = r.detail;
+            if (r.state === 'same') { it.status = 'skipped'; it.note = 'already there'; }
+            else if (r.state === 'invalid') { it.status = 'failed'; it.error = r.detail || 'Invalid path'; }
+            else if (r.state === 'conflict' && $('conflict').value === 'skip') { it.status = 'skipped'; it.note = r.detail || 'a different file exists'; }
+            else it.status = 'ready';
+        });
+        $('progressTitle').textContent = `Checking existing files (${Math.min(i + CHECK_BATCH, list.length).toLocaleString()}/${list.length.toLocaleString()})`;
+    }
+}
+
+async function startUpload() {
+    if (run?.running || !items.size) return;
+    const dest = destValue();
+    const workers = Math.max(1, Math.min(PARALLEL_MAX, Number($('parallel').value) || 3));
+    const todo = [...items.values()].filter(it => ['pending', 'ready', 'failed'].includes(it.status) || it.dest !== dest);
+    for (const it of todo) { it.status = 'pending'; it.error = null; it.dest = dest; it.sent = 0; }
+    run = { running: true, cancelled: false, xhrs: new Set(), startedAt: performance.now(), samples: [], dest, todo, failedList: [] };
+    $('progressPanel').classList.remove('hidden');
+    $('start').disabled = true; $('retry').classList.add('hidden'); $('cancel').classList.remove('hidden');
+    $('formMsg').className = 'msg'; $('formMsg').textContent = '';
+    $('bar').classList.remove('done');
+    const ticker = setInterval(renderProgress, 250);
+    try {
+        $('progressTitle').textContent = 'Checking existing files';
+        await checkAll(todo, dest);
+        const queue = todo.filter(it => it.status === 'ready');
+        run.uploadStart = performance.now();
+        $('progressTitle').textContent = 'Uploading';
+        await Promise.all(Array.from({ length: Math.min(workers, queue.length) }, async () => {
+            while (!run.cancelled) {
+                const item = queue.shift();
+                if (!item) return;
+                await uploadOne(item, dest);
+            }
+        }));
+    } catch (err) {
+        $('formMsg').className = 'msg error'; $('formMsg').textContent = String(err.message || err);
+        run.cancelled = true;
+        run.errored = true;
+    } finally {
+        clearInterval(ticker);
+        run.running = false;
+    }
+    renderProgress();
+    await finish();
+}
+
+function counts() {
+    const c = { done: 0, skipped: 0, failed: 0, uploading: 0, left: 0, bytes: 0, sent: 0 };
+    for (const it of run.todo) {
+        if (it.status === 'done') { c.done++; c.bytes += it.size; c.sent += it.size; }
+        else if (it.status === 'skipped') c.skipped++;
+        else if (it.status === 'failed') c.failed++;
+        else {
+            c.left++; c.bytes += it.size;
+            if (it.status === 'uploading') { c.uploading++; c.sent += it.sent; }
+        }
+    }
+    return c;
+}
+
+function renderProgress() {
+    if (!run) return;
+    const c = counts();
+    const now = performance.now();
+    run.samples.push([now, c.sent]);
+    while (run.samples.length > 2 && now - run.samples[0][0] > 5000) run.samples.shift();
+    const [t0, s0] = run.samples[0];
+    const speed = now > t0 ? (c.sent - s0) / ((now - t0) / 1000) : 0;
+    const pct = c.bytes ? 100 * c.sent / c.bytes : (run.running ? 0 : 100);
+    $('bar').firstElementChild.style.width = `${Math.min(100, pct)}%`;
+    const stats = [
+        ['Transferred', `${fmtSize(c.sent)} of ${fmtSize(c.bytes)}`],
+        ['Files', `${c.done.toLocaleString()} done \u00b7 ${c.left.toLocaleString()} left`],
+    ];
+    if (c.skipped) stats.push(['Skipped', c.skipped.toLocaleString()]);
+    if (c.failed) stats.push(['Failed', c.failed.toLocaleString()]);
+    if (run.running && speed > 0) {
+        stats.push(['Speed', `${fmtSize(speed)}/s`]);
+        stats.push(['Time left', fmtDuration((c.bytes - c.sent) / speed)]);
+    }
+    $('stats').replaceChildren(...stats.map(([k, v]) => el('span', {}, `${k}: `, el('b', {}, v))));
+
+    const active = run.todo.filter(it => it.status === 'uploading').slice(0, 8);
+    $('active').replaceChildren(...active.map(it => {
+        const fill = el('div'); fill.style.width = `${it.size ? 100 * it.sent / it.size : 0}%`;
+        return el('div', {}, el('span', { class: 'nm', title: it.rel }, it.rel), el('span', { class: 'muted' }, fmtSize(it.size)), el('span', { class: 'mini' }, fill));
+    }));
+
+    const failed = run.todo.filter(it => it.status === 'failed');
+    if (failed.length !== run.failedList.length) {
+        run.failedList = failed;
+        $('fails').replaceChildren(...failed.slice(0, 200).map(it => el('div', {}, it.rel, el('div', { class: 'why' }, it.error))));
+        if (failed.length > 200) $('fails').append(el('div', { class: 'muted' }, `\u2026 and ${failed.length - 200} more`));
+    }
+}
+
+async function queueJob(endpoint, body) {
+    const res = await fetch(`/api/jobs/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(errorText(data, `HTTP ${res.status}`));
+}
+
+async function finish() {
+    const c = counts();
+    $('cancel').classList.add('hidden');
+    const msg = $('formMsg');
+    renderStaged();
+    if (run.errored) { $('progressTitle').textContent = 'Could not start'; return; }
+    if (c.failed) $('retry').classList.remove('hidden');
+    if (run.cancelled && !c.done && !c.failed) {
+        $('progressTitle').textContent = 'Canceled';
+        msg.className = 'msg'; msg.textContent = 'Upload canceled.';
+        return;
+    }
+    $('progressTitle').textContent = run.cancelled ? 'Stopped' : (c.failed ? 'Finished with errors' : 'Finished');
+    if (!run.cancelled && !c.failed) $('bar').classList.add('done');
+    const parts = [`Uploaded ${c.done.toLocaleString()} file(s)`];
+    if (c.skipped) parts.push(`${c.skipped.toLocaleString()} skipped`);
+    if (c.failed) parts.push(`${c.failed.toLocaleString()} failed`);
+    let text = parts.join(', ') + '.';
+    let ok = !c.failed && !run.cancelled;
+    if (c.done > 0) {
+        try {
+            const queued = [];
+            if ($('doRescan').checked) { await queueJob('reindex', { path: run.dest }); queued.push('rescan'); }
+            if ($('doThumbs').checked) { await queueJob('thumbnails', { path: run.dest }); queued.push('thumbnails'); }
+            if (queued.length) text += ` Queued: ${queued.join(' and ')}.`;
+        } catch (err) {
+            ok = false; text += ` Could not queue follow-up jobs: ${err.message}`;
+        }
+    }
+    msg.className = `msg ${ok ? 'ok' : 'error'}`;
+    msg.replaceChildren(text + ' ', el('a', { href: `/jobs?path=${encodeURIComponent(run.dest)}` }, 'View jobs'));
+}
+
+$('start').addEventListener('click', startUpload);
+$('retry').addEventListener('click', startUpload);
+$('cancel').addEventListener('click', () => {
+    if (!run?.running) return;
+    run.cancelled = true;
+    for (const x of [...run.xhrs]) x.abort();
+});
+window.addEventListener('beforeunload', (e) => { if (run?.running) { e.preventDefault(); e.returnValue = ''; } });
+
+const initial = new URLSearchParams(location.search).get('dest');
+if (initial) $('dest').value = initial;
+renderStaged();
+</script>
+</body>
+</html>
+

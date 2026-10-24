@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import dataclasses
 import errno
 import os
+import typing
 import uuid
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Callable
 from pathlib import Path
 
 from ..contracts.uploads import UploadCheckItem, UploadFileSpec, UploadResult
@@ -23,6 +25,7 @@ from .paths import resolve_under_root
 MAX_COMPONENT_BYTES = 255
 MAX_PATH_BYTES = 4096
 WRITE_BUFFER = 1024 * 1024
+_T = typing.TypeVar("_T")
 
 
 def clean_relative_path(rel: str) -> tuple[str, ...]:
@@ -133,16 +136,23 @@ class UploadService:
         target = self.target_for(dest, rel)
         tmp = target.parent / f".upload-{uuid.uuid4().hex}"
         try:
-            existed = await asyncio.to_thread(self._prepare, target, overwrite)
-            written = await self._write(tmp, chunks)
+            existed = await self._fs(target, self._prepare, target, overwrite)
+            written = await self._write(tmp, target, chunks)
             if expected_size is not None and written != expected_size:
                 raise UploadIncompleteError(f"Received {written} of {expected_size} bytes.")
-            await asyncio.to_thread(self._finish, tmp, target, overwrite, mtime_ms)
+            await self._fs(target, self._finish, tmp, target, overwrite, mtime_ms)
+        finally:
+            with contextlib.suppress(OSError):
+                tmp.unlink(missing_ok=True)
+        return UploadResult(path=self._rel(target), size=written, replaced=existed and overwrite)
+
+    @staticmethod
+    async def _fs(target: Path, fn: Callable[..., _T], *args: object) -> _T:
+        '''Run blocking filesystem work in a thread, turning OSErrors into upload errors.'''
+        try:
+            return await asyncio.to_thread(fn, *args)
         except OSError as e:
             raise _translate(e, target) from e
-        finally:
-            tmp.unlink(missing_ok=True)
-        return UploadResult(path=self._rel(target), size=written, replaced=existed and overwrite)
 
     def _prepare(self, target: Path, overwrite: bool) -> bool:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -154,19 +164,23 @@ class UploadService:
         return existed
 
     @staticmethod
-    async def _write(tmp: Path, chunks: AsyncIterable[bytes]) -> int:
+    async def _write(tmp: Path, target: Path, chunks: AsyncIterable[bytes]) -> int:
+        # Errors from `chunks` (e.g. a dropped connection) propagate untouched; only disk errors are translated.
         written = 0
         buffer = bytearray()
-        with tmp.open("xb") as f:
+        f = await UploadService._fs(target, lambda: tmp.open("xb"))
+        try:
             async for chunk in chunks:
                 buffer += chunk
                 if len(buffer) >= WRITE_BUFFER:
                     data, buffer = bytes(buffer), bytearray()
-                    await asyncio.to_thread(f.write, data)
+                    await UploadService._fs(target, f.write, data)
                     written += len(data)
             if buffer:
-                await asyncio.to_thread(f.write, bytes(buffer))
+                await UploadService._fs(target, f.write, bytes(buffer))
                 written += len(buffer)
+        finally:
+            f.close()
         return written
 
     @staticmethod

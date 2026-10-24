@@ -6,7 +6,11 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from mediatools.contracts import ErrorResponse
-from mediatools.contracts.uploads import UploadCheckRequest, UploadCheckResponse, UploadResult
+from mediatools.contracts.uploads import (
+    UploadCheckRequest,
+    UploadCheckResponse,
+    UploadResult,
+)
 
 from ..dependencies import UploadDep
 from ..settings import TEMPLATES_DIR

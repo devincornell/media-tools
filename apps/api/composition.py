@@ -6,12 +6,12 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from mediatools.application import BrowserService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
-from mediatools.application.uploads import UploadService
 from mediatools.application.media_jobs import (
     MediaJobDeps,
     MediaJobService,
     build_handlers,
 )
+from mediatools.application.uploads import UploadService
 from mediatools.index_db import MediaIndexDB, MediaJobCollection
 from mediatools.jobs import JobManager, JobWorker, MongoJobLogStore, MongoJobRepository
 
