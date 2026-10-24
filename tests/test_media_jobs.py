@@ -83,16 +83,20 @@ def tree(tmp_path: Path, video_cache: dict[str, Path]) -> dict[str, Path]:
 def settings_for(tree: dict[str, Path], db_name: str, **extra: object) -> Settings:
     return Settings(
         site_root_path=tree["root"], site_thumb_path=tree["thumbs"], site_mongodb_url=MONGO_URL,
-        site_database_name=db_name, site_copy_source_roots=[tree["incoming"]], **extra,
+        site_database_name=db_name, **{"site_copy_source_roots": [tree["incoming"]], **extra},
     )
 
 
-def run_services(tree: dict[str, Path], body: Callable[[Services, pymongo.AsyncMongoClient, str], Awaitable[None]]) -> None:
+def run_services(
+    tree: dict[str, Path],
+    body: Callable[[Services, pymongo.AsyncMongoClient, str], Awaitable[None]],
+    **extra: object,
+) -> None:
     async def main() -> None:
         db_name = f"test_media_jobs_{uuid.uuid4().hex[:8]}"
         client: pymongo.AsyncMongoClient = pymongo.AsyncMongoClient(MONGO_URL)
         try:
-            config = ServerConfig.from_settings(settings_for(tree, db_name))
+            config = ServerConfig.from_settings(settings_for(tree, db_name, **extra))
             await body(await build_services(config, client[db_name]), client, db_name)
         finally:
             await client.drop_database(db_name)
@@ -217,6 +221,32 @@ def test_convert_mp4(tree: dict[str, Path]):
         assert (tree["root"] / "b" / "clip2.mkv").exists()
 
     run_services(tree, body)
+
+
+def test_move_from_inside_gallery_drops_source_entries(tree: dict[str, Path]):
+    root = tree["root"]
+    src = root / "a"
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        (src / "deep").mkdir()
+        shutil.move(src / "clip1.mp4", src / "deep" / "clip1.mp4")
+        await submit_and_run(s, ReindexRequest(path="."))
+        assert {"a", "a/deep"} <= set(await s.gallery.list_directories())
+        assert len((await s.gallery.directory_page("a")).vids) >= 1
+
+        status, out = await submit_and_run(s, MoveRequest(source=str(src), dest="b/from_a"))
+        r = out["result"]
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert r["source_reindex"]["directories_removed"] == 1  # a/deep was emptied and removed
+
+        dirs = set(await s.gallery.list_directories())
+        assert "a/deep" not in dirs and "b/from_a" in dirs and "b/from_a/deep" in dirs
+        assert (await s.gallery.directory_page("a")).vids == []
+        assert len((await s.gallery.directory_page("b/from_a")).vids) >= 1
+        log = [ln.message for ln in await s.job_manager.logs(out["view"].job.id, limit=1000)]
+        assert any(m.startswith("Source is inside the gallery") for m in log)
+
+    run_services(tree, body, site_copy_source_roots=[root])
 
 
 def test_move_then_rescan(tree: dict[str, Path]):

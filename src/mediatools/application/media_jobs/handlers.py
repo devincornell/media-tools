@@ -467,9 +467,22 @@ class MoveHandler(_Base):
             "warnings": warnings,
         }
         await self.deps.records.set_result(job_id, result)
+        in_gallery = source.is_relative_to(self.deps.root_path)
+        dest_lo = 90 if in_gallery else 80
+        if in_gallery:
+            ctx.log(f"Source is inside the gallery; rescanning {self._rel(source)} to drop moved entries")
+            result["source_reindex"] = await self._rescan_source(source, ctx, 80, dest_lo)
+            await self.deps.records.set_result(job_id, result)
         ctx.log(f"Rescanning {self._rel(dest)}")
-        result["reindex"] = await self._reindex(dest, ctx, 80, 100)
+        result["reindex"] = await self._reindex(dest, ctx, dest_lo, 100)
         await self.deps.records.set_result(job_id, result)
+
+    async def _rescan_source(self, source: Path, ctx: JobContext, lo: float, hi: float) -> Result:
+        if source.is_dir():
+            return await self._reindex(source, ctx, lo, hi)
+        removed = await self.deps.index.dirs.delete_by_path_prefix(source)
+        ctx.log(f"Source no longer exists; removed {removed} directories from the index")
+        return {"directories": 0, "directories_removed": removed, "videos": 0, "videos_new": 0, "errors": [], "error_count": 0}
 
 
 def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:

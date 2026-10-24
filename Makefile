@@ -51,6 +51,7 @@ serve_dwhost: SERVE_DB = dwhost
 serve_dwhost: SERVE_TEMPLATE = scripts/templates/gpt_multi_v09.html
 serve_dwhost: SERVE_PORT = 6969
 serve_dwhost: SERVE_COPY_ROOTS = /mnt/hdd-b/
+serve_dwhost: SERVE_SUDO = sudo
 
 serve_gopro: SERVE_ROOT = /mnt/hdd-a/gopro/gopro_raw_organized
 serve_gopro: SERVE_THUMBS = /mnt/hdd-a/gopro/gopro_raw_organized_thumbs
@@ -61,8 +62,10 @@ serve_gopro: SERVE_COPY_ROOTS =
 
 # SERVE_COPY_ROOTS: space-separated dirs that move jobs may read from (empty disables move jobs).
 # SERVE_WORKERS: jobs run at once (default 4).
+# SERVE_SUDO=sudo runs the server as root using the venv Python directly (not `uv run`, which would
+# leave root-owned files in .venv and uv's cache). No bytecode is written so the repo stays user-owned.
 serve_dwhost serve_gopro:
-	sudo uv run --group api python -m apps.api \
+	$(if $(SERVE_SUDO),$(SERVE_SUDO) env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python,uv run --group api python) -m apps.api \
 		--root-path "$(SERVE_ROOT)" \
 		--thumb-path "$(SERVE_THUMBS)" \
 		--database-name $(SERVE_DB) \

@@ -355,6 +355,7 @@ function summary(item) {
             case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
             case 'move': parts.push(`${r.moved} moved, ${r.deduplicated} already present, ${(r.conflicts || []).length} conflicts`); break;
         }
+        if (r.source_reindex) parts.push(`source rescanned (${r.source_reindex.directories_removed} stale dirs removed)`);
         if (r.reindex) parts.push(`rescanned ${r.reindex.directories} dirs`);
     }
     const node = el('div', {}, parts.join('; '));
