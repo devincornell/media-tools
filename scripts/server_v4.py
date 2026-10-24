@@ -102,6 +102,13 @@ def create_app(config: ServerConfig) -> FastAPI:
         return app.state.db
 
     CHUNK_SIZE = 1024 * 1024  # 1 MB
+    VIDEO_MEDIA_TYPES = {
+        '.mp4': 'video/mp4',
+        '.m4v': 'video/mp4',
+        '.webm': 'video/webm',
+        '.mov': 'video/quicktime',
+        '.mkv': 'video/x-matroska',
+    }
 
     @app.get("/")
     async def root():
@@ -238,6 +245,7 @@ def create_app(config: ServerConfig) -> FastAPI:
         if not full_path.is_file():
             raise HTTPException(status_code=400, detail=f"Not a file: {video_path}")
 
+        media_type = VIDEO_MEDIA_TYPES.get(full_path.suffix.lower(), 'video/mp4')
         file_size = full_path.stat().st_size
         if range:
             start_str, end_str = range.replace("bytes=", "").split("-")
@@ -252,7 +260,7 @@ def create_app(config: ServerConfig) -> FastAPI:
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Accept-Ranges": "bytes",
             "Content-Length": str(content_length),
-            "Content-Type": "video/mp4",
+            "Content-Type": media_type,
             "Cache-Control": "public, max-age=31536000",
             "Connection": "keep-alive",
         }
@@ -263,7 +271,7 @@ def create_app(config: ServerConfig) -> FastAPI:
             content=data,
             status_code=206 if range else 200,
             headers=headers,
-            media_type="video/mp4",
+            media_type=media_type,
         )
 
     @app.get("/thumb/{file_hash}")

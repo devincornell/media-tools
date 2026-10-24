@@ -227,6 +227,10 @@ if __name__ == '__main__':
     print(f'{len(mdir.all_video_files())=}')
 
     if args.reindex:
+        answer = input(f"Reindexing will dump the existing '{settings.site_database_name}' database. Continue? [y/N]: ")
+        if answer.strip().lower() not in ('y', 'yes'):
+            print('Reindex cancelled.')
+            return
         asyncio.run(reindex(root_path, settings.site_mongodb_url, settings.site_database_name))
     
     scan_media_dir(
