@@ -1,0 +1,18 @@
+# Reads SITE_* values from .env in this directory for interpolation only; the rest of .env is not passed in.
+# Media is mounted at the same absolute path as on the host because the index stores absolute paths.
+services:
+  api:
+    build: .
+    image: mediatools-api
+    ports:
+      - "${SITE_PORT:-8000}:8000"
+    environment:
+      SITE_ROOT_PATH: ${SITE_ROOT_PATH:?set SITE_ROOT_PATH}
+      SITE_THUMB_PATH: /thumbs
+      SITE_MONGODB_URL: ${SITE_MONGODB_URL:?set SITE_MONGODB_URL}
+      SITE_DATABASE_NAME: ${SITE_DATABASE_NAME:?set SITE_DATABASE_NAME}
+      SITE_MAX_CLIP_DURATION: ${SITE_MAX_CLIP_DURATION:-0}
+    volumes:
+      - ${SITE_ROOT_PATH}:${SITE_ROOT_PATH}:ro
+      - ${SITE_THUMB_PATH:?set SITE_THUMB_PATH}:/thumbs:ro
+    restart: unless-stopped

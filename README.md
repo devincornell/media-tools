@@ -12,6 +12,47 @@ import mediatools
 ```
 
 
+## Gallery server
+
+`apps/api/` is a FastAPI app that serves an indexed media directory (see `mediatools.index_db`). It is not part of the installed package. Configure it with `SITE_*` environment variables or a `.env` file in the repo root:
+
+| Variable | Required | Description |
+|---|---|---|
+| `SITE_ROOT_PATH` | yes | Media root. Must match the absolute paths stored in the index. |
+| `SITE_THUMB_PATH` | yes | Directory of `<hash>.gif` thumbnails. |
+| `SITE_MONGODB_URL` | yes | MongoDB connection URL. |
+| `SITE_DATABASE_NAME` | yes | MongoDB database holding the index. |
+| `SITE_TEMPLATE_PATH` | no | Gallery template (default `apps/api/templates/gallery.html`). |
+| `SITE_REELS_TEMPLATE_PATH` | no | Reels template (default `apps/api/templates/reels.html`). |
+| `SITE_PORT` | no | Port for `python -m apps.api` and the Compose host port (default 8000). |
+| `SITE_MAX_CLIP_DURATION` | no | Videos shorter than this many seconds are listed as clips (default 0). |
+
+Run locally from the repo root:
+
+```bash
+uv run --group api uvicorn apps.api.main:app --reload
+# or, with CLI overrides of the SITE_* settings:
+uv run --group api python -m apps.api --root-path /path/to/media -p 8000
+```
+
+Run in Docker (reads `SITE_*` from `.env`; media and thumbnails are mounted read-only):
+
+```bash
+docker compose up -d --build
+```
+
+Browse `/page/`, `/reel/`, or the JSON API under `/api` (docs at `/docs`). A typed client is available with the `client` extra:
+
+```python
+from mediatools.client import GalleryClient
+
+with GalleryClient("http://localhost:8000") as client:
+    page = client.get_directory("some/subdir")
+```
+
+Tests: `uv run --group api --extra client pytest tests/test_api.py`.
+
+
 ## API Overview
 
 Currently, the package provides tools for working with video and image files.

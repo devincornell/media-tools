@@ -26,7 +26,41 @@ test:
 	uv run pytest tests/test_ffmpeg_interface.py
 	uv run pytest tests/test_image_processing.py
 	uv run pytest tests/test_media_management.py
-	
+	uv run --group api --extra client pytest tests/test_api.py
+
+
+################################## API Server ##################################
+.PHONY: serve_dwhost serve_gopro
+
+serve_dwhost: SERVE_ROOT = /mnt/hdd-b/.sys/
+serve_dwhost: SERVE_THUMBS = /mnt/hdd-b/.dwhelper_thumbs/
+serve_dwhost: SERVE_DB = dwhost
+serve_dwhost: SERVE_TEMPLATE = scripts/templates/gpt_multi_v09.html
+serve_dwhost: SERVE_PORT = 6969
+
+serve_gopro: SERVE_ROOT = /mnt/hdd-a/gopro/gopro_raw_organized
+serve_gopro: SERVE_THUMBS = /mnt/hdd-a/gopro/gopro_raw_organized_thumbs
+serve_gopro: SERVE_DB = gopro
+serve_gopro: SERVE_TEMPLATE = scripts/templates/gpt_multi_v07_crazy.html
+serve_gopro: SERVE_PORT = 8000
+
+serve_dwhost serve_gopro:
+	uv run --group api python -m apps.api \
+		--root-path "$(SERVE_ROOT)" \
+		--thumb-path "$(SERVE_THUMBS)" \
+		--database-name $(SERVE_DB) \
+		--template-path $(SERVE_TEMPLATE) \
+		--reels-template-path scripts/templates/reels.html \
+		--port $(SERVE_PORT)
+
+api_serve:
+	uv run --group api uvicorn apps.api.main:app --reload
+
+docker_build:
+	docker build -t mediatools-api .
+
+docker_up:
+	docker compose up -d --build
 
 
 ################################## MKDocs-Material Documentation Website Generation ##################################
