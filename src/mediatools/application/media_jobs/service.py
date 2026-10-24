@@ -122,6 +122,10 @@ class MediaJobService:
             raise InvalidJobRequestError(str(e)) from e
         if not source.is_dir():
             raise InvalidJobRequestError(f"Source directory not found: {request.source}")
+        if fileops.is_protected_root(source, self.copy_source_roots):
+            raise InvalidJobRequestError(
+                "Choose a folder inside the copy source root, not the root itself: the source folder is removed after the move."
+            )
         if not os.access(source, os.W_OK | os.X_OK):
             raise InvalidJobRequestError(fileops.permission_message(source, [source]))
         dest = self._under_root(request.dest)

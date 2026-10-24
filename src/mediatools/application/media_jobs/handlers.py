@@ -217,6 +217,16 @@ class _Base:
             await self.deps.index.dirs.upsert_directory(parent)
 
 
+    async def _unlink_from_parent(self, path: Path) -> None:
+        '''Drop `path` from an indexed parent's subdirectory list (after the folder was removed).'''
+        try:
+            parent = await self.deps.index.dirs.find_by_path(path.parent)
+        except MediaDirIndexNotFoundError:
+            return
+        if parent is not None and parent.subpaths.pop(path.name, None) is not None:
+            await self.deps.index.dirs.upsert_directory(parent)
+
+
 class ReindexHandler(_Base):
     async def execute(self, job_id: str, ctx: JobContext) -> str | None:
         req = await self._load(job_id, ReindexRequest)
@@ -389,6 +399,10 @@ class ConvertMp4Handler(_Base):
         return result
 
 
+class MoveIncompleteError(Exception):
+    '''Some entries could not be moved, so the source folder still exists. Retried, as the cause may be transient.'''
+
+
 class MoveHandler(_Base):
     async def execute(self, job_id: str, ctx: JobContext) -> str | None:
         req = await self._load(job_id, MoveRequest)
@@ -396,8 +410,15 @@ class MoveHandler(_Base):
             source = resolve_allowed_source(req.source, self.deps.copy_source_roots)
         except PathOutsideRootError as e:
             raise PermanentJobError(str(e), code="invalid_source") from e
+        if fileops.is_protected_root(source, self.deps.copy_source_roots):
+            raise PermanentJobError(
+                "A copy source root itself can't be moved, because the source folder is removed afterwards.",
+                code="protected_source",
+            )
         if not source.is_dir():
-            raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
+            if ctx.job.attempt_count <= 1:
+                raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
+            ctx.log("The source folder is already gone (emptied by an earlier attempt)")
         dest = self._target(req.dest)
         # Lock the real locations too, so a symlink alias can't dodge another job's lock.
         async with self._locked(ctx, [source, source.resolve(), dest, dest.resolve()], exclusive=True):
@@ -405,83 +426,116 @@ class MoveHandler(_Base):
         return None
 
     async def _run(self, job_id: str, req: MoveRequest, source: Path, dest: Path, ctx: JobContext) -> None:
-        ctx.log(f"Listing files in {source} ...")
-        await ctx.checkpoint(0, "Listing source files", force=True)
-        if blocked := await asyncio.to_thread(fileops.unwritable_dirs, source):
-            raise PermanentJobError(fileops.permission_message(source, blocked), code="permission_denied")
-        files, links = await asyncio.to_thread(fileops.list_source_files, source)
+        root = self.deps.root_path
+        # Index entries live under the source's path as the gallery sees it, which may be a link or its target.
+        in_gallery = [p for p in dict.fromkeys((source, Path(os.path.realpath(source)))) if p.is_relative_to(root)]
+        files: list[Path] = []
+        others: list[Path] = []
+        if source.is_dir():
+            ctx.log(f"Listing files in {source} ...")
+            await ctx.checkpoint(0, "Listing source files", force=True)
+            if blocked := await asyncio.to_thread(fileops.unwritable_dirs, source):
+                raise PermanentJobError(fileops.permission_message(source, blocked), code="permission_denied")
+            files, others = await asyncio.to_thread(fileops.list_source_files, source)
         total_bytes = sum(f.stat().st_size for f in files) or 1
-        ctx.log(f"Moving {len(files)} files ({total_bytes / 1e9:.2f} GB) to {self._rel(dest)} "
+        ctx.log(f"Moving {len(files)} files ({total_bytes / 1e9:.2f} GB) and {len(others)} link(s) to {self._rel(dest)} "
                 f"with {req.workers} parallel transfers")
         dest.mkdir(parents=True, exist_ok=True)
         tally = dict.fromkeys(fileops.MoveOutcome, 0)
-        conflicts: list[str] = []
+        renamed: list[str] = []
         failed: list[str] = []
         processed_bytes = 0
         messages = {
             fileops.MoveOutcome.MOVED: "moved",
             fileops.MoveOutcome.DEDUPLICATED: "already present (same size), removed from source",
-            fileops.MoveOutcome.CONFLICT: "CONFLICT, destination differs in size, left in source",
         }
+
+        def note(rel: Path, moved: fileops.Moved, is_link: bool = False) -> None:
+            if not is_link:
+                tally[moved.outcome] += 1  # links are counted separately
+            if moved.outcome is fileops.MoveOutcome.RENAMED:
+                new = moved.path.relative_to(dest)
+                renamed.append(f"{rel} -> {new}")
+                ctx.log(f"RENAMED, something else is already at the destination: {rel} -> {new}")
+            else:
+                ctx.log(f"{'link ' if is_link else ''}{messages[moved.outcome]}: {rel}")
 
         async def one(src: Path) -> None:
             nonlocal processed_bytes
             size = src.stat().st_size
             rel = src.relative_to(source)
             try:
-                outcome = await asyncio.to_thread(fileops.move_file, src, dest / rel, job_id[:8])
+                moved = await asyncio.to_thread(fileops.move_file, src, dest / rel, job_id[:8], True)
             except OSError as e:
                 failed.append(f"{rel}: {e.strerror or e}")
                 ctx.log(f"ERROR, left in source: {rel} ({e.strerror or e})")
                 return
             finally:
                 processed_bytes += size
-            tally[outcome] += 1
-            ctx.log(f"{messages[outcome]}: {rel}")
-            if outcome is fileops.MoveOutcome.CONFLICT:
-                conflicts.append(str(rel))
+            note(rel, moved)
 
         await _bounded(files, one, req.workers, ctx, lambda n: (80 * processed_bytes / total_bytes, f"Moving files {n}/{len(files)}"))
-        for link in links:
-            ctx.log(f"skipped symlink: {link.relative_to(source)}")
-        source_empty = await asyncio.to_thread(fileops.remove_empty_dirs, source)
+        links_moved = 0
+        for link in others:
+            rel = link.relative_to(source)
+            try:
+                moved = await asyncio.to_thread(fileops.move_entry, link, dest / rel)
+            except OSError as e:
+                failed.append(f"{rel}: {e.strerror or e}")
+                ctx.log(f"ERROR, left in source: {rel} ({e.strerror or e})")
+                continue
+            links_moved += 1
+            note(rel, moved, is_link=True)
+
+        await ctx.checkpoint(80, "Removing the source folder", force=True)
+        remaining = await asyncio.to_thread(fileops.remove_source_tree, source)
+        source_removed = not os.path.lexists(source)
+        ctx.log("Source folder removed" if source_removed else f"Source folder NOT removed: {len(remaining)} item(s) left")
         ctx.log(f"Moved {tally[fileops.MoveOutcome.MOVED]}, {tally[fileops.MoveOutcome.DEDUPLICATED]} already present, "
-                f"{len(conflicts)} conflicts, {len(failed)} errors; source is {'now empty' if source_empty else 'NOT empty'}")
+                f"{len(renamed)} renamed, {len(failed)} errors")
 
         warnings: list[pydantic.JsonValue] = []
-        if conflicts:
-            warnings.append(f"{len(conflicts)} file(s) already exist at the destination with a different size; left in source.")
+        if renamed:
+            warnings.append(f"{len(renamed)} file(s) clashed with a different file at the destination and were kept under a numbered name.")
+        if links_moved:
+            warnings.append(f"{links_moved} symlink(s)/special file(s) were moved as they are; a relative link may now point elsewhere.")
         if failed:
-            warnings.append(f"{len(failed)} file(s) could not be moved; left in source (see log).")
-        if links:
-            warnings.append(f"{len(links)} symlink(s) in source were skipped.")
+            warnings.append(f"{len(failed)} entr(ies) could not be moved (see log).")
         result: Result = {
             "source": str(source),
             "dest": self._rel(dest),
             "files": len(files),
             "moved": tally[fileops.MoveOutcome.MOVED],
             "deduplicated": tally[fileops.MoveOutcome.DEDUPLICATED],
-            "conflicts": _capped(conflicts),
+            "renamed": _capped(renamed),
+            "links_moved": links_moved,
             "failed": _capped(failed),
-            "skipped_symlinks": _capped(str(p.relative_to(source)) for p in links),
-            "source_empty": source_empty,
+            "source_removed": source_removed,
             "warnings": warnings,
         }
         await self.deps.records.set_result(job_id, result)
-        in_gallery = next((p for p in (source, source.resolve()) if p.is_relative_to(self.deps.root_path)), None)
-        dest_lo = 90 if in_gallery else 80
+
+        dest_lo = 90 if in_gallery else 82
         if in_gallery:
-            ctx.log(f"Source is inside the gallery; rescanning {self._rel(in_gallery)} to drop moved entries")
-            result["source_reindex"] = await self._rescan_source(in_gallery, ctx, 80, dest_lo)
+            ctx.log(f"Source is inside the gallery; updating the index for {self._rel(in_gallery[0])}")
+            source_results = [await self._rescan_source(p, ctx, 82, dest_lo) for p in in_gallery]
+            result["source_reindex"] = source_results[0]
             await self.deps.records.set_result(job_id, result)
         ctx.log(f"Rescanning {self._rel(dest)}")
         result["reindex"] = await self._reindex(dest, ctx, dest_lo, 100)
         await self.deps.records.set_result(job_id, result)
 
+        if not source_removed:
+            first = "; ".join(failed[:3]) or ", ".join(str(p.relative_to(source)) for p in remaining[:3])
+            raise MoveIncompleteError(
+                f"The source folder still exists: {len(remaining)} item(s) could not be moved. {first}"
+            )
+
     async def _rescan_source(self, source: Path, ctx: JobContext, lo: float, hi: float) -> Result:
         if source.is_dir():
             return await self._reindex(source, ctx, lo, hi)
         removed = await self.deps.index.dirs.delete_by_path_prefix(source)
+        await self._unlink_from_parent(source)
         ctx.log(f"Source no longer exists; removed {removed} directories from the index")
         return {"directories": 0, "directories_removed": removed, "videos": 0, "videos_new": 0, "errors": [], "error_count": 0}
 

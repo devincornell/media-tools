@@ -220,7 +220,7 @@ async function submitJob(event) {
     const kind = $('kind').value;
     const body = buildRequest(kind);
     if (kind === 'cleanup' && !body.dry_run && !confirm(`Permanently delete matching files under "${body.path}"?`)) return;
-    if (kind === 'move' && !confirm(`Move everything from\n${body.source}\ninto\n${body.dest}?\nSource files are deleted after a successful copy.`)) return;
+    if (kind === 'move' && !confirm(`Move everything from\n${body.source}\ninto\n${body.dest}?\nThe source folder is removed afterwards. Files whose names clash with different files already there are kept under a numbered name.`)) return;
     const msg = $('formMsg');
     msg.className = 'msg'; msg.textContent = 'Submitting...';
     try {
@@ -261,7 +261,13 @@ function summary(item) {
                 break;
             }
             case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
-            case 'move': parts.push(`${r.moved} moved, ${r.deduplicated} already present, ${(r.conflicts || []).length} conflicts`); break;
+            case 'move': {
+                const extra = [`${(r.renamed || []).length} renamed`];
+                if (r.links_moved) extra.push(`${r.links_moved} link(s)`);
+                extra.push(r.source_removed ? 'source removed' : 'SOURCE STILL EXISTS');
+                parts.push(`${r.moved} moved, ${r.deduplicated} already present, ${extra.join(', ')}`);
+                break;
+            }
         }
         if (r.source_reindex) parts.push(`source rescanned (${r.source_reindex.directories_removed} stale dirs removed)`);
         if (r.reindex) parts.push(`rescanned ${r.reindex.directories} dirs`);
