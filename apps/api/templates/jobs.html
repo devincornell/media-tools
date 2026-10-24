@@ -48,6 +48,8 @@
         pre { white-space: pre-wrap; word-break: break-all; background: var(--panel-2); padding: 0.75rem; border-radius: 8px; max-height: 24rem; overflow: auto; margin: 0; font-size: 0.78rem; }
         .details td { background: #111; }
         .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .details-grid .full { grid-column: 1 / -1; }
+        pre.log { max-height: 30rem; font-family: ui-monospace, monospace; }
         .target { font-family: ui-monospace, monospace; font-size: 0.82rem; }
     </style>
 </head>
@@ -254,12 +256,50 @@ async function cancelJob(id) {
     refresh();
 }
 
+const LOG_PAGE = 2000;
+const LOG_KEEP = 5000;
+const logs = new Map();  // job id -> { pre, lines, lastId, loading }
+
+function logState(id) {
+    if (!logs.has(id)) logs.set(id, { pre: el('pre', { class: 'log' }, 'Loading log...'), lines: [], lastId: null, loading: false });
+    return logs.get(id);
+}
+
+async function fetchLogs(id) {
+    const st = logState(id);
+    if (st.loading) return;
+    st.loading = true;
+    try {
+        const params = new URLSearchParams({ limit: String(LOG_PAGE) });
+        if (st.lastId) params.set('after', st.lastId);
+        const res = await fetch(`/v1/jobs/${encodeURIComponent(id)}/logs?${params}`);
+        if (!res.ok) return;
+        const page = await res.json();
+        const first = st.lastId === null;
+        st.lastId = page.last_id;
+        if (first && page.lines.length === LOG_PAGE) st.lines.push('... earlier lines omitted ...');
+        if (!page.lines.length && !first) return;
+        const pre = st.pre;
+        const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 30;
+        for (const ln of page.lines) {
+            const t = new Date(ln.ts).toLocaleTimeString();
+            st.lines.push(`${t}  ${ln.attempt_no > 1 ? `[attempt ${ln.attempt_no}] ` : ''}${ln.message}`);
+        }
+        if (st.lines.length > LOG_KEEP) st.lines.splice(0, st.lines.length - LOG_KEEP);
+        pre.textContent = st.lines.length ? st.lines.join('\n') : 'No log lines yet.';
+        if (atBottom || first) pre.scrollTop = pre.scrollHeight;
+    } finally {
+        st.loading = false;
+    }
+}
+
 function detailsRow(item) {
     const attempts = item.attempts.map(a =>
         `#${a.attempt_no} ${a.status} ${fmtTime(a.started_at)} → ${fmtTime(a.finished_at) || '...'}` +
         (a.error_message || a.error_code ? `  [${a.error_code || ''}] ${a.error_message || ''}` : '')).join('\n');
     return el('tr', { class: 'details' }, el('td', { colspan: '8' },
         el('div', { class: 'details-grid' },
+            el('div', { class: 'full' }, el('div', { class: 'muted' }, 'Log'), logState(item.job.id).pre),
             el('div', {}, el('div', { class: 'muted' }, 'Parameters'), el('pre', {}, JSON.stringify(item.params, null, 2)),
                 el('div', { class: 'muted', style: 'margin-top: 0.5rem' }, `Attempts (${item.job.attempt_count}/${item.job.max_attempts})`),
                 el('pre', {}, attempts || 'none yet'),
@@ -269,12 +309,15 @@ function detailsRow(item) {
 
 function render(page) {
     const tbody = $('jobRows');
+    const scroll = new Map([...logs].filter(([, st]) => st.pre.isConnected).map(([id, st]) => [id, st.pre.scrollTop]));
     tbody.replaceChildren();
     for (const item of page.items) {
         const job = item.job;
         const actions = el('td', {});
-        actions.append(el('button', { class: 'small', onclick: () => { expanded.has(job.id) ? expanded.delete(job.id) : expanded.add(job.id); render(page); } },
-            expanded.has(job.id) ? 'Hide' : 'Details'));
+        actions.append(el('button', { class: 'small', onclick: () => {
+            if (expanded.has(job.id)) { expanded.delete(job.id); } else { expanded.add(job.id); fetchLogs(job.id); }
+            render(page);
+        } }, expanded.has(job.id) ? 'Hide' : 'Details'));
         if (ACTIVE.has(job.status) && !job.cancel_requested) {
             actions.append(' ', el('button', { class: 'small', onclick: () => cancelJob(job.id) }, 'Cancel'));
         }
@@ -291,6 +334,7 @@ function render(page) {
             actions));
         if (expanded.has(job.id)) tbody.append(detailsRow(item));
     }
+    for (const [id, top] of scroll) if (logs.get(id).pre.isConnected) logs.get(id).pre.scrollTop = top;
     $('listMsg').textContent = page.total > page.items.length ? `Showing ${page.items.length} of ${page.total}` : '';
 }
 
@@ -306,6 +350,7 @@ async function refresh() {
         const page = await res.json();
         if (!res.ok) throw new Error(errorText(page, `HTTP ${res.status}`));
         render(page);
+        for (const item of page.items) if (expanded.has(item.job.id)) fetchLogs(item.job.id);
         if (page.items.some(i => ACTIVE.has(i.job.status))) delay = 2000;
         $('listMsg').classList.remove('error');
     } catch (e) {

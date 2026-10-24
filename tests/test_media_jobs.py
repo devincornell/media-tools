@@ -116,6 +116,12 @@ def test_reindex_subdir_tracks_stale_and_siblings(tree: dict[str, Path]):
         assert r["directories"] == 6 and r["videos_new"] == 5  # clip1/clip1_copy share a hash
         assert r["error_count"] == 3  # empty.mp4, bad.mp4, trip/batch/conflict.mp4 can't be probed
         assert set(await s.gallery.list_directories()) == {".", "a", "b", "trip", "trip/batch", "trip2"}
+        log = [ln.message for ln in await s.job_manager.logs(out["view"].job.id, limit=1000)]
+        assert any(m.startswith("Found 6 directories") for m in log)
+        assert "[1/6] .: 0 videos, 0 images" in log
+        assert sum(m.startswith("[") and "/6] " in m for m in log) == 6
+        assert any("unreadable: a/bad.mp4" in m for m in log)
+        assert log[-1] == "Finished"
 
         shutil.rmtree(tree["root"] / "trip" / "batch")
         status, out = await submit_and_run(s, ReindexRequest(path="trip"))
@@ -123,6 +129,33 @@ def test_reindex_subdir_tracks_stale_and_siblings(tree: dict[str, Path]):
         assert set(await s.gallery.list_directories()) == {".", "a", "b", "trip", "trip2"}  # trip2 untouched
         page = await s.gallery.directory_page("trip")
         assert [v.vid_path_rel for v in page.vids] == ["trip/x.mp4"]
+
+    run_services(tree, body)
+
+
+def test_overlapping_jobs_wait_disjoint_jobs_run_in_parallel(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        jobs = [
+            await s.media_jobs.submit(ReindexRequest(path=".")),
+            await s.media_jobs.submit(ReindexRequest(path="trip")),
+            await s.media_jobs.submit(ThumbnailsRequest(path="a")),
+        ]
+        stop = asyncio.Event()
+        run = asyncio.create_task(s.worker.run(stop))
+        deadline = time.monotonic() + 60
+        while any(j.status is not JobStatus.SUCCEEDED for j in [await s.job_manager.get(j.id) for j in jobs]):
+            assert time.monotonic() < deadline
+            await asyncio.sleep(0.1)
+        stop.set()
+        await asyncio.wait_for(run, 10)
+
+        logs = {j.id: [ln.message for ln in await s.job_manager.logs(j.id, limit=1000)] for j in jobs}
+        waited = [j for j in jobs if any(m.startswith("Waiting for another job") for m in logs[j.id])]
+        assert len(waited) >= 1  # one of the overlapping rescans (. and trip) had to wait for the other
+        attempts = [(await s.job_manager.get(j.id)).attempts for j in jobs]
+        assert all(len(a) == 1 for a in attempts), attempts
+        attempts = [a[0] for a in attempts]
+        assert max(a.started_at for a in attempts) < min(a.finished_at for a in attempts if a.finished_at)
 
     run_services(tree, body)
 
@@ -261,6 +294,10 @@ def test_api_end_to_end(tree: dict[str, Path]):
             assert listing["items"][0]["result"]["directories"] == 6
             assert client.get("/v1/jobs", params={"status": "succeeded"}).json()["total"] == 1
             assert client.get("/v1/jobs/nope").status_code == 404
+            log = client.get(f"/v1/jobs/{accepted['job_id']}/logs", params={"limit": 3}).json()
+            assert [ln["message"] for ln in log["lines"]][-1] == "Finished" and log["last_id"] == log["lines"][-1]["id"]
+            assert client.get(f"/v1/jobs/{accepted['job_id']}/logs", params={"after": log["last_id"]}).json()["lines"] == []
+            assert client.get(f"/v1/jobs/{accepted['job_id']}/logs", params={"after": "bad"}).status_code == 422
             assert client.post(f"/v1/jobs/{accepted['job_id']}/cancel").json()["status"] == "succeeded"
 
             assert "/jobs?path=trip" in client.get("/page/trip").text

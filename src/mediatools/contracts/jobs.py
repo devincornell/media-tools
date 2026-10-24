@@ -50,6 +50,18 @@ class JobPage(_Contract):
     offset: Annotated[int, Field(description="Offset used.")]
 
 
+class JobLogLineView(_Contract):
+    id: Annotated[str, Field(description="Opaque, increasing line ID; pass as `after` to fetch newer lines.")]
+    attempt_no: Annotated[int, Field(description="Attempt that wrote the line.")]
+    ts: Annotated[datetime.datetime, Field(description="When the line was logged (UTC).")]
+    message: Annotated[str, Field(description="Log text.")]
+
+
+class JobLogPage(_Contract):
+    lines: Annotated[list[JobLogLineView], Field(description="Log lines, oldest first.")]
+    last_id: Annotated[str | None, Field(description="ID of the last line returned (or the `after` given if none).")]
+
+
 class JobAccepted(_Contract):
     '''Returned with HTTP 202 when a job is queued.'''
 

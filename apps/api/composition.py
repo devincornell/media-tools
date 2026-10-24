@@ -11,7 +11,7 @@ from mediatools.application.media_jobs import (
     build_handlers,
 )
 from mediatools.index_db import MediaIndexDB, MediaJobCollection
-from mediatools.jobs import JobManager, JobWorker, MongoJobRepository
+from mediatools.jobs import JobManager, JobWorker, MongoJobLogStore, MongoJobRepository
 
 from .settings import ServerConfig
 
@@ -29,9 +29,11 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
     index = await MediaIndexDB.from_client(database)  # type: ignore[arg-type]
     repo = MongoJobRepository.from_database(database)
     await repo.create_indexes()
+    log_store = MongoJobLogStore.from_database(database)
+    await log_store.create_indexes()
     records = MediaJobCollection.from_database(database)
     # Jobs are scoped to the gallery root they operate on.
-    manager = JobManager(repo, scope_id=str(config.root_path))
+    manager = JobManager(repo, scope_id=str(config.root_path), log_store=log_store)
     deps = MediaJobDeps(
         root_path=config.root_path,
         thumb_path=config.thumb_path,
@@ -58,6 +60,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
             repo,
             build_handlers(deps),
             scope_id=manager.scope_id,
+            logs=log_store,
             lease_seconds=config.job_lease_seconds,
             concurrency=config.worker_concurrency,
         ),

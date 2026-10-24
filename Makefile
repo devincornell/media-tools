@@ -60,6 +60,7 @@ serve_gopro: SERVE_PORT = 8000
 serve_gopro: SERVE_COPY_ROOTS =
 
 # SERVE_COPY_ROOTS: space-separated dirs that move jobs may read from (empty disables move jobs).
+# SERVE_WORKERS: jobs run at once (default 4).
 serve_dwhost serve_gopro:
 	uv run --group api python -m apps.api \
 		--root-path "$(SERVE_ROOT)" \
@@ -68,6 +69,7 @@ serve_dwhost serve_gopro:
 		--template-path $(SERVE_TEMPLATE) \
 		--reels-template-path scripts/templates/reels.html \
 		$(foreach r,$(SERVE_COPY_ROOTS),--copy-source-root "$(r)") \
+		$(if $(SERVE_WORKERS),--worker-concurrency $(SERVE_WORKERS)) \
 		--port $(SERVE_PORT)
 
 worker:

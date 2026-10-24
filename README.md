@@ -28,7 +28,7 @@ import mediatools
 | `SITE_MAX_CLIP_DURATION` | no | Videos shorter than this many seconds are listed as clips (default 0). |
 | `SITE_COPY_SOURCE_ROOTS` | no | JSON list of directories move jobs may read from, e.g. `'["/mnt/incoming"]'`. Empty (default) disables move jobs. |
 | `SITE_RUN_WORKER` | no | Run the job worker inside the server process (default `true`). |
-| `SITE_WORKER_CONCURRENCY` | no | Jobs one worker runs at once (default 1). |
+| `SITE_WORKER_CONCURRENCY` | no | Jobs one worker runs at once (default 4). |
 | `SITE_JOB_LEASE_SECONDS` | no | How long a job stays claimed without a heartbeat before another worker may resume it (default 60). |
 
 Run locally from the repo root:
@@ -68,7 +68,11 @@ Long-running maintenance runs as background jobs, tracked in MongoDB, viewable a
 | Convert to MP4 | Converts other video formats to MP4 next to the originals, then rescans. |
 | Move + rescan | Moves a directory (from a `SITE_COPY_SOURCE_ROOTS` location) into the gallery in parallel, then rescans the destination. Files already present with the same size are just deleted from the source; files present with a *different* size are left in the source and reported. |
 
-Jobs survive restarts: an interrupted job is resumed by the next worker once its lease expires, and every handler skips work that is already done. Cancelling stops a running job at its next checkpoint. To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
+Jobs survive restarts: an interrupted job is resumed by the next worker once its lease expires, and every handler skips work that is already done. Cancelling stops a running job at its next checkpoint.
+
+Jobs run in parallel (`SITE_WORKER_CONCURRENCY`, default 4). Jobs that change the index or files (rescan, convert, move, and cleanup with deletes) wait for any other job in the same worker that touches an overlapping folder (the same folder, a parent, or a child). Thumbnails and dry-run cleanups only read, so they run alongside each other. Each job writes a live log (the per-directory output of a rescan, every file moved, and so on), shown under **Details** and available at `GET /v1/jobs/{id}/logs`. Logs are kept for 30 days.
+
+To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
 
 The server has no authentication. Anyone who can reach it can start jobs, including deletes. Keep it on a trusted network.
 

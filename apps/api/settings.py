@@ -22,7 +22,7 @@ class Settings(pydantic_settings.BaseSettings):
     site_max_clip_duration: float = 0.0
     site_copy_source_roots: list[Path] = []
     site_run_worker: bool = True
-    site_worker_concurrency: int = 1
+    site_worker_concurrency: int = 4
     site_job_lease_seconds: float = 60.0
 
 
@@ -37,7 +37,7 @@ class ServerConfig:
     database_name: str
     copy_source_roots: tuple[Path, ...] = ()
     run_worker: bool = True
-    worker_concurrency: int = 1
+    worker_concurrency: int = 4
     job_lease_seconds: float = 60.0
 
     @classmethod

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import builtins
 import dataclasses
 
+from .logs import JobLogLine, MongoJobLogStore
 from .models import Job, JobStatus, new_job_id, utcnow
 from .repository import MongoJobRepository
 
@@ -16,6 +18,7 @@ class JobManager:
 
     repo: MongoJobRepository
     scope_id: str
+    log_store: MongoJobLogStore | None = None
 
     async def submit(
         self,
@@ -61,3 +64,10 @@ class JobManager:
         if job is None:
             raise JobNotFoundError(f"Job not found: {job_id}")
         return job
+
+    async def logs(self, job_id: str, *, after: str | None = None, limit: int = 500) -> builtins.list[JobLogLine]:
+        '''Log lines after line ID `after`, or the most recent `limit` lines.'''
+        await self.get(job_id)
+        if self.log_store is None:
+            return []
+        return await self.log_store.read(job_id, after=after, limit=limit)

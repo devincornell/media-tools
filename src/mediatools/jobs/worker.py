@@ -12,6 +12,7 @@ import typing
 import uuid
 from collections.abc import Callable, Mapping
 
+from .logs import MongoJobLogStore
 from .models import Job, utcnow
 from .repository import LeaseLostError, MongoJobRepository
 
@@ -33,12 +34,20 @@ class PermanentJobError(Exception):
 
 
 class JobContext:
-    '''Handed to handlers for progress reporting and cancellation checks.'''
+    '''Handed to handlers for progress reporting, logging, and cancellation checks.'''
 
-    def __init__(self, job: Job, repo: MongoJobRepository, progress_interval: float = 1.0):
+    def __init__(
+        self,
+        job: Job,
+        repo: MongoJobRepository,
+        logs: MongoJobLogStore | None = None,
+        progress_interval: float = 1.0,
+    ):
         self.job = job
         self.lease_lost = False
         self._repo = repo
+        self._logs = logs
+        self._log_buffer: list[tuple[datetime.datetime, str]] = []
         self._progress_interval = progress_interval
         self._last_write = 0.0
 
@@ -50,12 +59,22 @@ class JobContext:
     def cancel_requested(self) -> bool:
         return self.job.cancel_requested_at is not None
 
+    def log(self, message: str) -> None:
+        '''Queue a log line; lines are written in batches at checkpoints.'''
+        self._log_buffer.append((utcnow(), message))
+
+    async def flush_logs(self) -> None:
+        if self._logs is not None and self._log_buffer:
+            lines, self._log_buffer = self._log_buffer, []
+            await self._logs.append(self.job_id, self.job.attempt_count, lines)
+
     async def checkpoint(self, percent: float | None = None, stage: str | None = None, *, force: bool = False) -> None:
-        '''Report progress (throttled) and raise JobCanceled if cancellation was requested.'''
+        '''Report progress and flush logs (throttled); raise JobCanceled if cancellation was requested.'''
         now = time.monotonic()
         if force or now - self._last_write >= self._progress_interval:
             pct = None if percent is None else max(0, min(100, int(percent)))
             self.job = await self._repo.update_progress(self.job, pct, stage)
+            await self.flush_logs()
             self._last_write = now
         if self.cancel_requested:
             raise JobCanceled()
@@ -82,6 +101,7 @@ class JobWorker:
     repo: MongoJobRepository
     handlers: Mapping[str, JobHandler]
     scope_id: str | None = None
+    logs: MongoJobLogStore | None = None
     worker_id: str = dataclasses.field(default_factory=default_worker_id)
     lease_seconds: float = 60.0
     poll_interval: float = 2.0
@@ -124,7 +144,8 @@ class JobWorker:
         return await self.repo.claim(self.worker_id, self.lease_seconds, self.handlers.keys(), self.scope_id)
 
     async def _execute(self, job: Job) -> None:
-        ctx = JobContext(job, self.repo)
+        ctx = JobContext(job, self.repo, self.logs)
+        ctx.log(f"Attempt {job.attempt_count}/{job.max_attempts} started on {self.worker_id}")
         handler_task = asyncio.create_task(self.handlers[job.job_type].execute(job.id, ctx))
         lease_task = asyncio.create_task(self._keep_lease(ctx, handler_task))
         try:
@@ -132,25 +153,35 @@ class JobWorker:
         except asyncio.CancelledError:
             current = asyncio.current_task()
             if current is not None and current.cancelling():
+                ctx.log("Worker shutting down; job returned to the queue")
                 if not ctx.lease_lost:
                     await self._safe(self.repo.release(ctx.job))
                 raise
+            ctx.log("Lease lost; another worker will resume this job")
             logger.warning("Lease lost for job %s; abandoning attempt %s", job.id, job.attempt_count)
         except LeaseLostError:
+            ctx.log("Lease lost; another worker will resume this job")
             logger.warning("Lease lost for job %s; abandoning attempt %s", job.id, job.attempt_count)
         except JobCanceled:
+            ctx.log("Canceled")
             await self._safe(self.repo.confirm_cancel(ctx.job))
         except PermanentJobError as e:
+            ctx.log(f"Failed: {e}")
             await self._safe(self.repo.fail(ctx.job, e.code, str(e), retry_at=None))
         except Exception as e:
             logger.exception("Job %s (%s) attempt %s failed", job.id, job.job_type, job.attempt_count)
-            await self._safe(self.repo.fail(ctx.job, type(e).__name__, str(e), retry_at=self._retry_at(ctx.job)))
+            retry_at = self._retry_at(ctx.job)
+            ctx.log(f"Error: {type(e).__name__}: {e}" + (
+                f"; retrying at {retry_at:%H:%M:%S} UTC" if retry_at else "; no attempts left"))
+            await self._safe(self.repo.fail(ctx.job, type(e).__name__, str(e), retry_at=retry_at))
         else:
+            ctx.log("Finished")
             await self._safe(self.repo.complete(ctx.job, result_ref))
         finally:
             lease_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await lease_task
+            await self._safe(ctx.flush_logs())
 
     def _retry_at(self, job: Job) -> datetime.datetime | None:
         if job.attempt_count >= job.max_attempts:

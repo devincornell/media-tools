@@ -19,6 +19,7 @@ from mediatools.jobs import (
     JobStatus,
     JobWorker,
     LeaseLostError,
+    MongoJobLogStore,
     MongoJobRepository,
     PermanentJobError,
 )
@@ -225,5 +226,72 @@ def test_handler_cancel_exception_is_cooperative():
         job = await JobManager(repo, "s").submit("t.v1")
         await worker(repo, **{"t.v1": FnHandler(fn)}).run_once()
         assert (await repo.get(job.id)).status is JobStatus.CANCELED
+
+    run_with_repo(body)
+
+
+def test_logs_are_persisted_paginated_and_scoped():
+    async def body(repo: MongoJobRepository) -> None:
+        store = MongoJobLogStore(repo._collection.database["job_logs"])
+        await store.create_indexes()
+
+        async def fn(job_id: str, ctx: JobContext) -> None:
+            for i in range(25):
+                ctx.log(f"line {i}")
+            await ctx.checkpoint(50, "half", force=True)
+            if ctx.job.attempt_count == 1:
+                raise RuntimeError("boom")
+
+        manager = JobManager(repo, "s", log_store=store)
+        job = await manager.submit("t.v1")
+        w = JobWorker(repo, {"t.v1": FnHandler(fn)}, logs=store, poll_interval=0.05, backoff=lambda n: 0.0)
+        await w.run_once()
+        await w.run_once()
+
+        lines = await manager.logs(job.id, limit=1000)
+        messages = [ln.message for ln in lines]
+        assert messages[0].startswith("Attempt 1/3 started on")
+        assert messages[1:26] == [f"line {i}" for i in range(25)]
+        assert messages[26].startswith("Error: RuntimeError: boom; retrying")
+        assert messages[27].startswith("Attempt 2/3 started") and messages[-1] == "Finished"
+        assert {ln.attempt_no for ln in lines} == {1, 2}
+
+        tail = await manager.logs(job.id, limit=3)
+        assert [ln.message for ln in tail] == messages[-3:]
+        after = await manager.logs(job.id, after=lines[10].id, limit=5)
+        assert [ln.message for ln in after] == messages[11:16]
+        with pytest.raises(JobNotFoundError):
+            await JobManager(repo, "other", log_store=store).logs(job.id)
+
+    run_with_repo(body)
+
+
+def test_worker_runs_jobs_concurrently():
+    async def body(repo: MongoJobRepository) -> None:
+        running = 0
+        peak = 0
+        gate = asyncio.Event()
+
+        async def fn(job_id: str, ctx: JobContext) -> None:
+            nonlocal running, peak
+            running += 1
+            peak = max(peak, running)
+            if running == 3:
+                gate.set()
+            await asyncio.wait_for(gate.wait(), 5)
+            running -= 1
+
+        m = JobManager(repo, "s")
+        jobs = [await m.submit("t.v1") for _ in range(4)]
+        stop = asyncio.Event()
+        w = JobWorker(repo, {"t.v1": FnHandler(fn)}, concurrency=3, poll_interval=0.05)
+        run = asyncio.create_task(w.run(stop))
+        deadline = asyncio.get_running_loop().time() + 10
+        while not all(j.status is JobStatus.SUCCEEDED for j in [await repo.get(j.id) for j in jobs]):
+            assert asyncio.get_running_loop().time() < deadline
+            await asyncio.sleep(0.05)
+        stop.set()
+        await asyncio.wait_for(run, 5)
+        assert peak == 3
 
     run_with_repo(body)
