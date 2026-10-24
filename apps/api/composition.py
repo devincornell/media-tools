@@ -6,6 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from mediatools.application import BrowserService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
+from mediatools.application.uploads import UploadService
 from mediatools.application.media_jobs import (
     MediaJobDeps,
     MediaJobService,
@@ -22,6 +23,7 @@ class Services:
     gallery: GalleryService
     browser: BrowserService
     picker: FolderPicker
+    uploads: UploadService
     job_manager: JobManager
     media_jobs: MediaJobService
     worker: JobWorker
@@ -54,6 +56,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
         ),
         browser=BrowserService(root_path=config.root_path, dirs=index.dirs),
         picker=FolderPicker(gallery_root=config.root_path, source_roots=config.copy_source_roots),
+        uploads=UploadService(root_path=config.root_path),
         job_manager=manager,
         media_jobs=MediaJobService(
             root_path=config.root_path,

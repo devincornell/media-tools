@@ -7,6 +7,7 @@ from pathlib import Path
 import pydantic_settings
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 class Settings(pydantic_settings.BaseSettings):

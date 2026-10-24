@@ -8,6 +8,7 @@ from mediatools.application import (
     InvalidJobRequestError,
     MediaFileNotFoundError,
     PathOutsideRootError,
+    UploadError,
 )
 from mediatools.contracts import ErrorResponse
 from mediatools.jobs import JobNotFoundError
@@ -30,9 +31,15 @@ async def _invalid_request(request: Request, exc: Exception) -> JSONResponse:
     return _error(422, str(exc))
 
 
+async def _upload_error(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, UploadError)
+    return _error(exc.status_code, str(exc))
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DirectoryNotIndexedError, _not_found)
     app.add_exception_handler(MediaFileNotFoundError, _not_found)
     app.add_exception_handler(PathOutsideRootError, _outside_root)
     app.add_exception_handler(JobNotFoundError, _not_found)
     app.add_exception_handler(InvalidJobRequestError, _invalid_request)
+    app.add_exception_handler(UploadError, _upload_error)

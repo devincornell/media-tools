@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 
 from mediatools.application import BrowserService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
+from mediatools.application.uploads import UploadService
 from mediatools.application.media_jobs import MediaJobService
 from mediatools.contracts import JobConfigView
 from mediatools.jobs import JobManager
@@ -23,6 +24,10 @@ def get_browser(request: Request) -> BrowserService:
 
 def get_picker(request: Request) -> FolderPicker:
     return request.app.state.picker
+
+
+def get_uploads(request: Request) -> UploadService:
+    return request.app.state.uploads
 
 
 def get_renderer(request: Request) -> PageRenderer:
@@ -44,6 +49,7 @@ def get_job_config(request: Request) -> JobConfigView:
 GalleryDep = Annotated[GalleryService, Depends(get_gallery)]
 BrowserDep = Annotated[BrowserService, Depends(get_browser)]
 PickerDep = Annotated[FolderPicker, Depends(get_picker)]
+UploadDep = Annotated[UploadService, Depends(get_uploads)]
 RendererDep = Annotated[PageRenderer, Depends(get_renderer)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager)]
 MediaJobsDep = Annotated[MediaJobService, Depends(get_media_jobs)]

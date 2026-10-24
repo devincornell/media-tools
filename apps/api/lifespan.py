@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.gallery = services.gallery
         app.state.browser = services.browser
         app.state.picker = services.picker
+        app.state.uploads = services.uploads
         app.state.job_manager = services.job_manager
         app.state.media_jobs = services.media_jobs
         app.state.job_config = JobConfigView(
