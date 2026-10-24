@@ -399,7 +399,8 @@ class MoveHandler(_Base):
         if not source.is_dir():
             raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
         dest = self._target(req.dest)
-        async with self._locked(ctx, [source, dest], exclusive=True):
+        # Lock the real locations too, so a symlink alias can't dodge another job's lock.
+        async with self._locked(ctx, [source, source.resolve(), dest, dest.resolve()], exclusive=True):
             await self._run(job_id, req, source, dest, ctx)
         return None
 
@@ -467,11 +468,11 @@ class MoveHandler(_Base):
             "warnings": warnings,
         }
         await self.deps.records.set_result(job_id, result)
-        in_gallery = source.is_relative_to(self.deps.root_path)
+        in_gallery = next((p for p in (source, source.resolve()) if p.is_relative_to(self.deps.root_path)), None)
         dest_lo = 90 if in_gallery else 80
         if in_gallery:
-            ctx.log(f"Source is inside the gallery; rescanning {self._rel(source)} to drop moved entries")
-            result["source_reindex"] = await self._rescan_source(source, ctx, 80, dest_lo)
+            ctx.log(f"Source is inside the gallery; rescanning {self._rel(in_gallery)} to drop moved entries")
+            result["source_reindex"] = await self._rescan_source(in_gallery, ctx, 80, dest_lo)
             await self.deps.records.set_result(job_id, result)
         ctx.log(f"Rescanning {self._rel(dest)}")
         result["reindex"] = await self._reindex(dest, ctx, dest_lo, 100)

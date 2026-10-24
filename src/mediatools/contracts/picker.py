@@ -23,6 +23,8 @@ class PickerDir(_Contract):
     path: Annotated[str, Field(description="Absolute path.")]
     rel: Annotated[str | None, Field(description="Path relative to the gallery root, or null if outside it.")]
     readable: Annotated[bool, Field(description="Whether the server can list this folder.")]
+    is_symlink: Annotated[bool, Field(description="Whether this entry is a symbolic link to a folder (it is followed).")]
+    link_target: Annotated[str | None, Field(description="Where the symbolic link points, if `is_symlink`.")]
     writable: Annotated[bool, Field(description="Whether the server can create and delete entries in this folder.")]
     owner: Annotated[str, Field(description="Owning user.")]
     num_files: Annotated[int, Field(description="Files directly inside (capped; see `more_files`).")]

@@ -68,7 +68,7 @@ Long-running maintenance runs as background jobs, tracked in MongoDB, viewable a
 | Convert to MP4 | Converts other video formats to MP4 next to the originals, then rescans. |
 | Move + rescan | Moves a directory (from a `SITE_COPY_SOURCE_ROOTS` location) into the gallery in parallel, then rescans the destination. Files already present with the same size are just deleted from the source; files present with a *different* size are left in the source and reported. The server user must be able to delete files in every source folder; if it can't, the move is refused before anything is copied, with the `chown` command to fix it. |
 
-Every path field on the jobs page has a **Browse…** button that opens a folder picker. It lists folders live from disk, but only inside the gallery root (for targets and destinations) or the copy source roots (for move sources), and marks folders the server can't write to.
+Every path field on the jobs page has a **Browse…** button that opens a folder picker. It lists folders live from disk, but only inside the gallery root (for targets and destinations) or the copy source roots (for move sources), and marks folders the server can't write to. Symbolic links to folders are followed and shown with a link icon, even when they point outside those roots, so a symlink you place inside a copy source root makes its target movable. Links inside a move source are still skipped, never followed.
 
 Jobs survive restarts: an interrupted job is resumed by the next worker once its lease expires, and every handler skips work that is already done. Cancelling stops a running job at its next checkpoint.
 

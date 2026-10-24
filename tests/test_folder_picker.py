@@ -46,19 +46,29 @@ def test_gallery_scope(layout: dict[str, Path]):
     assert italy.parent == str(layout["gallery"] / "trips") and italy.rel == "trips/italy"
 
 
-def test_source_scope_hides_escaping_symlinks_and_reports_permissions(layout: dict[str, Path]):
+def test_source_scope_follows_symlinks_and_reports_permissions(layout: dict[str, Path]):
+    (layout["outside"] / "real_sub").mkdir()
+    (layout["outside"] / "real_file").write_bytes(b"x")
     picker = FolderPicker(layout["gallery"], (layout["incoming"],))
     src = listing(picker, "source")
     by_name = {d.name: d for d in src.dirs}
-    assert set(by_name) == {"batch", "locked"}  # "escape" points outside every root
-    assert by_name["batch"].rel is None and by_name["batch"].num_files == 2
+    assert set(by_name) == {"batch", "locked", "escape"}
+    assert by_name["batch"].rel is None and by_name["batch"].num_files == 2 and not by_name["batch"].is_symlink
     assert by_name["locked"].writable is False and by_name["locked"].readable is True
+    link = by_name["escape"]
+    assert (link.is_symlink, link.link_target, link.num_files, link.has_subdirs) == (True, str(layout["outside"]), 1, True)
+
+    inside = listing(picker, "source", link.path)  # navigate through the link
+    assert inside.path == str(layout["incoming"] / "escape") and inside.parent == str(layout["incoming"])
+    assert [d.name for d in inside.dirs] == ["real_sub"]
+    assert listing(picker, "source", inside.dirs[0].path).parent == inside.path
 
 
 def test_paths_outside_roots_are_rejected(layout: dict[str, Path]):
     picker = FolderPicker(layout["gallery"], (layout["incoming"],))
     for scope, path in [("gallery", str(layout["incoming"])), ("source", str(layout["outside"])),
-                        ("source", str(layout["incoming"] / "escape")), ("gallery", str(layout["gallery"] / ".."))]:
+                        ("gallery", str(layout["gallery"] / "..")),
+                        ("source", str(layout["incoming"] / "escape" / ".." / ".."))]:
         with pytest.raises(PathOutsideRootError):
             listing(picker, scope, path)
     with pytest.raises(MediaFileNotFoundError):

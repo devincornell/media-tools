@@ -125,8 +125,8 @@ class MediaJobService:
         if not os.access(source, os.W_OK | os.X_OK):
             raise InvalidJobRequestError(fileops.permission_message(source, [source]))
         dest = self._under_root(request.dest)
-        dest_real = dest.resolve()
-        if dest_real.is_relative_to(source) or source.is_relative_to(dest_real):
+        dest_real, source_real = dest.resolve(), source.resolve()
+        if dest_real.is_relative_to(source_real) or source_real.is_relative_to(dest_real):
             raise InvalidJobRequestError("Source and destination must not contain each other.")
         existing = next(p for p in (dest, *dest.parents) if p.exists())
         if not os.access(existing, os.W_OK | os.X_OK):

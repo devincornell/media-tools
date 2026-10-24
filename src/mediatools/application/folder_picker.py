@@ -31,11 +31,14 @@ class FolderPicker:
         roots = (self.gallery_root,) if scope == "gallery" else self.source_roots
         if not roots:
             raise InvalidJobRequestError("Move jobs are disabled: no copy source roots are configured.")
-        return tuple(r.resolve() for r in roots)
+        return tuple(Path(os.path.normpath(r)) for r in roots)
 
     def _list(self, scope: PickerScope, path: str | None) -> PickerListing:
         roots = self._scope_roots(scope)
-        target = Path(path).resolve() if path else roots[0]
+        if path and not os.path.isabs(path):
+            raise PathOutsideRootError(f"Path must be absolute: {path}")
+        # Lexical, not resolved: a symlink inside a root is followed even when it points elsewhere.
+        target = Path(os.path.normpath(path)) if path else roots[0]
         # Outermost matching root, so you can always navigate back up to it.
         matching = [r for r in roots if target.is_relative_to(r)]
         if not matching:
@@ -51,10 +54,8 @@ class FolderPicker:
         except PermissionError as e:
             raise InvalidJobRequestError(f"The server can't read {target}") from e
         for entry in entries:
-            if entry.is_dir():
-                child = Path(entry.path).resolve()
-                if any(child.is_relative_to(r) for r in roots):
-                    dirs.append(self._describe(entry.name, child))
+            if entry.is_dir():  # follows symlinks
+                dirs.append(self._describe(entry.name, target / entry.name, entry.is_symlink()))
             elif entry.is_file():
                 num_files += 1
         st = target.stat()
@@ -70,7 +71,7 @@ class FolderPicker:
             dirs=sorted(dirs, key=lambda d: d.name.lower()),
         )
 
-    def _describe(self, name: str, path: Path) -> PickerDir:
+    def _describe(self, name: str, path: Path, is_symlink: bool) -> PickerDir:
         num_files, has_subdirs, readable = 0, False, True
         try:
             with os.scandir(path) as it:
@@ -88,6 +89,8 @@ class FolderPicker:
             path=str(path),
             rel=self._rel(path),
             readable=readable,
+            is_symlink=is_symlink,
+            link_target=os.readlink(path) if is_symlink else None,
             writable=os.access(path, os.W_OK | os.X_OK),
             owner=user_name(path.stat().st_uid),
             num_files=num_files,
@@ -96,5 +99,5 @@ class FolderPicker:
         )
 
     def _rel(self, path: Path) -> str | None:
-        root = self.gallery_root.resolve()
+        root = Path(os.path.normpath(self.gallery_root))
         return str(path.relative_to(root)) if path.is_relative_to(root) else None

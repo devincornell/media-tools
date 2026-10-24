@@ -16,11 +16,13 @@ def resolve_under_root(root: Path, rel_path: str) -> Path:
 
 
 def resolve_allowed_source(source: str, allowed_roots: Iterable[Path]) -> Path:
-    '''Resolve `source` (following symlinks) and require it to be inside one of `allowed_roots`.'''
-    path = Path(source)
-    if not path.is_absolute():
+    '''Require `source` to be inside one of `allowed_roots`, lexically, so symlinks inside a root are followed.
+
+    The allow-list is therefore only as strict as the symlinks you create inside the roots.
+    '''
+    if not os.path.isabs(source):
         raise PathOutsideRootError(f"Source must be an absolute path: {source}")
-    resolved = path.resolve()
-    if not any(resolved.is_relative_to(root.resolve()) for root in allowed_roots):
+    path = Path(os.path.normpath(source))
+    if not any(path.is_relative_to(os.path.normpath(root)) for root in allowed_roots):
         raise PathOutsideRootError(f"Source is not inside an allowed copy source root: {source}")
-    return resolved
+    return path

@@ -241,7 +241,8 @@ async function pickerGo(path) {
 
 function dirMeta(d) {
     const files = d.readable ? `${d.num_files.toLocaleString()}${d.more_files ? '+' : ''} files` : 'no access';
-    return d.writable ? files : `${files} \u00b7 read-only (owner: ${d.owner})`;
+    const link = d.is_symlink ? `\u2192 ${d.link_target} \u00b7 ` : '';
+    return link + (d.writable ? files : `${files} \u00b7 read-only (owner: ${d.owner})`);
 }
 
 function renderPicker() {
@@ -257,7 +258,7 @@ function renderPicker() {
     const rows = L.dirs.map(d => el('div', {
         class: `prow${d.name.startsWith('.') ? ' hidden-dir' : ''}${d.writable ? '' : ' locked'}`,
         title: d.path, onclick: () => d.readable && pickerGo(d.path),
-    }, el('i', { class: `fas ${d.writable ? 'fa-folder' : 'fa-folder-closed'} ico` }),
+    }, el('i', { class: `fas ${d.is_symlink ? 'fa-link' : d.writable ? 'fa-folder' : 'fa-folder-closed'} ico` }),
        el('span', { class: 'nm' }, d.name),
        el('span', { class: 'meta' }, dirMeta(d)),
        d.has_subdirs ? el('i', { class: 'fas fa-chevron-right meta' }) : null));

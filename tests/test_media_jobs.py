@@ -310,6 +310,26 @@ def test_move_refuses_sources_it_cannot_delete_from(tree: dict[str, Path]):
     run_services(tree, body)
 
 
+def test_move_follows_symlinked_source(tree: dict[str, Path], tmp_path: Path):
+    real = tmp_path / "elsewhere" / "stash"
+    real.mkdir(parents=True)
+    shutil.copy(tree["root"] / "trip" / "x.mp4", real / "clip.mp4")
+    (real / "inner_link").symlink_to(tree["root"])  # links inside the source are not followed
+    link = tree["incoming"] / "stash_link"
+    link.symlink_to(real)
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        status, out = await submit_and_run(s, MoveRequest(source=str(link), dest="imported_link"))
+        r = out["result"]
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert (r["moved"], r["skipped_symlinks"]) == (1, ["inner_link"]) and r["source"] == str(link)
+        assert (tree["root"] / "imported_link" / "clip.mp4").is_file()
+        assert not (real / "clip.mp4").exists()
+        assert (await s.gallery.directory_page("imported_link")).num_vids == 1
+
+    run_services(tree, body)
+
+
 def test_submission_validation(tree: dict[str, Path], tmp_path: Path):
     async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
         bad = [
