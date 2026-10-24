@@ -12,3 +12,7 @@ class MediaFileNotFoundError(GalleryError):
 
 class PathOutsideRootError(GalleryError):
     '''The requested relative path escapes the gallery root.'''
+
+
+class InvalidJobRequestError(GalleryError):
+    '''A job submission was rejected (bad path, disabled feature, ...).'''

@@ -5,6 +5,11 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
+# Needed by job handlers (probing, thumbnails, conversion).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --group api --no-install-project
 COPY src/ src/

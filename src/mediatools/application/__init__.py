@@ -1,6 +1,7 @@
 from .errors import (
     DirectoryNotIndexedError,
     GalleryError,
+    InvalidJobRequestError,
     MediaFileNotFoundError,
     PathOutsideRootError,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "DirectoryNotIndexedError",
     "GalleryError",
     "GalleryService",
+    "InvalidJobRequestError",
     "MediaFileNotFoundError",
     "PathOutsideRootError",
     "VideoIndexReader",

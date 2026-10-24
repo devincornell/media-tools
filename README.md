@@ -26,6 +26,10 @@ import mediatools
 | `SITE_REELS_TEMPLATE_PATH` | no | Reels template (default `apps/api/templates/reels.html`). |
 | `SITE_PORT` | no | Port for `python -m apps.api` and the Compose host port (default 8000). |
 | `SITE_MAX_CLIP_DURATION` | no | Videos shorter than this many seconds are listed as clips (default 0). |
+| `SITE_COPY_SOURCE_ROOTS` | no | JSON list of directories move jobs may read from, e.g. `'["/mnt/incoming"]'`. Empty (default) disables move jobs. |
+| `SITE_RUN_WORKER` | no | Run the job worker inside the server process (default `true`). |
+| `SITE_WORKER_CONCURRENCY` | no | Jobs one worker runs at once (default 1). |
+| `SITE_JOB_LEASE_SECONDS` | no | How long a job stays claimed without a heartbeat before another worker may resume it (default 60). |
 
 Run locally from the repo root:
 
@@ -35,7 +39,7 @@ uv run --group api uvicorn apps.api.main:app --reload
 uv run --group api python -m apps.api --root-path /path/to/media -p 8000
 ```
 
-Run in Docker (reads `SITE_*` from `.env`; media and thumbnails are mounted read-only):
+Run in Docker (reads `SITE_*` from `.env`; runs as UID/GID 1000 by default, set `UID`/`GID` to match the owner of your media):
 
 ```bash
 docker compose up -d --build
@@ -50,7 +54,25 @@ with GalleryClient("http://localhost:8000") as client:
     page = client.get_directory("some/subdir")
 ```
 
-Tests: `uv run --group api --extra client pytest tests/test_api.py`.
+Tests: `uv run --group api --extra client pytest tests/test_api.py tests/test_fileops.py`.
+
+### Jobs
+
+Long-running maintenance runs as background jobs, tracked in MongoDB, viewable and startable at `/jobs` (the sync icon in the gallery sidebar opens it for the current folder). Each job targets one directory, so subdirectories can be processed independently:
+
+| Task | What it does |
+|---|---|
+| Rescan | Re-indexes a directory tree: updates changed folders, removes deleted ones, probes new videos. |
+| Thumbnails | Creates missing animated GIF thumbnails (optionally regenerates all). |
+| Cleanup | Finds empty, unprobable, or same-folder duplicate videos. **Dry run by default**; turn it off to delete, after which the folder is rescanned. |
+| Convert to MP4 | Converts other video formats to MP4 next to the originals, then rescans. |
+| Move + rescan | Moves a directory (from a `SITE_COPY_SOURCE_ROOTS` location) into the gallery in parallel, then rescans the destination. Files already present with the same size are just deleted from the source; files present with a *different* size are left in the source and reported. |
+
+Jobs survive restarts: an interrupted job is resumed by the next worker once its lease expires, and every handler skips work that is already done. Cancelling stops a running job at its next checkpoint. To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
+
+The server has no authentication. Anyone who can reach it can start jobs, including deletes. Keep it on a trusted network.
+
+Job tests need a disposable MongoDB (never a real one): `make test_mongo_up && make test_jobs && make test_mongo_down`.
 
 
 ## API Overview

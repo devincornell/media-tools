@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Protocol
@@ -16,8 +15,8 @@ from ..video.ffmpeg import NoResolutionError, NoVideoStreamError
 from .errors import (
     DirectoryNotIndexedError,
     MediaFileNotFoundError,
-    PathOutsideRootError,
 )
+from .paths import resolve_under_root
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +44,7 @@ class GalleryService:
     videos: VideoIndexReader
 
     def resolve_under_root(self, rel_path: str) -> Path:
-        '''Join `rel_path` to the root, rejecting paths that escape it (lexically, so symlinks inside the root still work).'''
-        candidate = Path(os.path.normpath(self.root_path / (rel_path or ".")))
-        if not candidate.is_relative_to(self.root_path):
-            raise PathOutsideRootError(f"Path is outside the gallery root: {rel_path}")
-        return candidate
+        return resolve_under_root(self.root_path, rel_path)
 
     async def directory_page(self, rel_path: str = ".") -> DirectoryPage:
         path = self.resolve_under_root(rel_path)

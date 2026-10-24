@@ -6,12 +6,38 @@ from .gallery import (
     SubdirectorySummary,
     VideoSummary,
 )
+from .jobs import (
+    CleanupRequest,
+    ConvertMp4Request,
+    JobAccepted,
+    JobAttemptView,
+    JobConfigView,
+    JobPage,
+    JobView,
+    MediaJobPage,
+    MediaJobView,
+    MoveRequest,
+    ReindexRequest,
+    ThumbnailsRequest,
+)
 
 __all__ = [
+    "CleanupRequest",
+    "ConvertMp4Request",
     "DirectoryPage",
     "ErrorResponse",
     "ImageSummary",
+    "JobAccepted",
+    "JobAttemptView",
+    "JobConfigView",
+    "JobPage",
+    "JobView",
+    "MediaJobPage",
+    "MediaJobView",
+    "MoveRequest",
     "PathList",
+    "ReindexRequest",
     "SubdirectorySummary",
+    "ThumbnailsRequest",
     "VideoSummary",
 ]

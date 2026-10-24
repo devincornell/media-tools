@@ -26,7 +26,7 @@ from ..util import format_memory, format_time, fname_to_title, fname_to_id
 
 from ..file_stat_result import FileStatResult
 
-from .util import index_hash_func
+from .util import index_hash_func, path_prefix_regex
 
 class VideoFileNotFoundError(Exception):
     '''Raised when a video file is not found in the database.'''
@@ -77,7 +77,7 @@ class VideoIndexCollection:
     async def find_created_at_projection(self, path_prefix: pathlib.Path|str = '/') -> list[VideoIndexCreationTimeProjection]:
         '''Find the creation time of all VideoIndexDocs where the path starts with the given root_path.'''
         cursor = self._collection.find(
-            {'path_str': {'$regex': f'^{re.escape(str(path_prefix))}'}}, 
+            {'path_str': path_prefix_regex(path_prefix)}, 
             projection=VideoIndexCreationTimeProjection.projection()
         )
         results = []
@@ -87,7 +87,7 @@ class VideoIndexCollection:
 
     async def find_by_prefix(self, root_path: pathlib.Path) -> list[VideoIndexDoc]:
         '''Find all VideoIndexDocs where the path starts with the given root_path.'''
-        cursor = self._collection.find({'path_str': {'$regex': f'^{re.escape(str(root_path))}'}})
+        cursor = self._collection.find({'path_str': path_prefix_regex(root_path)})
         docs = []
         async for doc in cursor:
             docs.append(VideoIndexDoc.model_validate(doc)) # Pydantic v2 model validation
@@ -97,8 +97,7 @@ class VideoIndexCollection:
         '''Return the number of documents in the collection. If path_prefix is provided, only counts documents where path_str starts with the given prefix.'''
         if path_prefix is None:
             return await self._collection.count_documents({})
-        regex = re.compile(f"^{re.escape(str(path_prefix))}")
-        return await self._collection.count_documents({"path_str": regex})
+        return await self._collection.count_documents({"path_str": path_prefix_regex(path_prefix)})
 
     async def find_first(self) -> Optional[VideoIndexDoc]:
         '''Get the first document in the collection.'''

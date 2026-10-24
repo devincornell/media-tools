@@ -20,6 +20,10 @@ class Settings(pydantic_settings.BaseSettings):
     site_reels_template_path: Path = TEMPLATES_DIR / "reels.html"
     site_port: int = 8000
     site_max_clip_duration: float = 0.0
+    site_copy_source_roots: list[Path] = []
+    site_run_worker: bool = True
+    site_worker_concurrency: int = 1
+    site_job_lease_seconds: float = 60.0
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,6 +35,10 @@ class ServerConfig:
     max_clip_duration: float
     mongodb_url: str
     database_name: str
+    copy_source_roots: tuple[Path, ...] = ()
+    run_worker: bool = True
+    worker_concurrency: int = 1
+    job_lease_seconds: float = 60.0
 
     @classmethod
     def from_settings(cls, settings: Settings) -> typing.Self:
@@ -45,6 +53,10 @@ class ServerConfig:
         for label, path in resolved.items():
             if not path.exists():
                 raise FileNotFoundError(f"{label} not found: {path}")
+        copy_roots = tuple(p.resolve() for p in settings.site_copy_source_roots)
+        for path in copy_roots:
+            if not path.is_dir():
+                raise FileNotFoundError(f"Copy source root not found: {path}")
 
         return cls(
             root_path=resolved["Root path"],
@@ -54,4 +66,8 @@ class ServerConfig:
             max_clip_duration=settings.site_max_clip_duration,
             mongodb_url=settings.site_mongodb_url,
             database_name=settings.site_database_name,
+            copy_source_roots=copy_roots,
+            run_worker=settings.site_run_worker,
+            worker_concurrency=max(1, settings.site_worker_concurrency),
+            job_lease_seconds=settings.site_job_lease_seconds,
         )

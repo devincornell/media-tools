@@ -19,7 +19,7 @@ import pymongo
 import pymongo.errors
 from pymongo.asynchronous.collection import AsyncCollection
 
-from .util import index_hash_func
+from .util import index_hash_func, path_prefix_regex
 from ..mediadir import MediaDir
 
 from ..file_stat_result import FileStatResult
@@ -72,20 +72,33 @@ class MediaDirIndexCollection:
         index_doc = MediaDirIndexDoc.from_media_dir_scan(mdir)
         await self.upsert_directory(index_doc)
 
-    async def upsert_directory(self, doc: MediaDirIndexDoc):
+    async def upsert_directory(self, doc: MediaDirIndexDoc, scan_id: str | None = None):
         """Update existing record by path_str or insert a new one."""
+        replacement = doc.model_dump()
+        if scan_id is not None:
+            replacement["last_scan_id"] = scan_id
         await self._collection.replace_one(
             filter={"path_str": doc.path_str},
-            replacement=doc.model_dump(), # Pydantic v2 dict conversion
+            replacement=replacement,
             upsert=True
         )
 
+    async def delete_stale(self, prefix: str | pathlib.Path, scan_id: str) -> int:
+        '''Delete documents under `prefix` that were not upserted by the scan `scan_id`.'''
+        result = await self._collection.delete_many(
+            {"path_str": path_prefix_regex(prefix), "last_scan_id": {"$ne": scan_id}}
+        )
+        return result.deleted_count
+
+    async def touch(self, path: str | pathlib.Path, scan_id: str) -> None:
+        '''Keep an existing document through `delete_stale` without rewriting it (e.g. when its rescan failed).'''
+        await self._collection.update_one({"path_str": str(path)}, {"$set": {"last_scan_id": scan_id}})
+
     async def count(self, path_prefix: str | pathlib.Path | None = None) -> int:
-        '''Return the number of documents in the collection. If path_prefix is provided, only counts documents where path_str starts with the given prefix.'''
+        '''Return the number of documents in the collection. If path_prefix is provided, only counts documents at or beneath that path.'''
         if path_prefix is None:
             return await self._collection.count_documents({})
-        regex = re.compile(f"^{re.escape(str(path_prefix))}")
-        return await self._collection.count_documents({"path_str": regex})
+        return await self._collection.count_documents({"path_str": path_prefix_regex(path_prefix)})
 
     async def find_first(self) -> Optional[MediaDirIndexDoc]:
         '''Get the first document in the collection.'''
@@ -102,16 +115,8 @@ class MediaDirIndexCollection:
         raise MediaDirIndexNotFoundError(f'Media directory index not found for path: {path}')
 
     async def find_by_path_prefix(self, prefix: str | pathlib.Path) -> list[MediaDirIndexDoc]:
-        '''Find all documents where path_str starts with the given prefix.'''
-        prefix_str = str(prefix)
-        
-        # Use re.escape to handle paths with special regex characters
-        # The '^' anchor ensures we only match the start of the string
-        regex = re.compile(f"^{re.escape(prefix_str)}")
-        
-        cursor = self._collection.find({"path_str": regex})
-        
-        # Validate each document returned by the cursor
+        '''Find all documents at or beneath the given path.'''
+        cursor = self._collection.find({"path_str": path_prefix_regex(prefix)})
         return [MediaDirIndexDoc.model_validate(doc) async for doc in cursor]
 
     async def find_direct_subdirs(self, path: str | pathlib.Path) -> list[MediaDirIndexDoc]:
@@ -123,10 +128,8 @@ class MediaDirIndexCollection:
         return [MediaDirIndexDoc.model_validate(doc) async for doc in cursor]
     
     async def delete_by_path_prefix(self, prefix: str | pathlib.Path) -> int:
-        '''Delete all documents where path_str starts with the given prefix. Returns the count of deleted documents.'''
-        prefix_str = str(prefix)
-        regex = re.compile(f"^{re.escape(prefix_str)}")
-        result = await self._collection.delete_many({"path_str": regex})
+        '''Delete all documents at or beneath the given path. Returns the count of deleted documents.'''
+        result = await self._collection.delete_many({"path_str": path_prefix_regex(prefix)})
         return result.deleted_count
 
 class IndexMediaFile(pydantic.BaseModel):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -7,13 +9,15 @@ from contextlib import asynccontextmanager
 import pymongo
 from fastapi import FastAPI
 
-from mediatools.application import GalleryService
-from mediatools.index_db import MediaIndexDB
+from mediatools.contracts import JobConfigView
 
+from .composition import build_services
 from .rendering import PageRenderer
 from .settings import ServerConfig, Settings
 
 logger = logging.getLogger(__name__)
+
+WORKER_SHUTDOWN_TIMEOUT = 15.0
 
 
 @asynccontextmanager
@@ -22,20 +26,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = ServerConfig.from_settings(settings)
 
     mongo_client: pymongo.AsyncMongoClient = pymongo.AsyncMongoClient(config.mongodb_url)
+    stop = asyncio.Event()
+    worker_task: asyncio.Task[None] | None = None
     try:
-        db = await MediaIndexDB.from_client(mongo_client[config.database_name])  # type: ignore[arg-type]
-        app.state.gallery = GalleryService(
-            root_path=config.root_path,
-            thumb_path=config.thumb_path,
-            max_clip_duration=config.max_clip_duration,
-            dirs=db.dirs,
-            videos=db.videos,
+        services = await build_services(config, mongo_client[config.database_name])
+        app.state.gallery = services.gallery
+        app.state.job_manager = services.job_manager
+        app.state.media_jobs = services.media_jobs
+        app.state.job_config = JobConfigView(
+            copy_source_roots=[str(p) for p in config.copy_source_roots],
+            worker_enabled=config.run_worker,
         )
         app.state.renderer = PageRenderer(
             template_path=config.template_path,
             reels_template_path=config.reels_template_path,
         )
-        logger.info("Serving %s (database %r)", config.root_path, config.database_name)
+        if config.run_worker:
+            worker_task = asyncio.create_task(services.worker.run(stop))
+        logger.info("Serving %s (database %r, job worker %s)", config.root_path, config.database_name,
+                    "on" if config.run_worker else "off")
         yield
     finally:
+        stop.set()
+        if worker_task is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(worker_task), WORKER_SHUTDOWN_TIMEOUT)
+            except TimeoutError:
+                logger.warning("Job worker did not stop in time; its jobs will be recovered when their leases expire")
+                worker_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await worker_task
         await mongo_client.aclose()

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jobs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a; --panel: #161616; --panel-2: #202020; --border: rgba(255,255,255,0.1);
+            --text: #fff; --muted: #a3a3a3; --accent: #6366f1;
+            --queued: #6b7280; --running: #3b82f6; --succeeded: #22c55e; --failed: #ef4444; --canceled: #f59e0b;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        main { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        h1 { font-size: 1.5rem; margin: 0; }
+        h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+        a { color: var(--accent); }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+        .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+        label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+        label.check { flex-direction: row; align-items: center; color: var(--text); font-size: 0.9rem; }
+        input, select, button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; }
+        input[type=text] { min-width: 22rem; }
+        input[type=number] { width: 5rem; }
+        button { cursor: pointer; }
+        button.primary { background: var(--accent); border-color: var(--accent); }
+        button.small { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+        .hidden { display: none !important; }
+        .msg { margin-top: 0.75rem; font-size: 0.9rem; }
+        .msg.error { color: var(--failed); }
+        .msg.ok { color: var(--succeeded); }
+        .danger { color: var(--failed); font-size: 0.85rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+        th { color: var(--muted); font-weight: 500; }
+        .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: #000; }
+        .badge.queued { background: var(--queued); color: #fff; } .badge.running { background: var(--running); color: #fff; }
+        .badge.succeeded { background: var(--succeeded); } .badge.failed { background: var(--failed); color: #fff; }
+        .badge.canceled { background: var(--canceled); }
+        .bar { width: 140px; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-bottom: 0.25rem; }
+        .bar > div { height: 100%; background: var(--running); }
+        .stage, .muted { color: var(--muted); font-size: 0.8rem; }
+        .warn { color: var(--canceled); }
+        .err { color: var(--failed); }
+        pre { white-space: pre-wrap; word-break: break-all; background: var(--panel-2); padding: 0.75rem; border-radius: 8px; max-height: 24rem; overflow: auto; margin: 0; font-size: 0.78rem; }
+        .details td { background: #111; }
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .target { font-family: ui-monospace, monospace; font-size: 0.82rem; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Jobs</h1>
+        <a id="backLink" href="/page/">&larr; Back to gallery</a>
+    </header>
+
+    <section class="panel">
+        <h2>New job</h2>
+        <form id="jobForm">
+            <div class="row">
+                <label>Task
+                    <select id="kind">
+                        <option value="reindex">Rescan index</option>
+                        <option value="thumbnails">Generate thumbnails</option>
+                        <option value="cleanup">Clean up videos</option>
+                        <option value="convert_mp4">Convert to MP4</option>
+                        <option value="move">Move into gallery + rescan</option>
+                    </select>
+                </label>
+                <label data-for="reindex thumbnails cleanup convert_mp4">Directory (relative to gallery root)
+                    <input type="text" id="path" value=".">
+                </label>
+                <label data-for="move">Source directory (absolute)
+                    <input type="text" id="source" list="sourceRoots" placeholder="/path/inside/an/allowed/root">
+                    <datalist id="sourceRoots"></datalist>
+                </label>
+                <label data-for="move">Destination (relative to gallery root)
+                    <input type="text" id="dest" placeholder="new/folder">
+                </label>
+                <label data-for="thumbnails move">Parallel workers
+                    <input type="number" id="workers" min="1" max="16">
+                </label>
+                <label class="check" data-for="thumbnails"><input type="checkbox" id="overwrite"> Regenerate existing</label>
+            </div>
+            <div class="row" data-for="cleanup" style="margin-top: 0.75rem">
+                <label class="check"><input type="checkbox" id="deleteEmpty" checked> Empty files</label>
+                <label class="check"><input type="checkbox" id="deleteUnprobable"> Unprobable files</label>
+                <label class="check"><input type="checkbox" id="deleteDuplicates"> Duplicates (same folder)</label>
+                <label class="check"><input type="checkbox" id="dryRun" checked> Dry run (report only)</label>
+                <span id="dryRunWarning" class="danger hidden">Files will be permanently deleted.</span>
+            </div>
+            <p id="moveDisabled" class="danger hidden" data-for="move">Move jobs are disabled: set SITE_COPY_SOURCE_ROOTS on the server.</p>
+            <p id="workerOff" class="muted hidden">This server isn't running a job worker; jobs will wait for a separate worker process.</p>
+            <div class="row" style="margin-top: 0.75rem">
+                <button type="submit" class="primary">Queue job</button>
+            </div>
+            <div id="formMsg" class="msg"></div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem">
+            <h2 style="margin: 0">History</h2>
+            <div class="row">
+                <label>Status
+                    <select id="filterStatus">
+                        <option value="">All</option>
+                        <option>queued</option><option>running</option><option>succeeded</option>
+                        <option>failed</option><option>canceled</option>
+                    </select>
+                </label>
+                <label>Task
+                    <select id="filterKind">
+                        <option value="">All</option>
+                        <option value="reindex">Rescan</option><option value="thumbnails">Thumbnails</option>
+                        <option value="cleanup">Cleanup</option><option value="convert_mp4">Convert</option>
+                        <option value="move">Move</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+        <table>
+            <thead><tr>
+                <th>Task</th><th>Target</th><th>Status</th><th>Progress</th><th>Submitted</th><th>Duration</th><th>Summary</th><th></th>
+            </tr></thead>
+            <tbody id="jobRows"></tbody>
+        </table>
+        <div id="listMsg" class="msg"></div>
+    </section>
+</main>
+
+<script>
+const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan' };
+const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move' };
+const ACTIVE = new Set(['queued', 'running']);
+const expanded = new Set();
+const $ = (id) => document.getElementById(id);
+
+function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') node.className = v;
+        else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+        else node.setAttribute(k, v);
+    }
+    for (const c of children) if (c != null) node.append(c instanceof Node ? c : String(c));
+    return node;
+}
+
+function errorText(body, fallback) {
+    if (!body || body.detail == null) return fallback;
+    if (typeof body.detail === 'string') return body.detail;
+    return body.detail.map(d => `${(d.loc || []).slice(1).join('.') || 'request'}: ${d.msg}`).join('; ');
+}
+
+// ---------------------------------------------------------------- form
+function updateForm() {
+    const kind = $('kind').value;
+    document.querySelectorAll('[data-for]').forEach(n => n.classList.toggle('hidden', !n.dataset.for.split(' ').includes(kind)));
+    $('dryRunWarning').classList.toggle('hidden', $('dryRun').checked);
+    if (kind === 'move') $('moveDisabled').classList.toggle('hidden', $('sourceRoots').options.length > 0);
+}
+
+function buildRequest(kind) {
+    const workers = Number($('workers').value);
+    switch (kind) {
+        case 'reindex': case 'convert_mp4': return { path: $('path').value || '.' };
+        case 'thumbnails': return { path: $('path').value || '.', overwrite: $('overwrite').checked, workers };
+        case 'cleanup': return {
+            path: $('path').value || '.', delete_empty: $('deleteEmpty').checked,
+            delete_unprobable: $('deleteUnprobable').checked, delete_duplicates: $('deleteDuplicates').checked,
+            dry_run: $('dryRun').checked,
+        };
+        case 'move': return { source: $('source').value, dest: $('dest').value, workers };
+    }
+}
+
+async function submitJob(event) {
+    event.preventDefault();
+    const kind = $('kind').value;
+    const body = buildRequest(kind);
+    if (kind === 'cleanup' && !body.dry_run && !confirm(`Permanently delete matching files under "${body.path}"?`)) return;
+    if (kind === 'move' && !confirm(`Move everything from\n${body.source}\ninto\n${body.dest}?\nSource files are deleted after a successful copy.`)) return;
+    const msg = $('formMsg');
+    msg.className = 'msg'; msg.textContent = 'Submitting...';
+    try {
+        const res = await fetch(`/api/jobs/${ENDPOINT[kind]}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(errorText(data, `HTTP ${res.status}`));
+        msg.className = 'msg ok'; msg.textContent = `Queued job ${data.job_id.slice(0, 8)}`;
+        refresh();
+    } catch (e) {
+        msg.className = 'msg error'; msg.textContent = e.message;
+    }
+}
+
+// ---------------------------------------------------------------- table
+function fmtTime(iso) { return iso ? new Date(iso).toLocaleString() : ''; }
+
+function fmtDuration(job) {
+    if (!job.started_at) return '';
+    const end = job.finished_at ? new Date(job.finished_at) : new Date();
+    let s = Math.max(0, Math.round((end - new Date(job.started_at)) / 1000));
+    const h = Math.floor(s / 3600); s -= h * 3600;
+    const m = Math.floor(s / 60); s -= m * 60;
+    return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`;
+}
+
+function summary(item) {
+    const r = item.result, job = item.job, parts = [];
+    if (r) {
+        switch (item.kind) {
+            case 'reindex': parts.push(`${r.directories} dirs, ${r.videos} videos (${r.videos_new} new)`); break;
+            case 'thumbnails': parts.push(`${r.created} created, ${r.skipped_existing} already existed of ${r.videos}`); break;
+            case 'cleanup': {
+                const c = r.counts || {};
+                const n = (c.empty || 0) + (c.unprobable || 0) + (c.duplicates || 0);
+                parts.push(`${r.dry_run ? 'Would delete' : 'Deleted'} ${n} (${c.empty || 0} empty, ${c.unprobable || 0} unprobable, ${c.duplicates || 0} duplicate)`);
+                break;
+            }
+            case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
+            case 'move': parts.push(`${r.moved} moved, ${r.deduplicated} already present, ${(r.conflicts || []).length} conflicts`); break;
+        }
+        if (r.reindex) parts.push(`rescanned ${r.reindex.directories} dirs`);
+    }
+    const node = el('div', {}, parts.join('; '));
+    const errorCount = (r && r.error_count) || (r && r.reindex && r.reindex.error_count) || 0;
+    if (errorCount) node.append(el('div', { class: 'warn' }, `${errorCount} file error(s)`));
+    for (const w of (r && r.warnings) || []) node.append(el('div', { class: 'warn' }, w));
+    if (job.status === 'failed' && job.error_message) node.append(el('div', { class: 'err' }, job.error_message));
+    if (job.status === 'queued' && job.attempt_count > 0 && job.error_message) {
+        node.append(el('div', { class: 'warn' }, `Retrying after: ${job.error_message}`));
+    }
+    return node;
+}
+
+function progressCell(job) {
+    if (job.status === 'succeeded') return el('td', {}, el('span', { class: 'muted' }, '100%'));
+    if (job.status !== 'running') return el('td', {}, el('span', { class: 'stage' }, job.progress_stage || ''));
+    const pct = job.progress_percent ?? 0;
+    const fill = el('div'); fill.style.width = `${pct}%`;
+    return el('td', {}, el('div', { class: 'bar' }, fill), el('div', { class: 'stage' }, `${pct}% · ${job.progress_stage || 'starting'}`));
+}
+
+async function cancelJob(id) {
+    const res = await fetch(`/v1/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+    if (!res.ok) alert(errorText(await res.json().catch(() => null), `HTTP ${res.status}`));
+    refresh();
+}
+
+function detailsRow(item) {
+    const attempts = item.attempts.map(a =>
+        `#${a.attempt_no} ${a.status} ${fmtTime(a.started_at)} → ${fmtTime(a.finished_at) || '...'}` +
+        (a.error_message || a.error_code ? `  [${a.error_code || ''}] ${a.error_message || ''}` : '')).join('\n');
+    return el('tr', { class: 'details' }, el('td', { colspan: '8' },
+        el('div', { class: 'details-grid' },
+            el('div', {}, el('div', { class: 'muted' }, 'Parameters'), el('pre', {}, JSON.stringify(item.params, null, 2)),
+                el('div', { class: 'muted', style: 'margin-top: 0.5rem' }, `Attempts (${item.job.attempt_count}/${item.job.max_attempts})`),
+                el('pre', {}, attempts || 'none yet'),
+                el('div', { class: 'muted', style: 'margin-top: 0.5rem' }, `Job ${item.job.id} · ${item.job.job_type}`)),
+            el('div', {}, el('div', { class: 'muted' }, 'Result'), el('pre', {}, item.result ? JSON.stringify(item.result, null, 2) : 'none yet')))));
+}
+
+function render(page) {
+    const tbody = $('jobRows');
+    tbody.replaceChildren();
+    for (const item of page.items) {
+        const job = item.job;
+        const actions = el('td', {});
+        actions.append(el('button', { class: 'small', onclick: () => { expanded.has(job.id) ? expanded.delete(job.id) : expanded.add(job.id); render(page); } },
+            expanded.has(job.id) ? 'Hide' : 'Details'));
+        if (ACTIVE.has(job.status) && !job.cancel_requested) {
+            actions.append(' ', el('button', { class: 'small', onclick: () => cancelJob(job.id) }, 'Cancel'));
+        }
+        const statusText = job.cancel_requested && job.status === 'running' ? 'canceling' : job.status;
+        const dryTag = item.kind === 'cleanup' && item.params.dry_run ? ' (dry run)' : '';
+        tbody.append(el('tr', {},
+            el('td', {}, (KIND_LABEL[item.kind] || item.kind) + dryTag),
+            el('td', { class: 'target' }, item.kind === 'move' ? `${item.params.source} → ${item.target}` : (item.target ?? '')),
+            el('td', {}, el('span', { class: `badge ${job.status}` }, statusText)),
+            progressCell(job),
+            el('td', {}, fmtTime(job.created_at)),
+            el('td', {}, fmtDuration(job)),
+            el('td', {}, summary(item)),
+            actions));
+        if (expanded.has(job.id)) tbody.append(detailsRow(item));
+    }
+    $('listMsg').textContent = page.total > page.items.length ? `Showing ${page.items.length} of ${page.total}` : '';
+}
+
+let timer = null;
+async function refresh() {
+    clearTimeout(timer);
+    let delay = 10000;
+    try {
+        const params = new URLSearchParams({ limit: '100' });
+        if ($('filterStatus').value) params.set('status', $('filterStatus').value);
+        if ($('filterKind').value) params.set('kind', $('filterKind').value);
+        const res = await fetch(`/api/media-jobs?${params}`);
+        const page = await res.json();
+        if (!res.ok) throw new Error(errorText(page, `HTTP ${res.status}`));
+        render(page);
+        if (page.items.some(i => ACTIVE.has(i.job.status))) delay = 2000;
+        $('listMsg').classList.remove('error');
+    } catch (e) {
+        $('listMsg').className = 'msg error'; $('listMsg').textContent = `Could not load jobs: ${e.message}`;
+    }
+    timer = setTimeout(refresh, delay);
+}
+
+async function init() {
+    const path = new URLSearchParams(location.search).get('path');
+    if (path) {
+        $('path').value = path;
+        $('dest').value = path === '.' ? '' : path;
+        $('backLink').href = `/page/${path === '.' ? '' : path.split('/').map(encodeURIComponent).join('/')}`;
+    }
+    try {
+        const cfg = await (await fetch('/api/job-config')).json();
+        for (const root of cfg.copy_source_roots) $('sourceRoots').append(el('option', { value: root + '/' }));
+        $('workerOff').classList.toggle('hidden', cfg.worker_enabled);
+    } catch (e) { /* config is optional for rendering */ }
+    $('kind').addEventListener('change', () => { $('workers').value = $('kind').value === 'move' ? 4 : 2; updateForm(); });
+    $('dryRun').addEventListener('change', updateForm);
+    $('jobForm').addEventListener('submit', submitJob);
+    $('filterStatus').addEventListener('change', refresh);
+    $('filterKind').addEventListener('change', refresh);
+    $('workers').value = 2;
+    updateForm();
+    refresh();
+}
+init();
+</script>
+</body>
+</html>

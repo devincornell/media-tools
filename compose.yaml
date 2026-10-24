@@ -1,9 +1,12 @@
 # Reads SITE_* values from .env in this directory for interpolation only; the rest of .env is not passed in.
 # Media is mounted at the same absolute path as on the host because the index stores absolute paths.
+# Mounts are writable because jobs write thumbnails and can move/delete media; the container runs as
+# UID/GID (default 1000) so files it creates belong to you.
 services:
   api:
     build: .
     image: mediatools-api
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "${SITE_PORT:-8000}:8000"
     environment:
@@ -12,7 +15,10 @@ services:
       SITE_MONGODB_URL: ${SITE_MONGODB_URL:?set SITE_MONGODB_URL}
       SITE_DATABASE_NAME: ${SITE_DATABASE_NAME:?set SITE_DATABASE_NAME}
       SITE_MAX_CLIP_DURATION: ${SITE_MAX_CLIP_DURATION:-0}
+      # Enable move jobs: list the directories and mount each one below at the same path.
+      # SITE_COPY_SOURCE_ROOTS: '["/mnt/hdd-a/gopro/jdownloader"]'
     volumes:
-      - ${SITE_ROOT_PATH}:${SITE_ROOT_PATH}:ro
-      - ${SITE_THUMB_PATH:?set SITE_THUMB_PATH}:/thumbs:ro
+      - ${SITE_ROOT_PATH}:${SITE_ROOT_PATH}
+      - ${SITE_THUMB_PATH:?set SITE_THUMB_PATH}:/thumbs
+      # - /mnt/hdd-a/gopro/jdownloader:/mnt/hdd-a/gopro/jdownloader
     restart: unless-stopped
