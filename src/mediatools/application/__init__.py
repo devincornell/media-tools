@@ -1,3 +1,4 @@
+from .browser import BrowserService, FolderIndexReader
 from .errors import (
     DirectoryNotIndexedError,
     GalleryError,
@@ -8,8 +9,10 @@ from .errors import (
 from .gallery import DirectoryIndexReader, GalleryService, VideoIndexReader
 
 __all__ = [
+    "BrowserService",
     "DirectoryIndexReader",
     "DirectoryNotIndexedError",
+    "FolderIndexReader",
     "GalleryError",
     "GalleryService",
     "InvalidJobRequestError",

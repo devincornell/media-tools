@@ -4,11 +4,34 @@ from __future__ import annotations
 import collections
 import enum
 import os
+import pwd
 import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
 from ...util import get_hash_hex
+
+
+def user_name(uid: int) -> str:
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return str(uid)
+
+
+def unwritable_dirs(root: Path) -> list[Path]:
+    '''Directories under `root` (inclusive) in which this process can't delete or create entries.'''
+    return [Path(d) for d, _, _ in os.walk(root, followlinks=False) if not os.access(d, os.W_OK | os.X_OK)]
+
+
+def permission_message(source: Path, blocked: list[Path]) -> str:
+    me = user_name(os.getuid())
+    owners = sorted({user_name(p.stat().st_uid) for p in blocked})
+    return (
+        f"The server runs as '{me}' but can't delete files in {len(blocked)} source folder(s) "
+        f"(owned by {', '.join(owners)}), e.g. {blocked[0]}. Nothing was moved. "
+        f"Fix with: sudo chown -R {me} '{source}'"
+    )
 
 
 class MoveOutcome(enum.StrEnum):

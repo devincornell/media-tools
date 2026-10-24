@@ -34,6 +34,16 @@ class MediaDirIndexNotFoundError(Exception):
     '''Raised when a media directory index document is not found in the database.'''
     pass
 
+
+class DirectorySizeRow(pydantic.BaseModel):
+    '''Totals for the files directly inside one indexed directory.'''
+    path_str: str
+    bytes: int
+    num_videos: int
+    num_images: int
+    num_other: int
+    num_subdirs: int
+
 @dataclasses.dataclass
 class MediaDirIndexCollection:
     '''Interface for working with the media_dir_index collection.'''
@@ -93,6 +103,29 @@ class MediaDirIndexCollection:
     async def touch(self, path: str | pathlib.Path, scan_id: str) -> None:
         '''Keep an existing document through `delete_stale` without rewriting it (e.g. when its rescan failed).'''
         await self._collection.update_one({"path_str": str(path)}, {"$set": {"last_scan_id": scan_id}})
+
+    async def directory_sizes(self, prefix: str | pathlib.Path) -> list[DirectorySizeRow]:
+        '''Byte totals and file counts of the files *directly* in each indexed directory under `prefix`.'''
+        def entries(field: str) -> dict[str, typing.Any]:
+            return {"$objectToArray": {"$ifNull": [f"${field}", {}]}}
+
+        def total(field: str) -> dict[str, typing.Any]:
+            return {"$sum": f"${field}.v.stat.st_size"}
+
+        cursor = await self._collection.aggregate([
+            {"$match": {"path_str": path_prefix_regex(prefix)}},
+            {"$project": {
+                "_id": 0, "path_str": 1,
+                "v": entries("video_files"), "i": entries("image_files"), "o": entries("other_files"),
+                "num_subdirs": {"$size": entries("subpaths")},
+            }},
+            {"$project": {
+                "path_str": 1, "num_subdirs": 1,
+                "num_videos": {"$size": "$v"}, "num_images": {"$size": "$i"}, "num_other": {"$size": "$o"},
+                "bytes": {"$add": [total("v"), total("i"), total("o")]},
+            }},
+        ])
+        return [DirectorySizeRow.model_validate(doc) async for doc in cursor]
 
     async def count(self, path_prefix: str | pathlib.Path | None = None) -> int:
         '''Return the number of documents in the collection. If path_prefix is provided, only counts documents at or beneath that path.'''

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 from pathlib import Path
 
 from ...contracts import (
@@ -18,6 +19,7 @@ from ...index_db import MediaJobCollection, MediaJobRecord
 from ...jobs import Job, JobManager, JobStatus, new_job_id
 from ..errors import InvalidJobRequestError, PathOutsideRootError
 from ..paths import resolve_allowed_source, resolve_under_root
+from . import fileops
 from .types import (
     CLEANUP,
     CONVERT_MP4,
@@ -120,10 +122,17 @@ class MediaJobService:
             raise InvalidJobRequestError(str(e)) from e
         if not source.is_dir():
             raise InvalidJobRequestError(f"Source directory not found: {request.source}")
+        if not os.access(source, os.W_OK | os.X_OK):
+            raise InvalidJobRequestError(fileops.permission_message(source, [source]))
         dest = self._under_root(request.dest)
         dest_real = dest.resolve()
         if dest_real.is_relative_to(source) or source.is_relative_to(dest_real):
             raise InvalidJobRequestError("Source and destination must not contain each other.")
+        existing = next(p for p in (dest, *dest.parents) if p.exists())
+        if not os.access(existing, os.W_OK | os.X_OK):
+            raise InvalidJobRequestError(
+                f"The server can't write to {existing} (owned by {fileops.user_name(existing.stat().st_uid)})."
+            )
         return dest
 
     def _under_root(self, rel: str) -> Path:

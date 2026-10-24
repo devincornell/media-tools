@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #1e1e1e; --chrome: #2a2a2a; --stripe: #262626; --border: #3a3a3a;
+            --text: #e6e6e6; --muted: #9a9a9a; --select: #0a5fd1; --select-dim: #3a3a3c;
+            --folder: #5aa9f6; --video: #b48cf2; --image: #57c785; --file: #a0a0a0; --bar: #5aa9f6;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font: 13px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif;
+            background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+        }
+        .toolbar {
+            display: flex; align-items: center; gap: 1rem; padding: 0.55rem 1rem;
+            background: var(--chrome); border-bottom: 1px solid var(--border);
+        }
+        .toolbar h1 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
+        .toolbar a { color: var(--muted); text-decoration: none; }
+        .toolbar a:hover { color: var(--text); }
+        .scroller { flex: 1; overflow: auto; outline: none; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead th {
+            position: sticky; top: 0; z-index: 1; background: var(--chrome); color: var(--muted);
+            font-weight: 500; text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border); cursor: default; user-select: none; white-space: nowrap;
+        }
+        thead th:last-child { border-right: none; }
+        thead th.sorted { color: var(--text); }
+        thead th .arrow { font-size: 9px; margin-left: 4px; }
+        th.num, td.num { text-align: right; }
+        tbody tr:nth-child(even) { background: var(--stripe); }
+        tbody tr.selected { background: var(--select) !important; color: #fff; }
+        tbody tr.selected td { color: #fff; }
+        .scroller:not(:focus-within) tbody tr.selected { background: var(--select-dim) !important; }
+        td { padding: 2px 8px; height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        td.dim { color: var(--muted); }
+        .name { display: flex; align-items: center; gap: 5px; overflow: hidden; }
+        .name span.label { overflow: hidden; text-overflow: ellipsis; }
+        .twisty { width: 12px; flex: none; color: var(--muted); font-size: 9px; text-align: center; transition: transform 0.12s; }
+        .twisty.open { transform: rotate(90deg); }
+        tr.selected .twisty { color: #fff; }
+        .icon { width: 16px; flex: none; text-align: center; }
+        .icon.folder { color: var(--folder); } .icon.video { color: var(--video); }
+        .icon.image { color: var(--image); } .icon.other { color: var(--file); }
+        tr.selected .icon { color: #fff; }
+        .open-link { margin-left: auto; padding-left: 6px; color: var(--muted); visibility: hidden; flex: none; }
+        tr:hover .open-link, tr.selected .open-link { visibility: visible; color: inherit; }
+        .pct { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+        .pct .bar { width: 60px; height: 6px; border-radius: 3px; background: #3a3a3a; overflow: hidden; flex: none; }
+        .pct .bar > div { height: 100%; background: var(--bar); }
+        tr.selected .pct .bar { background: rgba(255,255,255,0.25); }
+        tr.selected .pct .bar > div { background: #fff; }
+        .status {
+            padding: 4px 1rem; background: var(--chrome); border-top: 1px solid var(--border);
+            color: var(--muted); font-size: 12px; display: flex; justify-content: space-between;
+        }
+        .placeholder td { color: var(--muted); font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1 id="title"><i class="fas fa-folder-tree" style="color: var(--folder)"></i> Library</h1>
+        <a href="/page/"><i class="fas fa-th-large"></i> Gallery</a>
+        <a href="/jobs"><i class="fas fa-tasks"></i> Jobs</a>
+    </div>
+    <div class="scroller" id="scroller" tabindex="0">
+        <table>
+            <colgroup>
+                <col style="width: 46%"><col style="width: 16%"><col style="width: 10%"><col style="width: 14%"><col style="width: 14%">
+            </colgroup>
+            <thead><tr id="head">
+                <th data-sort="name">Name</th>
+                <th data-sort="modified">Date Modified</th>
+                <th data-sort="size" class="num">Size</th>
+                <th data-sort="size" class="num">% of Library</th>
+                <th data-sort="kind">Kind</th>
+            </tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+    <div class="status"><span id="statusLeft">Loading...</span><span id="statusRight"></span></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STORE_KEY = 'browse.expanded';
+
+let tree = null;                 // FolderTree from the API
+const folders = new Map();       // path -> FolderNode
+const childFolders = new Map();  // path -> [FolderNode]
+const files = new Map();         // folder path -> [FileEntry] | 'loading' | 'error'
+let expanded = new Set(JSON.parse(localStorage.getItem(STORE_KEY) || '[]'));
+let sort = { key: 'name', dir: 1 };
+let visible = [];                // rows currently displayed: { type, item, depth }
+let selected = null;             // key of the selected row
+
+function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') node.className = v;
+        else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+        else node.setAttribute(k, v);
+    }
+    for (const c of children) if (c != null) node.append(c instanceof Node ? c : String(c));
+    return node;
+}
+
+function fmtSize(bytes) {
+    if (bytes < 1000) return `${bytes} bytes`;
+    const units = ['KB', 'MB', 'GB', 'TB', 'PB'];
+    let v = bytes, i = -1;
+    do { v /= 1000; i++; } while (v >= 1000 && i < units.length - 1);
+    return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
+}
+
+function fmtPct(p) {
+    if (p === 0) return '0%';
+    if (p < 0.1) return '<0.1%';
+    return `${p >= 10 ? p.toFixed(0) : p.toFixed(1)}%`;
+}
+
+function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) + ' at ' +
+        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function fileKind(f) {
+    const ext = (f.name.includes('.') ? f.name.split('.').pop() : '').toUpperCase();
+    if (f.kind === 'video') return `${ext || 'Video'} video`;
+    if (f.kind === 'image') return `${ext || 'Image'} image`;
+    return ext ? `${ext} file` : 'Document';
+}
+
+const urlPath = (p) => p.split('/').map(encodeURIComponent).join('/');
+const keyOf = (row) => `${row.type}:${row.item.path}`;
+const saveExpanded = () => localStorage.setItem(STORE_KEY, JSON.stringify([...expanded]));
+
+// ---------------------------------------------------------------- data
+async function loadTree() {
+    const res = await fetch('/api/browse/tree');
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+    tree = await res.json();
+    for (const f of tree.folders) {
+        folders.set(f.path, f);
+        if (f.parent !== null) {
+            if (!childFolders.has(f.parent)) childFolders.set(f.parent, []);
+            childFolders.get(f.parent).push(f);
+        }
+    }
+    expanded = new Set([...expanded].filter(p => folders.has(p)));
+}
+
+async function loadFiles(path) {
+    if (files.has(path)) return;
+    files.set(path, 'loading');
+    try {
+        const res = await fetch(`/api/browse/files?path=${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error();
+        files.set(path, (await res.json()).files);
+    } catch {
+        files.set(path, 'error');
+    }
+    render();
+}
+
+// ---------------------------------------------------------------- ordering
+function compare(a, b, type) {
+    const byName = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    let r = 0;
+    if (sort.key === 'name') r = byName;
+    else if (sort.key === 'size') r = a.size - b.size;
+    else if (sort.key === 'modified' && type === 'file') r = a.modified.localeCompare(b.modified);
+    else if (sort.key === 'kind' && type === 'file') r = fileKind(a).localeCompare(fileKind(b));
+    return r !== 0 ? r * sort.dir : byName;
+}
+
+function collect(path, depth, out) {
+    const subs = [...(childFolders.get(path) || [])].sort((a, b) => compare(a, b, 'folder'));
+    for (const f of subs) {
+        out.push({ type: 'folder', item: f, depth });
+        if (expanded.has(f.path)) collect(f.path, depth + 1, out);
+    }
+    const fl = files.get(path);
+    if (fl === 'loading') out.push({ type: 'placeholder', item: { path: `${path}#loading`, name: 'Loading...' }, depth });
+    else if (fl === 'error') out.push({ type: 'placeholder', item: { path: `${path}#error`, name: 'Could not load files' }, depth });
+    else if (Array.isArray(fl)) for (const f of [...fl].sort((a, b) => compare(a, b, 'file'))) out.push({ type: 'file', item: f, depth });
+}
+
+// ---------------------------------------------------------------- rendering
+function nameCell(row) {
+    const { type, item, depth } = row;
+    const pad = 8 + depth * 18;
+    if (type === 'placeholder') return el('td', { style: `padding-left:${pad + 17}px` }, item.name);
+    const twisty = el('span', { class: 'twisty' + (type === 'folder' && expanded.has(item.path) ? ' open' : '') },
+        type === 'folder' ? '\u25B6' : '');
+    if (type === 'folder') twisty.addEventListener('click', (e) => { e.stopPropagation(); toggle(item.path); });
+    const iconCls = type === 'folder' ? 'fa-folder folder' : item.kind === 'video' ? 'fa-file-video video'
+        : item.kind === 'image' ? 'fa-file-image image' : 'fa-file other';
+    const [fa, cls] = iconCls.split(' ');
+    const open = type === 'folder'
+        ? el('a', { class: 'open-link', href: `/page/${urlPath(item.path === '.' ? '' : item.path)}`, title: 'Open in gallery', onclick: (e) => e.stopPropagation() }, el('i', { class: 'fas fa-up-right-from-square' }))
+        : el('a', { class: 'open-link', href: fileUrl(item), target: '_blank', title: 'Open file', onclick: (e) => e.stopPropagation() }, el('i', { class: 'fas fa-up-right-from-square' }));
+    return el('td', { style: `padding-left:${pad}px` },
+        el('div', { class: 'name' }, twisty, el('i', { class: `fas ${fa} icon ${cls}` }), el('span', { class: 'label', title: item.name }, item.name), open));
+}
+
+function fileUrl(f) { return `/${f.kind === 'video' ? 'video' : 'file'}/${urlPath(f.path)}`; }
+
+function pctCell(item) {
+    const fill = el('div'); fill.style.width = `${Math.min(100, item.percent)}%`;
+    return el('td', { class: 'num' }, el('div', { class: 'pct' }, fmtPct(item.percent), el('div', { class: 'bar' }, fill)));
+}
+
+function folderKind(f) {
+    return f.files ? `Folder \u00B7 ${f.files.toLocaleString()} file${f.files === 1 ? '' : 's'}` : 'Folder';
+}
+
+function render() {
+    visible = [];
+    if (folders.has('.')) {
+        collect('.', 0, visible);  // like Finder: show the root's contents, not the root itself
+    } else {
+        for (const f of tree.folders.filter(f => f.parent === null).sort((a, b) => compare(a, b, 'folder'))) {
+            visible.push({ type: 'folder', item: f, depth: 0 });
+            if (expanded.has(f.path)) collect(f.path, 1, visible);
+        }
+    }
+    const tbody = $('rows');
+    tbody.replaceChildren(...visible.map((row) => {
+        const { type, item } = row;
+        const key = keyOf(row);
+        const tr = type === 'placeholder' ? el('tr', { class: 'placeholder' }, nameCell(row), el('td'), el('td'), el('td'), el('td'))
+            : type === 'folder'
+                ? el('tr', {}, nameCell(row), el('td', { class: 'dim' }, '--'), el('td', { class: 'num' }, fmtSize(item.size)), pctCell(item), el('td', { class: 'dim' }, folderKind(item)))
+                : el('tr', {}, nameCell(row), el('td', { class: 'dim' }, fmtDate(item.modified)), el('td', { class: 'num' }, fmtSize(item.size)), el('td'), el('td', { class: 'dim' }, fileKind(item)));
+        tr.dataset.key = key;
+        if (key === selected) tr.classList.add('selected');
+        if (type !== 'placeholder') {
+            tr.addEventListener('click', () => select(key));
+            tr.addEventListener('dblclick', () => activate(row));
+        }
+        return tr;
+    }));
+    renderHeader();
+    renderStatus();
+}
+
+function renderHeader() {
+    for (const th of $('head').children) {
+        th.classList.toggle('sorted', th.dataset.sort === sort.key);
+        th.querySelector('.arrow')?.remove();
+    }
+    const first = $('head').querySelector(`th[data-sort="${sort.key}"]`);
+    first.append(el('span', { class: 'arrow' }, sort.dir > 0 ? '\u25B2' : '\u25BC'));
+}
+
+function renderStatus() {
+    const root = folders.get('.');
+    const nFolders = tree.folders.length, nFiles = tree.folders.reduce((s, f) => s + f.num_videos + f.num_images + f.num_other, 0);
+    $('statusLeft').textContent = `${nFolders.toLocaleString()} folders, ${nFiles.toLocaleString()} files`;
+    $('statusRight').textContent = `Library: ${fmtSize(tree.total_size)}`;
+    if (root) $('title').lastChild.textContent = ` ${root.name || 'Library'}`;
+}
+
+// ---------------------------------------------------------------- interaction
+function toggle(path, open = !expanded.has(path)) {
+    if (open) { expanded.add(path); loadFiles(path); } else expanded.delete(path);
+    saveExpanded();
+    render();
+}
+
+function select(key, scroll = false) {
+    selected = key;
+    for (const tr of $('rows').children) tr.classList.toggle('selected', tr.dataset.key === key);
+    if (scroll) $('rows').querySelector(`tr[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function activate(row) {
+    if (row.type === 'folder') toggle(row.item.path);
+    else if (row.type === 'file') window.open(fileUrl(row.item), '_blank');
+}
+
+function onKey(e) {
+    const rows = visible.filter(r => r.type !== 'placeholder');
+    if (!rows.length) return;
+    let i = rows.findIndex(r => keyOf(r) === selected);
+    const row = rows[i];
+    switch (e.key) {
+        case 'ArrowDown': i = Math.min(rows.length - 1, i + 1); break;
+        case 'ArrowUp': i = Math.max(0, i - 1); break;
+        case 'ArrowRight':
+            if (row?.type === 'folder' && !expanded.has(row.item.path)) toggle(row.item.path, true);
+            else return;
+            e.preventDefault(); return;
+        case 'ArrowLeft': {
+            if (row?.type === 'folder' && expanded.has(row.item.path)) { toggle(row.item.path, false); e.preventDefault(); return; }
+            const parentPath = row?.type === 'folder' ? row.item.parent : row?.item.path.includes('/') ? row.item.path.slice(0, row.item.path.lastIndexOf('/')) : '.';
+            const parent = rows.findIndex(r => r.type === 'folder' && r.item.path === parentPath);
+            if (parent < 0) return;
+            i = parent; break;
+        }
+        case 'Enter': case ' ': if (row) activate(row); e.preventDefault(); return;
+        default: return;
+    }
+    e.preventDefault();
+    select(keyOf(rows[i]), true);
+}
+
+function onSort(th) {
+    const key = th.dataset.sort;
+    sort = sort.key === key ? { key, dir: -sort.dir } : { key, dir: key === 'name' ? 1 : -1 };
+    render();
+}
+
+async function init() {
+    for (const th of $('head').children) th.addEventListener('click', () => onSort(th));
+    $('scroller').addEventListener('keydown', onKey);
+    try {
+        await loadTree();
+    } catch (e) {
+        $('statusLeft').textContent = `Could not load the index: ${e.message}`;
+        return;
+    }
+    if (folders.has('.')) loadFiles('.');
+    for (const p of expanded) loadFiles(p);
+    render();
+    $('scroller').focus();
+}
+init();
+</script>
+</body>
+</html>

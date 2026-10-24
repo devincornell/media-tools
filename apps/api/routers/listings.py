@@ -3,9 +3,15 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
-from mediatools.contracts import DirectoryPage, ErrorResponse, PathList
+from mediatools.contracts import (
+    DirectoryPage,
+    ErrorResponse,
+    FolderFiles,
+    FolderTree,
+    PathList,
+)
 
-from ..dependencies import GalleryDep
+from ..dependencies import BrowserDep, GalleryDep
 
 router = APIRouter(tags=["listings"])
 
@@ -36,3 +42,15 @@ async def list_videos(gallery: GalleryDep) -> PathList:
 @api_router.get("/directory/{dir_path:path}", responses={404: {"model": ErrorResponse}})
 async def get_directory(dir_path: str, gallery: GalleryDep) -> DirectoryPage:
     return await gallery.directory_page(dir_path)
+
+
+@api_router.get("/browse/tree")
+async def folder_tree(browser: BrowserDep) -> FolderTree:
+    '''All indexed folders with recursive sizes and their share of the library.'''
+    return await browser.tree()
+
+
+@api_router.get("/browse/files", responses={404: {"model": ErrorResponse}})
+async def folder_files(browser: BrowserDep, path: str = ".") -> FolderFiles:
+    '''Indexed files directly inside one folder.'''
+    return await browser.files(path)

@@ -1,3 +1,4 @@
+from .browser import FileEntry, FolderFiles, FolderNode, FolderTree
 from .gallery import (
     DirectoryPage,
     ErrorResponse,
@@ -28,6 +29,10 @@ __all__ = [
     "ConvertMp4Request",
     "DirectoryPage",
     "ErrorResponse",
+    "FileEntry",
+    "FolderFiles",
+    "FolderNode",
+    "FolderTree",
     "ImageSummary",
     "JobAccepted",
     "JobAttemptView",

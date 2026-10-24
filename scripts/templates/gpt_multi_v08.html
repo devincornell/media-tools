@@ -1130,9 +1130,14 @@
                 </a>
             </div>
             <div class="nav-item">
-                <a href="/update" class="nav-link">
+                <a href="/jobs?path={{ page_path_rel | urlencode }}" class="nav-link" title="Jobs: rescan / thumbnails for this folder">
                     <i class="fas fa-sync-alt"></i>
                     <!-- <span>Update</span> -->
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="/browse" class="nav-link" title="Browse all files">
+                    <i class="fas fa-folder-tree"></i>
                 </a>
             </div>
 
@@ -1470,7 +1475,7 @@
         // Subfolder thumbnails data
         const subfolderThumbs = {
             {% for cp in subpages %}
-            "{{ cp.name }}": {{ cp.subfolder_thumbs_all | tojson }},
+            {{ cp.name | tojson }}: {{ cp.subfolder_thumbs_all | tojson }},
             {% endfor %}
         };
 

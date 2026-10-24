@@ -123,6 +123,21 @@ def test_reindex_subdir_tracks_stale_and_siblings(tree: dict[str, Path]):
         assert any("unreadable: a/bad.mp4" in m for m in log)
         assert log[-1] == "Finished"
 
+        def disk_size(p: Path) -> int:
+            return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+
+        ftree = await s.browser.tree()
+        by_path = {f.path: f for f in ftree.folders}
+        assert ftree.total_size == disk_size(tree["root"]) == by_path["."].size
+        assert by_path["trip"].size == disk_size(tree["root"] / "trip")
+        assert by_path["trip/batch"].parent == "trip" and by_path["trip"].num_subdirs == 1
+        assert round(by_path["a"].percent, 6) == round(100 * disk_size(tree["root"] / "a") / ftree.total_size, 6)
+        assert (by_path["a"].num_videos, by_path["a"].files) == (4, 4)
+        listing = await s.browser.files("trip/batch")
+        assert [(f.name, f.size) for f in listing.files] == [
+            ("conflict.mp4", 9), ("dupe.mp4", (tree["root"] / "trip/batch/dupe.mp4").stat().st_size),
+        ]
+
         shutil.rmtree(tree["root"] / "trip" / "batch")
         status, out = await submit_and_run(s, ReindexRequest(path="trip"))
         assert status is JobStatus.SUCCEEDED and out["result"]["directories_removed"] == 1
@@ -235,6 +250,32 @@ def test_move_creates_new_folder_linked_into_parent(tree: dict[str, Path]):
         assert "imported" in [sp.page_path_rel for sp in root_page.subpages]
         root_doc = await s.gallery.dirs.find_by_path(tree["root"])
         assert root_doc is not None and "imported" in root_doc.subpaths
+
+    run_services(tree, body)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="permission checks are meaningless as root")
+def test_move_refuses_sources_it_cannot_delete_from(tree: dict[str, Path]):
+    batch = tree["batch"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        batch.chmod(0o555)
+        try:
+            with pytest.raises(InvalidJobRequestError, match="sudo chown -R"):
+                await s.media_jobs.submit(MoveRequest(source=str(batch), dest="imported"))
+        finally:
+            batch.chmod(0o755)
+
+        (batch / "sub").chmod(0o555)
+        try:
+            status, out = await submit_and_run(s, MoveRequest(source=str(batch), dest="imported"))
+        finally:
+            (batch / "sub").chmod(0o755)
+        job = out["view"].job
+        assert status is JobStatus.FAILED and job.error_code == "permission_denied" and job.attempt_count == 1
+        assert "sub" in job.error_message and "Nothing was moved" in job.error_message
+        assert not (tree["root"] / "imported").exists()
+        assert (batch / "new1.mp4").exists()
 
     run_services(tree, body)
 

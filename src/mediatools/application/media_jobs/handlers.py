@@ -406,6 +406,8 @@ class MoveHandler(_Base):
     async def _run(self, job_id: str, req: MoveRequest, source: Path, dest: Path, ctx: JobContext) -> None:
         ctx.log(f"Listing files in {source} ...")
         await ctx.checkpoint(0, "Listing source files", force=True)
+        if blocked := await asyncio.to_thread(fileops.unwritable_dirs, source):
+            raise PermanentJobError(fileops.permission_message(source, blocked), code="permission_denied")
         files, links = await asyncio.to_thread(fileops.list_source_files, source)
         total_bytes = sum(f.stat().st_size for f in files) or 1
         ctx.log(f"Moving {len(files)} files ({total_bytes / 1e9:.2f} GB) to {self._rel(dest)} "
@@ -413,6 +415,7 @@ class MoveHandler(_Base):
         dest.mkdir(parents=True, exist_ok=True)
         tally = dict.fromkeys(fileops.MoveOutcome, 0)
         conflicts: list[str] = []
+        failed: list[str] = []
         processed_bytes = 0
         messages = {
             fileops.MoveOutcome.MOVED: "moved",
@@ -424,9 +427,15 @@ class MoveHandler(_Base):
             nonlocal processed_bytes
             size = src.stat().st_size
             rel = src.relative_to(source)
-            outcome = await asyncio.to_thread(fileops.move_file, src, dest / rel, job_id[:8])
+            try:
+                outcome = await asyncio.to_thread(fileops.move_file, src, dest / rel, job_id[:8])
+            except OSError as e:
+                failed.append(f"{rel}: {e.strerror or e}")
+                ctx.log(f"ERROR, left in source: {rel} ({e.strerror or e})")
+                return
+            finally:
+                processed_bytes += size
             tally[outcome] += 1
-            processed_bytes += size
             ctx.log(f"{messages[outcome]}: {rel}")
             if outcome is fileops.MoveOutcome.CONFLICT:
                 conflicts.append(str(rel))
@@ -436,11 +445,13 @@ class MoveHandler(_Base):
             ctx.log(f"skipped symlink: {link.relative_to(source)}")
         source_empty = await asyncio.to_thread(fileops.remove_empty_dirs, source)
         ctx.log(f"Moved {tally[fileops.MoveOutcome.MOVED]}, {tally[fileops.MoveOutcome.DEDUPLICATED]} already present, "
-                f"{len(conflicts)} conflicts; source is {'now empty' if source_empty else 'NOT empty'}")
+                f"{len(conflicts)} conflicts, {len(failed)} errors; source is {'now empty' if source_empty else 'NOT empty'}")
 
         warnings: list[pydantic.JsonValue] = []
         if conflicts:
             warnings.append(f"{len(conflicts)} file(s) already exist at the destination with a different size; left in source.")
+        if failed:
+            warnings.append(f"{len(failed)} file(s) could not be moved; left in source (see log).")
         if links:
             warnings.append(f"{len(links)} symlink(s) in source were skipped.")
         result: Result = {
@@ -450,6 +461,7 @@ class MoveHandler(_Base):
             "moved": tally[fileops.MoveOutcome.MOVED],
             "deduplicated": tally[fileops.MoveOutcome.DEDUPLICATED],
             "conflicts": _capped(conflicts),
+            "failed": _capped(failed),
             "skipped_symlinks": _capped(str(p.relative_to(source)) for p in links),
             "source_empty": source_empty,
             "warnings": warnings,

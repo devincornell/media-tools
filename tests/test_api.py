@@ -11,11 +11,13 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from apps.api.dependencies import get_gallery, get_renderer
+from apps.api.dependencies import get_browser, get_gallery, get_picker, get_renderer
 from apps.api.main import create_app
 from apps.api.rendering import PageRenderer
 from apps.api.settings import TEMPLATES_DIR
+from mediatools.application.folder_picker import FolderPicker
 from mediatools.application import (
+    BrowserService,
     DirectoryNotIndexedError,
     GalleryService,
     MediaFileNotFoundError,
@@ -24,7 +26,13 @@ from mediatools.application import (
 from mediatools.client import GalleryClient
 from mediatools.contracts import DirectoryPage
 from mediatools.file_stat_result import FileStatResult
-from mediatools.index_db import MediaDirIndexDoc, VideoFileNotFoundError, VideoIndexDoc
+from mediatools.index_db import (
+    DirectorySizeRow,
+    MediaDirIndexDoc,
+    VideoFileNotFoundError,
+    VideoIndexDoc,
+    path_prefix_regex,
+)
 from mediatools.index_db.mediadir_index_collection import IndexImageFile, IndexVideoFile
 from mediatools.video.ffmpeg import ProbeInfo
 
@@ -40,7 +48,18 @@ class FakeDirs:
         return [d for d in self.docs.values() if d.path.parent == Path(path)]
 
     async def find_by_path_prefix(self, prefix: Path) -> list[MediaDirIndexDoc]:
-        return [d for p, d in self.docs.items() if p.startswith(str(prefix))]
+        return [d for p, d in self.docs.items() if path_prefix_regex(prefix).match(p)]
+
+    async def directory_sizes(self, prefix: Path) -> list[DirectorySizeRow]:
+        return [
+            DirectorySizeRow(
+                path_str=d.path_str,
+                bytes=sum(f.stat.size for g in (d.video_files, d.image_files, d.other_files) for f in g.values()),
+                num_videos=len(d.video_files), num_images=len(d.image_files), num_other=len(d.other_files),
+                num_subdirs=len(d.subpaths),
+            )
+            for d in await self.find_by_path_prefix(prefix)
+        ]
 
 
 class FakeVideos:
@@ -118,9 +137,16 @@ def gallery(media_root: Path) -> GalleryService:
 
 
 @pytest.fixture
-def client(gallery: GalleryService) -> TestClient:
+def browser(gallery: GalleryService) -> BrowserService:
+    return BrowserService(root_path=gallery.root_path, dirs=gallery.dirs)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def client(gallery: GalleryService, browser: BrowserService) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_gallery] = lambda: gallery
+    app.dependency_overrides[get_browser] = lambda: browser
+    app.dependency_overrides[get_picker] = lambda: FolderPicker(gallery.root_path, ())
     app.dependency_overrides[get_renderer] = lambda: PageRenderer(TEMPLATES_DIR / "gallery.html", TEMPLATES_DIR / "reels.html")
     return TestClient(app)  # not entered as a context manager, so lifespan (MongoDB) is skipped
 
@@ -128,6 +154,39 @@ def client(gallery: GalleryService) -> TestClient:
 # ---------------------------------------------------------------------------
 # Application layer
 # ---------------------------------------------------------------------------
+
+def test_browser_tree_rolls_up_sizes(browser: BrowserService):
+    tree = asyncio.run(browser.tree())
+    by_path = {f.path: f for f in tree.folders}
+    # root: three video entries (4 bytes each) + photo.jpg (3); trip: beach.mp4 (5)
+    assert tree.total_size == 20
+    assert (by_path["."].size, by_path["."].direct_size, by_path["."].percent, by_path["."].files) == (20, 15, 100.0, 5)
+    assert (by_path["trip"].size, by_path["trip"].percent, by_path["trip"].parent) == (5, 25.0, ".")
+    assert by_path["."].parent is None
+
+
+def test_browser_tree_skips_unindexed_gaps(tmp_path: Path):
+    def doc(p: Path) -> MediaDirIndexDoc:
+        return MediaDirIndexDoc(path_str=str(p), subpaths={}, video_files={}, image_files={}, other_files={})
+
+    root = tmp_path / "lib"
+    fake = FakeDirs([doc(root), doc(root / "x" / "y"), doc(tmp_path / "library2")])
+    tree = asyncio.run(BrowserService(root_path=root, dirs=fake).tree())  # type: ignore[arg-type]
+    assert {f.path: f.parent for f in tree.folders} == {".": None, "x/y": "."}
+    assert tree.total_size == 0 and all(f.percent == 0 for f in tree.folders)
+
+
+def test_browser_files(browser: BrowserService):
+    listing = asyncio.run(browser.files("."))
+    assert [(f.name, f.kind) for f in listing.files] == [
+        ("long_video.mp4", "video"), ("missing.mp4", "video"), ("photo.jpg", "image"), ("short_clip.mp4", "video"),
+    ]
+    assert asyncio.run(browser.files("trip")).files[0].path == "trip/beach.mp4"
+    with pytest.raises(DirectoryNotIndexedError):
+        asyncio.run(browser.files("nope"))
+    with pytest.raises(PathOutsideRootError):
+        asyncio.run(browser.files(".."))
+
 
 def test_directory_page_splits_videos_and_clips(gallery: GalleryService):
     page = asyncio.run(gallery.directory_page("."))
@@ -170,6 +229,24 @@ def test_list_videos(gallery: GalleryService):
 def test_root_redirects(client: TestClient):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == "/page/"
+
+
+def test_folder_picker_endpoints(client: TestClient, media_root: Path):
+    assert client.get("/api/fs/roots").json() == [{"scope": "gallery", "path": str(media_root)}]
+    listing = client.get("/api/fs/dirs", params={"scope": "gallery"}).json()
+    assert listing["rel"] == "." and [d["name"] for d in listing["dirs"]] == ["trip"]
+    assert client.get("/api/fs/dirs", params={"scope": "gallery", "path": str(media_root.parent)}).status_code == 404
+    assert client.get("/api/fs/dirs", params={"scope": "source"}).status_code == 422
+
+
+def test_browse_endpoints(client: TestClient):
+    assert "text/html" in client.get("/browse").headers["content-type"]
+    tree = client.get("/api/browse/tree").json()
+    assert tree["total_size"] == 20 and {f["path"] for f in tree["folders"]} == {".", "trip"}
+    files = client.get("/api/browse/files", params={"path": "trip"}).json()
+    assert files == {"path": "trip", "files": [files["files"][0]]} and files["files"][0]["name"] == "beach.mp4"
+    assert client.get("/api/browse/files", params={"path": "nope"}).status_code == 404
+    assert client.get("/api/browse/files", params={"path": "../.."}).status_code == 404
 
 
 @pytest.mark.parametrize("url", ["/page/", "/page/trip", "/reel/", "/reel/trip"])
