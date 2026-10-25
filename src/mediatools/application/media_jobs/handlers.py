@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import dataclasses
+import datetime
 import logging
 import os
 import typing
@@ -16,6 +17,7 @@ import pymongo.errors
 from ...contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    MontageRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -31,17 +33,19 @@ from ...index_db import (
 )
 from ...jobs import JobContext, JobHandler, PermanentJobError
 from ...mediadir import MediaDir
-from ...video.ffmpeg import FFMPEGError, ffinput, ffmpeg, ffoutput, make_animated_thumb
+from ...video.ffmpeg import FFMPEGError, create_montage, ffinput, ffmpeg, ffoutput, make_animated_thumb
+from ...video.ffmpeg.core.probe import probe
 from ...video.video_file import VideoFile
 from ..errors import PathOutsideRootError
 from ..paths import resolve_allowed_source, resolve_under_root
 from . import fileops
 from .locks import PathLocks
-from .types import CLEANUP, CONVERT_MP4, MOVE, REINDEX, THUMBNAILS
+from .types import CLEANUP, CONVERT_MP4, MONTAGE, MOVE, REINDEX, THUMBNAILS
 
 logger = logging.getLogger(__name__)
 
 MAX_LISTED = 500
+VIDEO_SUFFIXES = {".mp4", ".mov", ".mkv", ".avi", ".m4v"}
 THUMB_FPS = 3
 THUMB_PERIOD_SEC = 10
 THUMB_WIDTH = 400
@@ -399,6 +403,104 @@ class ConvertMp4Handler(_Base):
         return result
 
 
+def _as_utc(value: datetime.datetime) -> datetime.datetime:
+    return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
+
+
+class MontageHandler(_Base):
+    async def execute(self, job_id: str, ctx: JobContext) -> str | None:
+        req = await self._load(job_id, MontageRequest)
+        sources = []
+        for source in req.sources:
+            try:
+                sources.append(resolve_allowed_source(source, (self.deps.root_path, *self.deps.copy_source_roots)))
+            except PathOutsideRootError as e:
+                raise PermanentJobError(str(e), code="invalid_source") from e
+        output = self._target(req.output)
+        if output.exists() and not req.overwrite:
+            raise PermanentJobError(f"Output already exists: {req.output}", code="output_exists")
+        async with self._locked(ctx, [output.parent], exclusive=True):
+            result = await self._run(job_id, req, sources, output, ctx)
+        await self.deps.records.set_result(job_id, result)
+        return None
+
+    async def _run(self, job_id: str, req: MontageRequest, sources: list[Path], output: Path, ctx: JobContext) -> Result:
+        start, end = _as_utc(req.start), _as_utc(req.end)
+        candidates: list[Path] = []
+        for source in sources:
+            if not source.is_dir():
+                raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
+            ctx.log(f"Listing files in {source} ...")
+            found = await asyncio.to_thread(
+                lambda s=source: [
+                    p for p in s.rglob("*")
+                    if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file()
+                    and (req.name_contains is None or req.name_contains in p.name)
+                ]
+            )
+            candidates.extend(found)
+        candidates = sorted(set(candidates))
+        total = len(candidates)
+        ctx.log(f"Probing {total} videos for creation_time between {start.isoformat()} and {end.isoformat()}")
+
+        selected: list[Path] = []
+        undated, errors = 0, []
+        for i, path in enumerate(candidates, 1):
+            try:
+                info = await asyncio.to_thread(probe, path)
+                raw = (info.tags or {}).get("creation_time")
+                if raw is None:
+                    undated += 1
+                elif start <= _as_utc(datetime.datetime.fromisoformat(str(raw))) <= end:
+                    selected.append(path)
+            except (FFMPEGError, ValueError, OverflowError) as e:
+                errors.append(f"{self._display(path)}: {type(e).__name__}")
+                ctx.log(f"unreadable: {self._display(path)} ({type(e).__name__})")
+            await ctx.checkpoint(_span(0, 30, i, total), f"Probing videos {i}/{total}")
+        ctx.log(f"{len(selected)} of {total} videos are in the date range ({undated} without creation_time)")
+
+        result: Result = {
+            "output": req.output,
+            "videos_found": total,
+            "videos_selected": len(selected),
+            "videos_without_creation_time": undated,
+            "errors": _capped(errors),
+            "error_count": len(errors),
+        }
+        if not selected:
+            raise PermanentJobError("No videos matched the date range.", code="no_videos")
+
+        output.parent.mkdir(parents=True, exist_ok=True)
+        tmp = output.with_name(f".{output.stem}.{job_id[:8]}.tmp.mp4")
+        ctx.log(f"Creating montage {req.output} from {len(selected)} videos (this step cannot be canceled midway)")
+        await ctx.checkpoint(30, "Rendering montage", force=True)
+        try:
+            await asyncio.to_thread(
+                create_montage,
+                video_files=selected,
+                output_filename=str(tmp),
+                clip_ratio=req.clip_ratio,
+                clip_duration=req.clip_duration,
+                random_seed=req.random_seed,
+                width=req.width,
+                height=req.height,
+                fps=req.fps,
+                use_cuda=req.use_cuda,
+                max_clips_per_video=req.max_clips_per_video,
+                max_total_clips=req.max_total_clips,
+                shuffle_clips=req.shuffle_clips,
+                overwrite=True,
+            )
+            os.replace(tmp, output)
+        except FFMPEGError as e:
+            raise PermanentJobError(f"ffmpeg failed: {e}", code="ffmpeg_failed") from e
+        finally:
+            tmp.unlink(missing_ok=True)
+        ctx.log("Montage created")
+        result["reindex"] = await self._reindex(output.parent, ctx, 90, 100)
+        return result
+
+
 class MoveIncompleteError(Exception):
     '''Some entries could not be moved, so the source folder still exists. Retried, as the cause may be transient.'''
 
@@ -547,4 +649,5 @@ def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
         CLEANUP: CleanupHandler(deps),
         CONVERT_MP4: ConvertMp4Handler(deps),
         MOVE: MoveHandler(deps),
+        MONTAGE: MontageHandler(deps),
     }

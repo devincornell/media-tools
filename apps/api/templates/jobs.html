@@ -23,7 +23,7 @@
         .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
         label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
         label.check { flex-direction: row; align-items: center; color: var(--text); font-size: 0.9rem; }
-        input, select, button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; }
+        input, select, button, textarea { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; }
         input[type=text] { min-width: 22rem; }
         input[type=number] { width: 5rem; }
         button { cursor: pointer; }
@@ -74,6 +74,7 @@
                         <option value="cleanup">Clean up videos</option>
                         <option value="convert_mp4">Convert to MP4</option>
                         <option value="move">Move into gallery + rescan</option>
+                        <option value="montage">Create montage</option>
                     </select>
                 </label>
                 <label data-for="reindex thumbnails cleanup convert_mp4">Directory (relative to gallery root)
@@ -96,6 +97,36 @@
                 <label class="check"><input type="checkbox" id="deleteDuplicates"> Duplicates (same folder)</label>
                 <label class="check"><input type="checkbox" id="dryRun" checked> Dry run (report only)</label>
                 <span id="dryRunWarning" class="danger hidden">Files will be permanently deleted.</span>
+            </div>
+            <div class="row" data-for="montage" style="margin-top: 0.75rem">
+                <label>Source directories (absolute, one per line)
+                    <textarea id="mSources" rows="3" cols="50" placeholder="/path/inside/an/allowed/root"></textarea>
+                </label>
+                <label>Output file (relative to gallery root, .mp4)
+                    <input type="text" id="mOutput" placeholder="montages/trip.mp4">
+                </label>
+                <label>Created from (UTC)
+                    <input type="datetime-local" id="mStart" step="1">
+                </label>
+                <label>Created to (UTC)
+                    <input type="datetime-local" id="mEnd" step="1">
+                </label>
+                <label>Filename contains (optional)
+                    <input type="text" id="mName" placeholder="GX" style="min-width: 8rem">
+                </label>
+            </div>
+            <div class="row" data-for="montage" style="margin-top: 0.75rem">
+                <label>Width <input type="number" id="mWidth" value="1920" min="16" max="7680" style="width: 6rem"></label>
+                <label>Height <input type="number" id="mHeight" value="1080" min="16" max="4320" style="width: 6rem"></label>
+                <label>FPS <input type="number" id="mFps" value="30" min="1" max="240"></label>
+                <label>Clip ratio (s per clip) <input type="number" id="mRatio" value="30" min="1" step="any"></label>
+                <label>Clip duration (s) <input type="number" id="mDuration" value="2" min="0.1" step="any"></label>
+                <label>Seed <input type="number" id="mSeed" value="0"></label>
+                <label>Max clips/video <input type="number" id="mMaxPer" min="1"></label>
+                <label>Max total clips <input type="number" id="mMaxTotal" min="1"></label>
+                <label class="check"><input type="checkbox" id="mShuffle"> Shuffle clips</label>
+                <label class="check"><input type="checkbox" id="mCuda"> CUDA</label>
+                <label class="check"><input type="checkbox" id="mOverwrite"> Overwrite existing</label>
             </div>
             <p id="moveDisabled" class="danger hidden" data-for="move">Move jobs are disabled: set SITE_COPY_SOURCE_ROOTS on the server.</p>
             <p id="workerOff" class="muted hidden">This server isn't running a job worker; jobs will wait for a separate worker process.</p>
@@ -122,7 +153,7 @@
                         <option value="">All</option>
                         <option value="reindex">Rescan</option><option value="thumbnails">Thumbnails</option>
                         <option value="cleanup">Cleanup</option><option value="convert_mp4">Convert</option>
-                        <option value="move">Move</option>
+                        <option value="move">Move</option><option value="montage">Montage</option>
                     </select>
                 </label>
             </div>
@@ -139,8 +170,8 @@
 
 <script src="/static/picker.js"></script>
 <script>
-const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan' };
-const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move' };
+const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan', montage: 'Montage' };
+const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move', montage: 'montage' };
 const ACTIVE = new Set(['queued', 'running']);
 const expanded = new Set();
 const $ = (id) => document.getElementById(id);
@@ -212,6 +243,20 @@ function buildRequest(kind) {
             dry_run: $('dryRun').checked,
         };
         case 'move': return { source: $('source').value, dest: $('dest').value, workers };
+        case 'montage': {
+            const optInt = (id) => ($(id).value === '' ? null : Number($(id).value));
+            return {
+                sources: $('mSources').value.split('\n').map(s => s.trim()).filter(Boolean),
+                output: $('mOutput').value.trim(),
+                start: $('mStart').value, end: $('mEnd').value,
+                name_contains: $('mName').value.trim() || null,
+                width: Number($('mWidth').value), height: Number($('mHeight').value), fps: Number($('mFps').value),
+                clip_ratio: Number($('mRatio').value), clip_duration: Number($('mDuration').value),
+                random_seed: Number($('mSeed').value),
+                max_clips_per_video: optInt('mMaxPer'), max_total_clips: optInt('mMaxTotal'),
+                shuffle_clips: $('mShuffle').checked, use_cuda: $('mCuda').checked, overwrite: $('mOverwrite').checked,
+            };
+        }
     }
 }
 
@@ -261,6 +306,7 @@ function summary(item) {
                 break;
             }
             case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
+            case 'montage': parts.push(`${r.videos_selected} of ${r.videos_found} videos in range${r.output ? ` → ${r.output}` : ''}`); break;
             case 'move': {
                 const extra = [`${(r.renamed || []).length} renamed`];
                 if (r.links_moved) extra.push(`${r.links_moved} link(s)`);

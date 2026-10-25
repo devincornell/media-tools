@@ -119,6 +119,35 @@ class MoveRequest(_Contract):
     workers: Annotated[int, Field(ge=1, le=32, description="Files transferred concurrently.")] = 4
 
 
+class MontageRequest(_Contract):
+    '''Build one montage video from random clips of the videos created within a date range.'''
+
+    sources: Annotated[list[str], Field(min_length=1, description="Absolute directories to search recursively; each must be inside the gallery root or a configured copy source root.")]
+    start: Annotated[datetime.datetime, Field(description="Earliest `creation_time` tag to include (naive values are UTC).")]
+    end: Annotated[datetime.datetime, Field(description="Latest `creation_time` tag to include (naive values are UTC).")]
+    output: Annotated[str, Field(description="Output `.mp4` path relative to the gallery root.")]
+    name_contains: Annotated[str | None, Field(description="Only consider files whose name contains this text (e.g. `GX` for GoPro).")] = None
+    width: Annotated[int, Field(ge=16, le=7680, description="Output width in pixels.")] = 1920
+    height: Annotated[int, Field(ge=16, le=4320, description="Output height in pixels.")] = 1080
+    fps: Annotated[int, Field(ge=1, le=240, description="Output frames per second.")] = 30
+    clip_ratio: Annotated[float, Field(gt=0, description="Seconds of source video per extracted clip (30 = one clip per 30 s).")] = 30
+    clip_duration: Annotated[float, Field(gt=0, le=600, description="Length of each clip in seconds.")] = 2.0
+    random_seed: Annotated[int, Field(description="Seed for clip selection.")] = 0
+    max_clips_per_video: Annotated[int | None, Field(ge=1, description="Cap on clips taken from one video.")] = None
+    max_total_clips: Annotated[int | None, Field(ge=1, description="Cap on clips in the montage.")] = None
+    shuffle_clips: Annotated[bool, Field(description="Shuffle clip order instead of keeping chronological order.")] = False
+    use_cuda: Annotated[bool, Field(description="Use CUDA acceleration.")] = False
+    overwrite: Annotated[bool, Field(description="Replace the output file if it exists.")] = False
+
+    @model_validator(mode="after")
+    def _valid_range(self) -> MontageRequest:
+        if self.start > self.end:
+            raise ValueError("start must not be after end.")
+        if not self.output.lower().endswith(".mp4"):
+            raise ValueError("output must end in .mp4.")
+        return self
+
+
 # --------------------------------------------------------------------------- media job views
 
 class MediaJobView(_Contract):

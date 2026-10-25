@@ -14,6 +14,7 @@ from mediatools.contracts import (
     JobConfigView,
     MediaJobPage,
     MediaJobView,
+    MontageRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -60,6 +61,12 @@ async def submit_convert_mp4(request: ConvertMp4Request, svc: MediaJobsDep) -> J
 @router.post("/api/jobs/move", status_code=202, responses=_INVALID)
 async def submit_move(request: MoveRequest, svc: MediaJobsDep) -> JobAccepted:
     '''Move a directory's contents into the gallery, then rescan the destination.'''
+    return await _submit(svc, request)
+
+
+@router.post("/api/jobs/montage", status_code=202, responses=_INVALID)
+async def submit_montage(request: MontageRequest, svc: MediaJobsDep) -> JobAccepted:
+    '''Build a montage from random clips of videos whose creation_time falls in a date range.'''
     return await _submit(svc, request)
 
 

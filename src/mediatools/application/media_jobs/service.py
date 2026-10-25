@@ -11,6 +11,7 @@ from ...contracts import (
     JobView,
     MediaJobPage,
     MediaJobView,
+    MontageRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -24,13 +25,14 @@ from .types import (
     CLEANUP,
     CONVERT_MP4,
     KIND_BY_TYPE,
+    MONTAGE,
     MOVE,
     REINDEX,
     THUMBNAILS,
     TYPE_BY_KIND,
 )
 
-MediaJobRequest = ReindexRequest | ThumbnailsRequest | CleanupRequest | ConvertMp4Request | MoveRequest
+MediaJobRequest = ReindexRequest | ThumbnailsRequest | CleanupRequest | ConvertMp4Request | MoveRequest | MontageRequest
 
 _TYPE_BY_REQUEST: dict[type, str] = {
     ReindexRequest: REINDEX,
@@ -38,6 +40,7 @@ _TYPE_BY_REQUEST: dict[type, str] = {
     CleanupRequest: CLEANUP,
     ConvertMp4Request: CONVERT_MP4,
     MoveRequest: MOVE,
+    MontageRequest: MONTAGE,
 }
 
 
@@ -108,10 +111,25 @@ class MediaJobService:
         '''Check paths up front so bad requests fail fast; returns the target directory.'''
         if isinstance(request, MoveRequest):
             return self._validate_move(request)
+        if isinstance(request, MontageRequest):
+            return self._validate_montage(request)
         target = self._under_root(request.path)
         if not target.is_dir():
             raise InvalidJobRequestError(f"Directory not found: {request.path}")
         return target
+
+    def _validate_montage(self, request: MontageRequest) -> Path:
+        for source in request.sources:
+            try:
+                path = resolve_allowed_source(source, (self.root_path, *self.copy_source_roots))
+            except PathOutsideRootError as e:
+                raise InvalidJobRequestError(str(e)) from e
+            if not path.is_dir():
+                raise InvalidJobRequestError(f"Source directory not found: {source}")
+        output = self._under_root(request.output)
+        if output.exists() and not request.overwrite:
+            raise InvalidJobRequestError(f"Output already exists: {request.output}")
+        return output
 
     def _validate_move(self, request: MoveRequest) -> Path:
         if not self.copy_source_roots:
