@@ -24,8 +24,8 @@ from .core.errors import FFMPEGExecutionError
 def create_montage(
     video_files: typing.List[Path], 
     output_filename: str, 
-    clip_ratio: float, # 30 would be one clip for every 30 seconds (10x shorter)
-    clip_duration: float, 
+    clip_ratio: float|None = None, # seconds of source per clip; 90 with 2s clips is ~45x shorter
+    clip_duration: float = 2.0,
     random_seed: int = 0, 
     width: int = 1920, 
     height: int = 1080, 
@@ -38,9 +38,13 @@ def create_montage(
     shuffle_clips: bool = False,
     overwrite: bool = False,
     tmp_dir: Path|str|None = None,
+    target_duration: float|None = None,
 ) -> FFMPEGResult:
     """
-    Creates a video montage by randomly sampling clips from videos according to clip_ratio.
+    Creates a video montage by randomly sampling clips from videos.
+
+    Give either `target_duration` (desired montage length in seconds; clips are shared out
+    in proportion to each video's length) or `clip_ratio` (one clip per that many seconds of source).
 
     This function takes a list of video file paths, extracts clips from each video 
     proportional to its length, and then concatenates them into a single montage file. 
@@ -65,6 +69,7 @@ def create_montage(
         random_seed=random_seed,
         clip_ratio=clip_ratio,
         max_clips_per_video=max_clips_per_video,
+        target_duration=target_duration,
     )
 
     if shuffle_clips:
@@ -94,10 +99,14 @@ def get_random_clips(
     video_paths: typing.List[Path], 
     clip_duration: float, 
     random_seed: int = 0, 
-    clip_ratio: float = 30, # one clip for every 30 seconds (10x shorter)
+    clip_ratio: float|None = None,
     max_clips_per_video: int|None = None,
+    target_duration: float|None = None,
 ) -> list[ClipInfo]:
     '''Extract random clips from the given video files.'''
+
+    if (clip_ratio is None) == (target_duration is None):
+        raise ValueError("Specify exactly one of clip_ratio or target_duration.")
 
     random.seed(random_seed)
     video_paths: list[Path] = [Path(path) for path in video_paths]
@@ -108,23 +117,34 @@ def get_random_clips(
     if clip_duration <= 0:
         raise ValueError("Error: Clip duration must be a positive number.")
 
-    all_clip_infos: list[ClipInfo] = []
+    durations: list[tuple[Path, float]] = []
     for video_path in sorted(video_paths):
-
         try:
             duration = probe(video_path).duration
         except FFMPEGExecutionError as e:
             continue
-        
-        if duration == 0:
+        if duration:
+            durations.append((video_path, duration))
+
+    if target_duration is not None:
+        counts = _allocate_clip_counts(
+            [d for _, d in durations], round(target_duration / clip_duration), clip_duration, max_clips_per_video,
+        )
+    else:
+        counts = []
+        for _, duration in durations:
+            if duration < clip_duration:
+                n = 1
+            else:
+                n = max(1, int(duration / clip_ratio))
+                if max_clips_per_video is not None:
+                    n = min(n, max_clips_per_video)
+            counts.append(n)
+
+    all_clip_infos: list[ClipInfo] = []
+    for (video_path, duration), num_clips in zip(durations, counts):
+        if num_clips == 0:
             continue
-            
-        if duration < clip_duration:
-            num_clips = 1
-        else:
-            num_clips = max(1, int(duration / clip_ratio))
-            if max_clips_per_video is not None:
-                num_clips = min(num_clips, max_clips_per_video)
 
         vid_clip_infos: list[ClipInfo] = []
         for n in range(num_clips):
@@ -153,6 +173,29 @@ def get_random_clips(
         all_clip_infos.extend(list(sorted(vid_clip_infos, key=lambda x: x.start_time)))
 
     return all_clip_infos
+
+
+def _allocate_clip_counts(
+    durations: list[float], total_clips: int, clip_duration: float, max_per_video: int|None,
+) -> list[int]:
+    '''Share `total_clips` across videos in proportion to length (largest remainder), capped by what each video can hold.'''
+    total_len = sum(durations)
+    if total_len <= 0 or total_clips <= 0:
+        return [0] * len(durations)
+    caps = [max(1, int(d / clip_duration)) for d in durations]
+    if max_per_video is not None:
+        caps = [min(c, max_per_video) for c in caps]
+    quotas = [total_clips * d / total_len for d in durations]
+    counts = [min(int(q), c) for q, c in zip(quotas, caps)]
+    remaining = total_clips - sum(counts)
+    by_remainder = sorted(range(len(durations)), key=lambda i: quotas[i] - int(quotas[i]), reverse=True)
+    for i in by_remainder:
+        if remaining <= 0:
+            break
+        if counts[i] < caps[i]:
+            counts[i] += 1
+            remaining -= 1
+    return counts
 
 
 

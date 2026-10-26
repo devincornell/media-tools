@@ -54,6 +54,14 @@
         .target { font-family: ui-monospace, monospace; font-size: 0.82rem; }
         .field { display: flex; gap: 0.4rem; }
         .field input { flex: 1; }
+        .montage { margin-top: 0.75rem; display: grid; gap: 0.75rem; }
+        .montage fieldset { border: 1px solid var(--border); border-radius: 10px; margin: 0; padding: 0.75rem; }
+        .montage legend { color: var(--muted); font-size: 0.8rem; font-weight: 600; padding: 0 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem 1rem; align-items: end; }
+        .grid .wide { grid-column: 1 / -1; }
+        .montage input[type=text], .montage input[type=number], .montage input[type=datetime-local], .montage select, .montage textarea { width: 100%; min-width: 0; }
+        .montage details > summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
+        .checks { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
     </style>
 </head>
 <body>
@@ -86,7 +94,7 @@
                 <label data-for="move">Destination (relative to gallery root; created if missing)
                     <span class="field"><input type="text" id="dest" placeholder="new/folder"><button type="button" data-pick="dest">Browse&hellip;</button></span>
                 </label>
-                <label data-for="thumbnails move montage">Parallel workers
+                <label data-for="thumbnails move">Parallel workers
                     <input type="number" id="workers" min="1" max="16">
                 </label>
                 <label class="check" data-for="thumbnails"><input type="checkbox" id="overwrite"> Regenerate existing</label>
@@ -98,35 +106,67 @@
                 <label class="check"><input type="checkbox" id="dryRun" checked> Dry run (report only)</label>
                 <span id="dryRunWarning" class="danger hidden">Files will be permanently deleted.</span>
             </div>
-            <div class="row" data-for="montage" style="margin-top: 0.75rem">
-                <label>Source directories (absolute, one per line)
-                    <textarea id="mSources" rows="3" cols="50" placeholder="/path/inside/an/allowed/root"></textarea>
-                </label>
-                <label>Output file (relative to gallery root, .mp4)
-                    <input type="text" id="mOutput" placeholder="montages/trip.mp4">
-                </label>
-                <label>Created from (UTC)
-                    <input type="datetime-local" id="mStart" step="1">
-                </label>
-                <label>Created to (UTC)
-                    <input type="datetime-local" id="mEnd" step="1">
-                </label>
-                <label>Filename contains (optional)
-                    <input type="text" id="mName" placeholder="GX" style="min-width: 8rem">
-                </label>
-            </div>
-            <div class="row" data-for="montage" style="margin-top: 0.75rem">
-                <label>Width <input type="number" id="mWidth" value="1920" min="16" max="7680" style="width: 6rem"></label>
-                <label>Height <input type="number" id="mHeight" value="1080" min="16" max="4320" style="width: 6rem"></label>
-                <label>FPS <input type="number" id="mFps" value="30" min="1" max="240"></label>
-                <label>Clip ratio (s per clip) <input type="number" id="mRatio" value="30" min="1" step="any"></label>
-                <label>Clip duration (s) <input type="number" id="mDuration" value="2" min="0.1" step="any"></label>
-                <label>Seed <input type="number" id="mSeed" value="0"></label>
-                <label>Max clips/video <input type="number" id="mMaxPer" min="1"></label>
-                <label>Max total clips <input type="number" id="mMaxTotal" min="1"></label>
-                <label class="check"><input type="checkbox" id="mShuffle"> Shuffle clips</label>
-                <label class="check"><input type="checkbox" id="mCuda"> CUDA</label>
-                <label class="check"><input type="checkbox" id="mOverwrite"> Overwrite existing</label>
+            <div class="montage" data-for="montage">
+                <fieldset>
+                    <legend>Source videos</legend>
+                    <div class="grid">
+                        <label class="wide">Directories to search (absolute, one per line)
+                            <textarea id="mSources" rows="3" placeholder="/path/inside/an/allowed/root"></textarea>
+                            <span class="field">
+                                <button type="button" class="small" data-pick="mSourceExt">Add from source roots&hellip;</button>
+                                <button type="button" class="small" data-pick="mSourceGallery">Add from gallery&hellip;</button>
+                            </span>
+                        </label>
+                        <label>Created from (UTC, optional)
+                            <input type="datetime-local" id="mStart" step="1">
+                        </label>
+                        <label>Created to (UTC, optional)
+                            <input type="datetime-local" id="mEnd" step="1">
+                        </label>
+                        <label>Filename contains (optional)
+                            <input type="text" id="mName" placeholder="GX">
+                        </label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Montage</legend>
+                    <div class="grid">
+                        <label class="wide">Output file (relative to gallery root, .mp4)
+                            <span class="field"><input type="text" id="mOutput" placeholder="montages/trip.mp4"><button type="button" data-pick="mOutput">Browse&hellip;</button></span>
+                        </label>
+                        <label>Length by
+                            <select id="mMode">
+                                <option value="target">Target montage length</option>
+                                <option value="ratio">One clip per N seconds of footage</option>
+                            </select>
+                        </label>
+                        <label id="mTargetLabel">Target length (minutes) <input type="number" id="mTarget" value="10" min="0.1" step="any"></label>
+                        <label id="mRatioLabel" class="hidden">Seconds of footage per clip <input type="number" id="mRatio" value="90" min="1" step="any"></label>
+                        <label>Clip duration (s) <input type="number" id="mDuration" value="2" min="0.1" step="any"></label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Video format</legend>
+                    <div class="grid">
+                        <label>Width <input type="number" id="mWidth" value="1920" min="16" max="7680"></label>
+                        <label>Height <input type="number" id="mHeight" value="1080" min="16" max="4320"></label>
+                        <label>FPS <input type="number" id="mFps" value="30" min="1" max="240"></label>
+                    </div>
+                </fieldset>
+                <details>
+                    <summary>Advanced options</summary>
+                    <div class="grid">
+                        <label>Parallel workers <input type="number" id="mWorkers" value="2" min="1" max="16"></label>
+                        <label>Random seed <input type="number" id="mSeed" value="0"></label>
+                        <label>Max clips per video <input type="number" id="mMaxPer" min="1" placeholder="no limit"></label>
+                        <label>Max total clips <input type="number" id="mMaxTotal" min="1" placeholder="no limit"></label>
+                        <div class="checks wide">
+                            <label class="check"><input type="checkbox" id="mShuffle"> Shuffle clips</label>
+                            <label class="check"><input type="checkbox" id="mCuda"> Use CUDA</label>
+                            <label class="check"><input type="checkbox" id="mOverwrite"> Overwrite existing output</label>
+                        </div>
+                    </div>
+                </details>
             </div>
             <p id="moveDisabled" class="danger hidden" data-for="move">Move jobs are disabled: set SITE_COPY_SOURCE_ROOTS on the server.</p>
             <p id="workerOff" class="muted hidden">This server isn't running a job worker; jobs will wait for a separate worker process.</p>
@@ -203,6 +243,28 @@ function destFor(rel) {
 }
 
 function openPicker(field) {
+    if (field === 'mSourceExt' || field === 'mSourceGallery') {
+        const scope = field === 'mSourceExt' ? 'source' : 'gallery';
+        FolderPicker.open({
+            scope, title: 'Choose a folder to search for videos',
+            onChoose: (L) => {
+                const lines = $('mSources').value.split('\n').map(s => s.trim()).filter(Boolean);
+                if (!lines.includes(L.path)) lines.push(L.path);
+                $('mSources').value = lines.join('\n');
+            },
+        });
+        return;
+    }
+    if (field === 'mOutput') {
+        const parts = $('mOutput').value.trim().split('/');
+        const file = /\.mp4$/i.test(parts[parts.length - 1]) ? parts.pop() : 'montage.mp4';
+        FolderPicker.open({
+            scope: 'gallery', title: 'Choose where to save the montage', startRel: parts.join('/'),
+            note: (L) => `will save as ${[L.rel && L.rel !== '.' ? L.rel : '', file].filter(Boolean).join('/')}`,
+            onChoose: (L) => { $('mOutput').value = [L.rel && L.rel !== '.' ? L.rel : '', file].filter(Boolean).join('/'); },
+        });
+        return;
+    }
     const current = $(field).value.trim();
     const hasSource = () => $('source').value.trim() !== '';
     if (field === 'source') {
@@ -245,14 +307,17 @@ function buildRequest(kind) {
         case 'move': return { source: $('source').value, dest: $('dest').value, workers };
         case 'montage': {
             const optInt = (id) => ($(id).value === '' ? null : Number($(id).value));
+            const byRatio = $('mMode').value === 'ratio';
             return {
                 sources: $('mSources').value.split('\n').map(s => s.trim()).filter(Boolean),
                 output: $('mOutput').value.trim(),
-                start: $('mStart').value, end: $('mEnd').value,
+                start: $('mStart').value || null, end: $('mEnd').value || null,
                 name_contains: $('mName').value.trim() || null,
                 width: Number($('mWidth').value), height: Number($('mHeight').value), fps: Number($('mFps').value),
-                clip_ratio: Number($('mRatio').value), clip_duration: Number($('mDuration').value),
-                random_seed: Number($('mSeed').value), workers,
+                clip_ratio: byRatio ? Number($('mRatio').value) : null,
+                target_duration: byRatio ? null : Number($('mTarget').value) * 60,
+                clip_duration: Number($('mDuration').value),
+                random_seed: Number($('mSeed').value), workers: Number($('mWorkers').value),
                 max_clips_per_video: optInt('mMaxPer'), max_total_clips: optInt('mMaxTotal'),
                 shuffle_clips: $('mShuffle').checked, use_cuda: $('mCuda').checked, overwrite: $('mOverwrite').checked,
             };
@@ -306,7 +371,7 @@ function summary(item) {
                 break;
             }
             case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
-            case 'montage': parts.push(`${r.videos_selected} of ${r.videos_found} videos in range${r.output ? ` → ${r.output}` : ''}`); break;
+            case 'montage': parts.push(`${r.videos_selected} of ${r.videos_found} videos${item.params.start || item.params.end ? ' in range' : ''}${r.output ? ` → ${r.output}` : ''}`); break;
             case 'move': {
                 const extra = [`${(r.renamed || []).length} renamed`];
                 if (r.links_moved) extra.push(`${r.links_moved} link(s)`);
@@ -461,6 +526,11 @@ async function init() {
     document.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => openPicker(b.dataset.pick)));
     $('kind').addEventListener('change', () => { $('workers').value = $('kind').value === 'move' ? 4 : 2; updateForm(); });
     $('dryRun').addEventListener('change', updateForm);
+    $('mMode').addEventListener('change', () => {
+        const byRatio = $('mMode').value === 'ratio';
+        $('mTargetLabel').classList.toggle('hidden', byRatio);
+        $('mRatioLabel').classList.toggle('hidden', !byRatio);
+    });
     $('jobForm').addEventListener('submit', submitJob);
     $('filterStatus').addEventListener('change', refresh);
     $('filterKind').addEventListener('change', refresh);

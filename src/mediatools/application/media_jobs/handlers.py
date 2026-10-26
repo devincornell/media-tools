@@ -425,7 +425,8 @@ class MontageHandler(_Base):
         return None
 
     async def _run(self, job_id: str, req: MontageRequest, sources: list[Path], output: Path, ctx: JobContext) -> Result:
-        start, end = _as_utc(req.start), _as_utc(req.end)
+        start = _as_utc(req.start) if req.start else None
+        end = _as_utc(req.end) if req.end else None
         candidates: list[Path] = []
         for source in sources:
             if not source.is_dir():
@@ -441,23 +442,29 @@ class MontageHandler(_Base):
             candidates.extend(found)
         candidates = sorted(set(candidates))
         total = len(candidates)
-        ctx.log(f"Probing {total} videos for creation_time between {start.isoformat()} and {end.isoformat()}")
-
         selected: list[Path] = []
         undated, errors = 0, []
-        for i, path in enumerate(candidates, 1):
+        if start is None and end is None:
+            selected = candidates
+            ctx.log(f"No date range given; using all {total} videos")
+        else:
+            ctx.log(f"Probing {total} videos for creation_time between {start.isoformat() if start else 'any'} and {end.isoformat() if end else 'any'}")
+        for i, path in enumerate(candidates if (start or end) else [], 1):
             try:
                 info = await asyncio.to_thread(probe, path)
                 raw = (info.tags or {}).get("creation_time")
                 if raw is None:
                     undated += 1
-                elif start <= _as_utc(datetime.datetime.fromisoformat(str(raw))) <= end:
+                    continue
+                created = _as_utc(datetime.datetime.fromisoformat(str(raw)))
+                if (start is None or start <= created) and (end is None or created <= end):
                     selected.append(path)
             except (FFMPEGError, ValueError, OverflowError) as e:
                 errors.append(f"{self._display(path)}: {type(e).__name__}")
                 ctx.log(f"unreadable: {self._display(path)} ({type(e).__name__})")
             await ctx.checkpoint(_span(0, 30, i, total), f"Probing videos {i}/{total}")
-        ctx.log(f"{len(selected)} of {total} videos are in the date range ({undated} without creation_time)")
+        if start or end:
+            ctx.log(f"{len(selected)} of {total} videos are in the date range ({undated} without creation_time)")
 
         result: Result = {
             "output": req.output,
@@ -468,7 +475,7 @@ class MontageHandler(_Base):
             "error_count": len(errors),
         }
         if not selected:
-            raise PermanentJobError("No videos matched the date range.", code="no_videos")
+            raise PermanentJobError("No videos matched.", code="no_videos")
 
         output.parent.mkdir(parents=True, exist_ok=True)
         tmp = output.with_name(f".{output.stem}.{job_id[:8]}.tmp.mp4")
@@ -480,6 +487,7 @@ class MontageHandler(_Base):
                 video_files=selected,
                 output_filename=str(tmp),
                 clip_ratio=req.clip_ratio,
+                target_duration=req.target_duration,
                 clip_duration=req.clip_duration,
                 random_seed=req.random_seed,
                 width=req.width,

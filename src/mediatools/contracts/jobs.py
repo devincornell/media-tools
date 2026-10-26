@@ -120,17 +120,18 @@ class MoveRequest(_Contract):
 
 
 class MontageRequest(_Contract):
-    '''Build one montage video from random clips of the videos created within a date range.'''
+    '''Build one montage video from random clips of the videos found in the sources, optionally limited to a creation date range.'''
 
     sources: Annotated[list[str], Field(min_length=1, description="Absolute directories to search recursively; each must be inside the gallery root or a configured copy source root.")]
-    start: Annotated[datetime.datetime, Field(description="Earliest `creation_time` tag to include (naive values are UTC).")]
-    end: Annotated[datetime.datetime, Field(description="Latest `creation_time` tag to include (naive values are UTC).")]
+    start: Annotated[datetime.datetime | None, Field(description="Earliest `creation_time` tag to include (naive values are UTC). Omit for no lower bound.")] = None
+    end: Annotated[datetime.datetime | None, Field(description="Latest `creation_time` tag to include (naive values are UTC). Omit for no upper bound.")] = None
     output: Annotated[str, Field(description="Output `.mp4` path relative to the gallery root.")]
     name_contains: Annotated[str | None, Field(description="Only consider files whose name contains this text (e.g. `GX` for GoPro).")] = None
     width: Annotated[int, Field(ge=16, le=7680, description="Output width in pixels.")] = 1920
     height: Annotated[int, Field(ge=16, le=4320, description="Output height in pixels.")] = 1080
     fps: Annotated[int, Field(ge=1, le=240, description="Output frames per second.")] = 30
-    clip_ratio: Annotated[float, Field(gt=0, description="Seconds of source video per extracted clip (30 = one clip per 30 s).")] = 30
+    clip_ratio: Annotated[float | None, Field(gt=0, description="Alternative to `target_duration`: seconds of source video per clip (90 with 2 s clips is about 45x shorter).")] = None
+    target_duration: Annotated[float | None, Field(gt=0, description="Desired montage length in seconds; clips are shared across videos in proportion to their length. Defaults to 600 unless `clip_ratio` is given.")] = 600
     clip_duration: Annotated[float, Field(gt=0, le=600, description="Length of each clip in seconds.")] = 2.0
     random_seed: Annotated[int, Field(description="Seed for clip selection.")] = 0
     max_clips_per_video: Annotated[int | None, Field(ge=1, description="Cap on clips taken from one video.")] = None
@@ -140,10 +141,19 @@ class MontageRequest(_Contract):
     workers: Annotated[int, Field(ge=1, le=16, description="Concurrent clip encodes; each is multithreaded and uses substantial memory at high resolutions.")] = 2
     overwrite: Annotated[bool, Field(description="Replace the output file if it exists.")] = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def _default_sampling(cls, data: object) -> object:
+        if isinstance(data, dict) and data.get("clip_ratio") is not None and "target_duration" not in data:
+            return {**data, "target_duration": None}
+        return data
+
     @model_validator(mode="after")
     def _valid_range(self) -> MontageRequest:
-        if self.start > self.end:
+        if self.start and self.end and self.start > self.end:
             raise ValueError("start must not be after end.")
+        if (self.clip_ratio is None) == (self.target_duration is None):
+            raise ValueError("Give exactly one of target_duration or clip_ratio.")
         if not self.output.lower().endswith(".mp4"):
             raise ValueError("output must end in .mp4.")
         return self
