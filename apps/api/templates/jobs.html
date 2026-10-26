@@ -86,7 +86,7 @@
                 <label data-for="move">Destination (relative to gallery root; created if missing)
                     <span class="field"><input type="text" id="dest" placeholder="new/folder"><button type="button" data-pick="dest">Browse&hellip;</button></span>
                 </label>
-                <label data-for="thumbnails move">Parallel workers
+                <label data-for="thumbnails move montage">Parallel workers
                     <input type="number" id="workers" min="1" max="16">
                 </label>
                 <label class="check" data-for="thumbnails"><input type="checkbox" id="overwrite"> Regenerate existing</label>
@@ -252,7 +252,7 @@ function buildRequest(kind) {
                 name_contains: $('mName').value.trim() || null,
                 width: Number($('mWidth').value), height: Number($('mHeight').value), fps: Number($('mFps').value),
                 clip_ratio: Number($('mRatio').value), clip_duration: Number($('mDuration').value),
-                random_seed: Number($('mSeed').value),
+                random_seed: Number($('mSeed').value), workers,
                 max_clips_per_video: optInt('mMaxPer'), max_total_clips: optInt('mMaxTotal'),
                 shuffle_clips: $('mShuffle').checked, use_cuda: $('mCuda').checked, overwrite: $('mOverwrite').checked,
             };

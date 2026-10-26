@@ -486,6 +486,8 @@ class MontageHandler(_Base):
                 height=req.height,
                 fps=req.fps,
                 use_cuda=req.use_cuda,
+                num_cores=req.workers,
+                tmp_dir=output.parent,  # clips can be many GB; /tmp may be RAM-backed
                 max_clips_per_video=req.max_clips_per_video,
                 max_total_clips=req.max_total_clips,
                 shuffle_clips=req.shuffle_clips,

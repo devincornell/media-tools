@@ -37,6 +37,7 @@ def create_montage(
     max_total_clips: int|None = None,
     shuffle_clips: bool = False,
     overwrite: bool = False,
+    tmp_dir: Path|str|None = None,
 ) -> FFMPEGResult:
     """
     Creates a video montage by randomly sampling clips from videos according to clip_ratio.
@@ -83,6 +84,7 @@ def create_montage(
         use_cuda = use_cuda,
         verbose = verbose,
         overwrite = overwrite,
+        tmp_dir = tmp_dir,
     )
 
 
@@ -167,6 +169,7 @@ def create_compilation(
     overwrite: bool = False,
     verbose: bool = False,
     fail_on_error: bool = False,
+    tmp_dir: Path|str|None = None,
 ) -> FFMPEGResult:
     """
     Creates a video montage from a list of video files using the high-level FFMPEG interface.
@@ -188,7 +191,7 @@ def create_compilation(
     Returns:
         FFMPEGResult: The result of the concatenate FFMPEG command.
     """
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir:
         clips = extract_clips(
             clip_infos = [ci if isinstance(ci, ClipInfo) else ClipInfo(path=ci[0], start_time=ci[1], duration=ci[2]) for ci in clip_infos],
             clip_dir = tmp_dir,
@@ -287,6 +290,10 @@ def extract_clips(
         verbose (bool, optional): Whether to print verbose output. Defaults to False.
     '''
     clip_packaged_data = [(ci, Path(clip_dir)/f"clip_{i:05}.mp4", width, height, fps, verbose, use_cuda) for i, ci in enumerate(clip_infos)]
+    # Each x264 encode is itself multithreaded and memory-hungry at high resolutions, so don't default to one per core.
+    num_cores = num_cores or max(1, (os.cpu_count() or 4) // 4)
+    threads = max(1, (os.cpu_count() or num_cores) // num_cores)
+    clip_packaged_data = [(*d, threads) for d in clip_packaged_data]
     with multiprocessing.Pool(num_cores) as p:
         clip_iter = p.imap_unordered(extract_clip_wrap, clip_packaged_data)
         if verbose:
@@ -311,6 +318,7 @@ def extract_clip_wrap(args) -> str|None:
     fps: int = args[4]
     verbose: bool = args[5]
     use_cuda: bool = args[6]
+    threads: int = args[7]
     return extract_clip_process(
         clip_info=clip_info,
         clip_path = clip_path,
@@ -319,6 +327,7 @@ def extract_clip_wrap(args) -> str|None:
         fps = fps,
         verbose = verbose,
         use_cuda = use_cuda,
+        threads = threads,
     )
 
 def extract_clip_process(
@@ -329,6 +338,7 @@ def extract_clip_process(
     fps: int,
     use_cuda: bool = False,
     verbose: bool = False,
+    threads: int|None = None,
 ) -> tuple[Path,Path|None]:
     '''Extract a single clip from a video file, returning the path to the processed clip.'''
     processed_clip_path = clip_path
@@ -355,6 +365,7 @@ def extract_clip_process(
                 pix_fmt='yuv420p',
                 preset='veryfast',
                 crf=23,
+                threads=threads,
             )
         ],
         loglevel = 'error',

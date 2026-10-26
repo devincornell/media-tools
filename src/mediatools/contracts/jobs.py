@@ -137,6 +137,7 @@ class MontageRequest(_Contract):
     max_total_clips: Annotated[int | None, Field(ge=1, description="Cap on clips in the montage.")] = None
     shuffle_clips: Annotated[bool, Field(description="Shuffle clip order instead of keeping chronological order.")] = False
     use_cuda: Annotated[bool, Field(description="Use CUDA acceleration.")] = False
+    workers: Annotated[int, Field(ge=1, le=16, description="Concurrent clip encodes; each is multithreaded and uses substantial memory at high resolutions.")] = 2
     overwrite: Annotated[bool, Field(description="Replace the output file if it exists.")] = False
 
     @model_validator(mode="after")
