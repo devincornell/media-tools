@@ -11,10 +11,16 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from apps.api.dependencies import get_browser, get_favorites, get_folder_favorites, get_gallery, get_picker, get_renderer
+from apps.api.dependencies import (
+    get_browser,
+    get_favorites,
+    get_folder_favorites,
+    get_gallery,
+    get_picker,
+    get_renderer,
+)
 from apps.api.main import create_app
 from apps.api.rendering import PageRenderer
-from mediatools.application.folder_picker import FolderPicker
 from mediatools.application import (
     BrowserService,
     DirectoryNotIndexedError,
@@ -24,6 +30,7 @@ from mediatools.application import (
     MediaFileNotFoundError,
     PathOutsideRootError,
 )
+from mediatools.application.folder_picker import FolderPicker
 from mediatools.client import GalleryClient
 from mediatools.contracts import DirectoryPage
 from mediatools.file_stat_result import FileStatResult

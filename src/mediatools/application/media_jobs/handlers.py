@@ -35,14 +35,30 @@ from ...index_db import (
 )
 from ...jobs import JobContext, JobHandler, PermanentJobError
 from ...mediadir import MediaDir
-from ...video.ffmpeg import FFMPEGError, create_montage, ffinput, ffmpeg, ffoutput, make_animated_thumb
+from ...video.ffmpeg import (
+    FFMPEGError,
+    create_montage,
+    ffinput,
+    ffmpeg,
+    ffoutput,
+    make_animated_thumb,
+)
 from ...video.ffmpeg.core.probe import probe
 from ...video.video_file import VideoFile
 from ..errors import PathOutsideRootError
 from ..paths import resolve_allowed_source, resolve_under_root
 from . import fileops
 from .locks import PathLocks
-from .types import CLEANUP, CONVERT_MP4, DELETE_ITEM, MONTAGE, MOVE, MOVE_ITEM, REINDEX, THUMBNAILS
+from .types import (
+    CLEANUP,
+    CONVERT_MP4,
+    DELETE_ITEM,
+    MONTAGE,
+    MOVE,
+    MOVE_ITEM,
+    REINDEX,
+    THUMBNAILS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +73,11 @@ Req = typing.TypeVar("Req", bound=pydantic.BaseModel)
 Item = typing.TypeVar("Item")
 
 
+class PathFavoriteStore(typing.Protocol):
+    async def move_prefix(self, old: str, new: str) -> int: ...
+    async def remove_prefix(self, key: str) -> int: ...
+
+
 @dataclasses.dataclass(frozen=True)
 class MediaJobDeps:
     root_path: Path
@@ -64,6 +85,7 @@ class MediaJobDeps:
     copy_source_roots: tuple[Path, ...]
     index: MediaIndexDB
     records: MediaJobCollection
+    favorite_folders: PathFavoriteStore
     locks: PathLocks = dataclasses.field(default_factory=PathLocks)
 
 
@@ -222,6 +244,19 @@ class _Base:
             parent.subpaths[path.name] = str(path)
             await self.deps.index.dirs.upsert_directory(parent)
 
+
+    async def _outermost_unindexed(self, path: Path) -> Path:
+        '''`path`, or its highest ancestor whose parent isn't indexed yet, so one rescan links new folders into the tree.'''
+        top = path
+        while top != self.deps.root_path and top.parent.is_relative_to(self.deps.root_path):
+            try:
+                parent = await self.deps.index.dirs.find_by_path(top.parent)
+            except MediaDirIndexNotFoundError:
+                parent = None
+            if parent is not None:
+                break
+            top = top.parent
+        return top
 
     async def _unlink_from_parent(self, path: Path) -> None:
         '''Drop `path` from an indexed parent's subdirectory list (after the folder was removed).'''
@@ -406,7 +441,7 @@ class ConvertMp4Handler(_Base):
 
 
 def _as_utc(value: datetime.datetime) -> datetime.datetime:
-    return value.replace(tzinfo=datetime.timezone.utc) if value.tzinfo is None else value.astimezone(datetime.timezone.utc)
+    return value.replace(tzinfo=datetime.UTC) if value.tzinfo is None else value.astimezone(datetime.UTC)
 
 
 class MontageHandler(_Base):
@@ -614,9 +649,15 @@ class _MoveRunner(_Base):
             source_results = [await self._rescan_source(p, ctx, 82, dest_lo) for p in in_gallery]
             result["source_reindex"] = source_results[0]
             await self.deps.records.set_result(job_id, result)
-        ctx.log(f"Rescanning {self._rel(dest)}")
-        result["reindex"] = await self._reindex(dest, ctx, dest_lo, 100)
+        rescan = await self._outermost_unindexed(dest)
+        ctx.log(f"Rescanning {self._rel(rescan)}")
+        result["reindex"] = await self._reindex(rescan, ctx, dest_lo, 100)
         await self.deps.records.set_result(job_id, result)
+
+        if source_removed:
+            for path in in_gallery:
+                if moved := await self.deps.favorite_folders.move_prefix(self._rel(path), self._rel(dest)):
+                    ctx.log(f"Moved {moved} folder favorite(s) to {self._rel(dest)}")
 
         if not source_removed:
             first = "; ".join(failed[:3]) or ", ".join(str(p.relative_to(source)) for p in remaining[:3])
@@ -664,9 +705,7 @@ class MoveItemHandler(_MoveRunner):
         source, dest_dir = self._target(req.path), self._target(req.dest)
         if source == self.deps.root_path:
             raise PermanentJobError("The gallery root can't be moved.", code="invalid_path")
-        if not dest_dir.is_dir():
-            raise PermanentJobError(f"Destination folder not found: {req.dest}", code="not_found")
-        dest = dest_dir / (req.name or source.name)
+        dest = dest_dir if req.merge_into_dest else dest_dir / (req.name or source.name)
         gone = not os.path.lexists(source)
         if gone:
             if ctx.job.attempt_count <= 1:
@@ -674,7 +713,15 @@ class MoveItemHandler(_MoveRunner):
             ctx.log("The item is already gone (moved by an earlier attempt)")
         # A symlink is moved as a link; only real folders are merged file by file.
         is_folder = (not gone and source.is_dir() and not source.is_symlink()) or (gone and dest.is_dir())
+        if req.merge_into_dest and not is_folder:
+            raise PermanentJobError("Only a folder can be merged into another folder.", code="invalid_path")
         async with self._locked(ctx, [source, source.resolve(), dest_dir, dest_dir.resolve()], exclusive=True):
+            if not dest_dir.is_dir():
+                try:
+                    dest_dir.mkdir(parents=True)
+                except (FileExistsError, NotADirectoryError) as e:
+                    raise PermanentJobError(f"Can't create {req.dest}: a file is in the way.", code="invalid_path") from e
+                ctx.log(f"Created folder {req.dest}")
             if is_folder:
                 await self._run(job_id, req.workers, source, dest, ctx)
             else:
@@ -701,7 +748,7 @@ class MoveItemHandler(_MoveRunner):
         await self.deps.records.set_result(job_id, result)
 
         # Rescan both sides; when one contains the other, the outer rescan covers it.
-        parent, target = source.parent, dest.parent
+        parent, target = source.parent, await self._outermost_unindexed(dest.parent)
         if parent.is_relative_to(target):
             parent = target
         elif target.is_relative_to(parent):
@@ -759,6 +806,8 @@ class DeleteItemHandler(_Base):
             await asyncio.to_thread(source.unlink)
             deleted = 1
         ctx.log(f"Deleted {rel} ({deleted} file(s))")
+        if dropped := await self.deps.favorite_folders.remove_prefix(rel):
+            ctx.log(f"Removed {dropped} folder favorite(s)")
 
         result: Result = {"path": rel, "deleted": deleted, "warnings": []}
         if is_folder:

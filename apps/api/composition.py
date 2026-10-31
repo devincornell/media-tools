@@ -4,7 +4,12 @@ import dataclasses
 
 from pymongo.asynchronous.database import AsyncDatabase
 
-from mediatools.application import BrowserService, FavoriteService, FolderFavoriteService, GalleryService
+from mediatools.application import (
+    BrowserService,
+    FavoriteService,
+    FolderFavoriteService,
+    GalleryService,
+)
 from mediatools.application.folder_picker import FolderPicker
 from mediatools.application.media_jobs import (
     MediaJobDeps,
@@ -49,6 +54,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
         copy_source_roots=config.copy_source_roots,
         index=index,
         records=records,
+        favorite_folders=favorite_folders,
     )
     return Services(
         gallery=GalleryService(

@@ -358,6 +358,65 @@ def test_move_item_merges_folder_into_its_parent(tree: dict[str, Path]):
     run_services(tree, body)
 
 
+def test_move_item_creates_missing_parent_folders(tree: dict[str, Path]):
+    root = tree["root"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip/x.mp4", dest="dir_b/dir_c/dir_d"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert (root / "dir_b" / "dir_c" / "dir_d" / "x.mp4").is_file() and not (root / "trip" / "x.mp4").exists()
+        assert {"dir_b", "dir_b/dir_c", "dir_b/dir_c/dir_d"} <= set(await s.gallery.list_directories())
+        assert "dir_b" in [sp.page_path_rel for sp in (await s.gallery.directory_page(".")).subpages]
+        assert [v.vid_path_rel for v in (await s.gallery.directory_page("dir_b/dir_c/dir_d")).vids] == ["dir_b/dir_c/dir_d/x.mp4"]
+
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip2", dest="a/new/deeper"))  # a folder
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert (root / "a" / "new" / "deeper" / "trip2" / "y.mp4").is_file() and not (root / "trip2").exists()
+        assert "a/new" in [sp.page_path_rel for sp in (await s.gallery.directory_page("a")).subpages]
+        assert "a/new/deeper/trip2" in set(await s.gallery.list_directories())
+
+    run_services(tree, body)
+
+
+def test_folder_favorites_follow_moves_and_deletes(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+        for folder in ("trip", "trip/batch", "trip2", "b"):
+            await s.folder_favorites.add(folder)
+
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip", dest="a/archive"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert set(await s.folder_favorites.list_all()) == {"a/archive/trip", "a/archive/trip/batch", "trip2", "b"}
+        page = await s.gallery.directory_page("a/archive")
+        assert [(sp.page_path_rel, sp.is_favorite) for sp in page.subpages] == [("a/archive/trip", True)]
+
+        status, out = await submit_and_run(s, DeleteItemRequest(path="a/archive"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert set(await s.folder_favorites.list_all()) == {"trip2", "b"}
+
+    run_services(tree, body)
+
+
+def test_move_item_merges_folder_into_the_gallery_root(tree: dict[str, Path]):
+    root = tree["root"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip2", dest=".", merge_into_dest=True))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert (root / "y.mp4").is_file() and not (root / "trip2").exists()
+        assert "trip2" not in set(await s.gallery.list_directories())
+        assert "y.mp4" in [v.vid_path_rel for v in (await s.gallery.directory_page(".")).vids]
+
+        with pytest.raises(InvalidJobRequestError, match="Only a folder"):
+            await s.media_jobs.submit(MoveItemRequest(path="y.mp4", dest="a", merge_into_dest=True))
+        with pytest.raises(ValueError):
+            MoveItemRequest(path="a", dest=".", name="x", merge_into_dest=True)
+
+    run_services(tree, body)
+
+
 def test_move_item_folder_between_gallery_folders(tree: dict[str, Path]):
     root = tree["root"]
 
@@ -383,7 +442,7 @@ def test_move_item_validation(tree: dict[str, Path]):
             MoveItemRequest(path="trip", dest="trip2"),  # a file with the folder's name is in the way
             MoveItemRequest(path=".", dest="a"),
             MoveItemRequest(path="nope.mp4", dest="a"),
-            MoveItemRequest(path="a/clip1.mp4", dest="missing"),
+            MoveItemRequest(path="trip/x.mp4", dest="a/clip1_copy.mp4/sub"),  # a file is in the way
             MoveItemRequest(path="a/clip1.mp4", dest="a"),  # already there
             MoveItemRequest(path="trip", dest="trip/batch"),  # into itself
             MoveItemRequest(path="trip", dest="trip"),

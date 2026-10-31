@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import re
 import typing
 from collections.abc import Collection
 
@@ -40,3 +41,25 @@ class FavoriteCollection:
     async def list_all(self) -> list[str]:
         cursor = self._collection.find({}, {"_id": 1}).sort("created_at", -1)
         return [doc["_id"] async for doc in cursor]
+
+    @staticmethod
+    def _at_or_under(key: str) -> dict[str, typing.Any]:
+        return {"_id": {"$regex": f"^{re.escape(key)}(/|$)"}}
+
+    async def move_prefix(self, old: str, new: str) -> int:
+        '''Re-key path-keyed favorites at or beneath `old` to the same place beneath `new`, keeping `created_at`.'''
+        docs = [doc async for doc in self._collection.find(self._at_or_under(old))]
+        for doc in docs:
+            await self._collection.update_one(
+                {"_id": new + doc["_id"][len(old):]},
+                {"$setOnInsert": {"created_at": doc.get("created_at") or datetime.datetime.now(datetime.UTC)}},
+                upsert=True,
+            )
+        if docs:
+            await self._collection.delete_many({"_id": {"$in": [doc["_id"] for doc in docs]}})
+        return len(docs)
+
+    async def remove_prefix(self, key: str) -> int:
+        '''Remove path-keyed favorites at or beneath `key`.'''
+        result = await self._collection.delete_many(self._at_or_under(key))
+        return result.deleted_count

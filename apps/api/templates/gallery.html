@@ -2028,7 +2028,7 @@
             if (value !== root && !value.startsWith(`${root}/`)) return { error: `The path must be inside ${root}` };
             const parts = value.slice(root.length).split('/').filter(Boolean);
             if (parts.includes('.') || parts.includes('..')) return { error: 'Use a plain path without "." or "..".' };
-            if (!parts.length) return { error: 'Enter a destination inside the gallery.' };
+            if (!parts.length) return { dir: '.', name: null, rel: '' };  // the gallery root itself
             const rel = parts.join('/');
             const name = parts.pop();
             return { dir: parts.join('/') || '.', name, rel };
@@ -2043,11 +2043,12 @@
             if (!blocked && target.rel === source) {
                 note = 'That is where it is now.';
                 blocked = true;
-            } else if (!blocked && source.startsWith(`${target.rel}/`)) {
+            } else if (!blocked && (target.rel === '' || source.startsWith(`${target.rel}/`))) {
+                const where = target.rel || 'the gallery root';
                 if (isFolder) {
-                    note = `The contents of "${source.split('/').pop()}" will be merged into ${target.rel}, then the empty folder removed.`;
+                    note = `The contents of "${source.split('/').pop()}" will be merged into ${where}, then the empty folder removed.`;
                 } else {
-                    note = `${target.rel} is a folder containing this file; add a file name to the path.`;
+                    note = `${where} is a folder containing this file; add a file name to the path.`;
                     blocked = true;
                 }
             } else if (!blocked && isFolder && target.rel.startsWith(`${source}/`)) {
@@ -2074,7 +2075,8 @@
             const target = parseMoveTarget();
             const original = card.dataset.path.split('/').pop();
             const body = { path: card.dataset.path, dest: target.dir };
-            if (target.name !== original) body.name = target.name;
+            if (target.name === null) body.merge_into_dest = true;
+            else if (target.name !== original) body.name = target.name;
             const confirmBtn = document.getElementById('moveDialogConfirm');
             confirmBtn.disabled = true;
             const error = await queueCardJob(card, 'move-item', body);
@@ -2096,7 +2098,7 @@
                 title: `Move "${card.dataset.path.split('/').pop()}" to...`,
                 start,
                 note: (listing) => `will move into ${listing.rel || '.'}`,
-                onChoose: (listing) => confirmMove(card, listing, target.error ? undefined : target.name),
+                onChoose: (listing) => confirmMove(card, listing, target.error || !target.name ? undefined : target.name),
             });
         }
 
@@ -2135,8 +2137,14 @@
         const JOB_ACTIVE = new Set(['queued', 'running']);
         let jobsTimer = null;
 
+        function moveItemTarget(p) {
+            if (p.merge_into_dest) return `${p.dest} (merged)`;
+            const name = p.name || p.path.split('/').pop();
+            return p.dest === '.' ? name : `${p.dest}/${name}`;
+        }
+
         function jobTarget(item) {
-            if (item.kind === 'move_item') return `${item.params.path} \u2192 ${item.params.dest}`;
+            if (item.kind === 'move_item') return `${item.params.path} \u2192 ${moveItemTarget(item.params)}`;
             if (item.kind === 'delete_item') return item.params.path;
             if (item.kind === 'move') return `${item.params.source} \u2192 ${item.target}`;
             return item.target ?? '';

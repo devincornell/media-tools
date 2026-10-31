@@ -183,13 +183,20 @@ class MediaJobService:
         if not os.path.lexists(source):
             raise InvalidJobRequestError(f"Not found: {request.path}")
         dest = self._under_root(request.dest)
-        if not dest.is_dir():
-            raise InvalidJobRequestError(f"Destination folder not found: {request.dest}")
+        # Missing destination folders are created by the job; the nearest existing one must be a writable folder.
+        existing = next(p for p in (dest, *dest.parents) if os.path.lexists(p))
+        if not existing.is_dir():
+            raise InvalidJobRequestError(
+                f"Can't create {request.dest}: {existing.relative_to(self.root_path)} is a file, not a folder."
+            )
         name = request.name or source.name
-        if dest.resolve() == source.parent.resolve() and name == source.name:
+        is_folder = source.is_dir() and not source.is_symlink()
+        if request.merge_into_dest and not is_folder:
+            raise InvalidJobRequestError("Only a folder can be merged into another folder.")
+        if dest.resolve() == source.parent.resolve() and name == source.name and not request.merge_into_dest:
             raise InvalidJobRequestError("The item is already there.")
-        target = dest / name
-        if source.is_dir() and not source.is_symlink():
+        target = dest if request.merge_into_dest else dest / name
+        if is_folder:
             src_real, target_real = source.resolve(), target.resolve()
             if target_real.is_relative_to(src_real):
                 raise InvalidJobRequestError("A folder can't be moved into itself.")
@@ -202,7 +209,7 @@ class MediaJobService:
                 raise InvalidJobRequestError(f"A file named {name} already exists in the destination folder.")
         elif target.is_dir() and not target.is_symlink():
             raise InvalidJobRequestError(f"A folder named {name} already exists in the destination folder.")
-        for folder in (source.parent, dest):
+        for folder in (source.parent, existing):
             if not os.access(folder, os.W_OK | os.X_OK):
                 raise InvalidJobRequestError(
                     f"The server can't write to {folder} (owned by {fileops.user_name(folder.stat().st_uid)})."
