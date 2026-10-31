@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 
 class _Contract(BaseModel):
@@ -123,8 +123,16 @@ class MoveItemRequest(_Contract):
     '''Move one file or folder of the gallery into another gallery folder, then rescan both locations.'''
 
     path: Annotated[str, Field(description="File or folder to move, relative to the gallery root.")]
-    dest: Annotated[str, Field(description="Existing destination folder relative to the gallery root (`.` for the root); the item keeps its name.")]
+    dest: Annotated[str, Field(description="Existing destination folder relative to the gallery root (`.` for the root).")]
+    name: Annotated[str | None, Field(description="Name the item gets in the destination folder; defaults to its current name.")] = None
     workers: Annotated[int, Field(ge=1, le=32, description="Files transferred concurrently when moving a folder.")] = 4
+
+    @field_validator("name")
+    @classmethod
+    def _plain_name(cls, name: str | None) -> str | None:
+        if name is not None and (name in {"", ".", ".."} or "/" in name or "\0" in name):
+            raise ValueError("name must be a single file or folder name.")
+        return name
 
 
 class DeleteItemRequest(_Contract):

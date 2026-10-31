@@ -649,6 +649,77 @@
             color: #f87171;
         }
 
+        /* Move confirmation */
+        .move-dialog-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .move-dialog {
+            width: min(460px, 92vw);
+            padding: 1rem 1.1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .move-dialog h3 {
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+            overflow-wrap: anywhere;
+        }
+
+        .move-dialog-path {
+            width: 100%;
+            padding: 0.5rem 0.6rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: ui-monospace, monospace;
+            font-size: 0.85rem;
+        }
+
+        .move-dialog-note {
+            min-height: 1.2rem;
+            margin-top: 0.4rem;
+            color: #f59e0b;
+            font-size: 0.8rem;
+        }
+
+        .move-dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .move-dialog-actions button {
+            padding: 0.4rem 0.9rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .move-dialog-actions button.primary {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .move-dialog-actions button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
         /* Jobs viewer */
         .jp-hidden { display: none !important; }
 
@@ -1703,6 +1774,20 @@
         <div class="jobs-list" id="jobsList"></div>
     </div>
 
+    <!-- Move confirmation -->
+    <div class="move-dialog-backdrop jp-hidden" id="moveDialog" role="dialog" aria-modal="true">
+        <div class="move-dialog">
+            <h3 id="moveDialogTitle"></h3>
+            <input type="text" class="move-dialog-path" id="moveDialogPath" spellcheck="false" autocomplete="off" aria-label="Destination path">
+            <div class="move-dialog-note" id="moveDialogNote"></div>
+            <div class="move-dialog-actions">
+                <button type="button" onclick="closeMoveDialog()">Cancel</button>
+                <button type="button" id="moveDialogBrowse">Browse...</button>
+                <button type="button" class="primary" id="moveDialogConfirm">Move</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/picker.js"></script>
     <script>
         // Subfolder thumbnails data
@@ -1918,41 +2003,128 @@
             openMenu = menu;
         }
 
-        function startMove(card) {
+        function startMove(card, start = null) {
             const path = card.dataset.path;
-            const parent = path.split('/').slice(0, -1).join('/');
             FolderPicker.open({
                 scope: 'gallery',
                 title: `Move "${path.split('/').pop()}" to...`,
-                startRel: parent,
+                start,
+                startRel: path.split('/').slice(0, -1).join('/'),
                 note: (listing) => `will move into ${listing.rel || '.'}`,
-                onChoose: (listing) => queueCardJob(card, 'move-item', { path, dest: listing.rel || '.' }, 'move'),
+                onChoose: (listing) => confirmMove(card, listing),
             });
         }
 
-        function startDelete(card) {
-            const path = card.dataset.path;
-            const name = path.split('/').pop();
-            const what = card.dataset.type === 'folder' ? `the folder "${name}" and everything in it` : `"${name}"`;
-            if (confirm(`Permanently delete ${what}? This can't be undone.`)) {
-                queueCardJob(card, 'delete-item', { path }, 'delete');
+        function closeMoveDialog() {
+            document.getElementById('moveDialog').classList.add('jp-hidden');
+        }
+
+        // The dialog edits the item's final path; a folder moved onto an existing folder is merged into it.
+        let moveState = null;
+
+        function parseMoveTarget() {
+            const { root } = moveState;
+            const value = document.getElementById('moveDialogPath').value.trim().replace(/\/{2,}/g, '/').replace(/\/+$/, '');
+            if (value !== root && !value.startsWith(`${root}/`)) return { error: `The path must be inside ${root}` };
+            const parts = value.slice(root.length).split('/').filter(Boolean);
+            if (parts.includes('.') || parts.includes('..')) return { error: 'Use a plain path without "." or "..".' };
+            if (!parts.length) return { error: 'Enter a destination inside the gallery.' };
+            const rel = parts.join('/');
+            const name = parts.pop();
+            return { dir: parts.join('/') || '.', name, rel };
+        }
+
+        function refreshMoveDialog() {
+            const target = parseMoveTarget();
+            const source = moveState.card.dataset.path;
+            const isFolder = moveState.card.dataset.type === 'folder';
+            let note = target.error || '';
+            let blocked = Boolean(target.error);
+            if (!blocked && target.rel === source) {
+                note = 'That is where it is now.';
+                blocked = true;
+            } else if (!blocked && source.startsWith(`${target.rel}/`)) {
+                if (isFolder) {
+                    note = `The contents of "${source.split('/').pop()}" will be merged into ${target.rel}, then the empty folder removed.`;
+                } else {
+                    note = `${target.rel} is a folder containing this file; add a file name to the path.`;
+                    blocked = true;
+                }
+            } else if (!blocked && isFolder && target.rel.startsWith(`${source}/`)) {
+                note = "A folder can't be moved into itself.";
+                blocked = true;
+            }
+            document.getElementById('moveDialogNote').textContent = note;
+            document.getElementById('moveDialogConfirm').disabled = blocked;
+        }
+
+        function confirmMove(card, listing, name = card.dataset.path.split('/').pop()) {
+            const root = listing.root.replace(/\/+$/, '');
+            moveState = { card, root };
+            const input = document.getElementById('moveDialogPath');
+            input.value = `${listing.path.replace(/\/+$/, '')}/${name}`;
+            document.getElementById('moveDialogTitle').textContent = `Move "${card.dataset.path.split('/').pop()}" to:`;
+            refreshMoveDialog();
+            document.getElementById('moveDialog').classList.remove('jp-hidden');
+            input.focus();
+        }
+
+        async function submitMoveDialog() {
+            const { card } = moveState;
+            const target = parseMoveTarget();
+            const original = card.dataset.path.split('/').pop();
+            const body = { path: card.dataset.path, dest: target.dir };
+            if (target.name !== original) body.name = target.name;
+            const confirmBtn = document.getElementById('moveDialogConfirm');
+            confirmBtn.disabled = true;
+            const error = await queueCardJob(card, 'move-item', body);
+            if (error) {
+                document.getElementById('moveDialogNote').textContent = error;
+                confirmBtn.disabled = false;
+            } else {
+                closeMoveDialog();
             }
         }
 
-        async function queueCardJob(card, endpoint, body, label) {
+        function browseFromMoveDialog() {
+            const { card, root } = moveState;
+            const target = parseMoveTarget();
+            closeMoveDialog();
+            const start = target.error ? root : `${root}${target.dir === '.' ? '' : `/${target.dir}`}`;
+            FolderPicker.open({
+                scope: 'gallery',
+                title: `Move "${card.dataset.path.split('/').pop()}" to...`,
+                start,
+                note: (listing) => `will move into ${listing.rel || '.'}`,
+                onChoose: (listing) => confirmMove(card, listing, target.error ? undefined : target.name),
+            });
+        }
+
+        async function startDelete(card) {
+            const path = card.dataset.path;
+            const name = path.split('/').pop();
+            const what = card.dataset.type === 'folder' ? `the folder "${name}" and everything in it` : `"${name}"`;
+            if (!confirm(`Permanently delete ${what}? This can't be undone.`)) return;
+            const error = await queueCardJob(card, 'delete-item', { path });
+            if (error) alert(`Could not start the delete: ${error}`);
+        }
+
+        // Resolves to an error message, or null once the job is queued.
+        async function queueCardJob(card, endpoint, body) {
             try {
                 const response = await fetch(`/api/jobs/${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
                 });
-                if (!response.ok) throw new Error(await apiError(response));
+                if (!response.ok) return await apiError(response);
                 const accepted = await response.json();
                 card.classList.add('busy-card');
                 pendingCards.set(accepted.job_id, card);
                 setJobsPanel(true);
+                return null;
             } catch (err) {
-                alert(`Could not start the ${label}: ${err.message}`);
+                return err.message;
             }
         }
 
@@ -2059,6 +2231,14 @@
             }
             jobsTimer = setTimeout(refreshJobs, delay);
         }
+
+        const movePath = document.getElementById('moveDialogPath');
+        movePath.addEventListener('input', refreshMoveDialog);
+        movePath.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('moveDialogConfirm').disabled) submitMoveDialog();
+        });
+        document.getElementById('moveDialogConfirm').addEventListener('click', submitMoveDialog);
+        document.getElementById('moveDialogBrowse').addEventListener('click', browseFromMoveDialog);
 
         refreshJobs();
 
@@ -2218,7 +2398,11 @@
         });
         window.addEventListener('scroll', closeCardMenu, true);
         window.addEventListener('resize', closeCardMenu);
-        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCardMenu(); });
+        window.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            closeCardMenu();
+            closeMoveDialog();
+        });
 
         // Image Lightbox Functions
         let currentImageThumbnail = null;

@@ -185,13 +185,23 @@ class MediaJobService:
         dest = self._under_root(request.dest)
         if not dest.is_dir():
             raise InvalidJobRequestError(f"Destination folder not found: {request.dest}")
-        if dest.resolve() == source.parent.resolve():
-            raise InvalidJobRequestError("The item is already in that folder.")
-        if source.is_dir() and (dest.resolve() == source.resolve() or dest.resolve().is_relative_to(source.resolve())):
-            raise InvalidJobRequestError("A folder can't be moved into itself.")
-        clash = dest / source.name
-        if source.is_dir() and os.path.lexists(clash) and not clash.is_dir():
-            raise InvalidJobRequestError(f"A file named {source.name} already exists in the destination folder.")
+        name = request.name or source.name
+        if dest.resolve() == source.parent.resolve() and name == source.name:
+            raise InvalidJobRequestError("The item is already there.")
+        target = dest / name
+        if source.is_dir() and not source.is_symlink():
+            src_real, target_real = source.resolve(), target.resolve()
+            if target_real.is_relative_to(src_real):
+                raise InvalidJobRequestError("A folder can't be moved into itself.")
+            # Merging into an ancestor: source/a/b.mp4 lands on target/a/b.mp4, which must not be inside the source.
+            if src_real.is_relative_to(target_real) and os.path.lexists(source.joinpath(*src_real.relative_to(target_real).parts)):
+                raise InvalidJobRequestError(
+                    f"Can't merge into {target.relative_to(self.root_path)}: {source.name} contains an entry that would land inside itself."
+                )
+            if os.path.lexists(target) and not target.is_dir():
+                raise InvalidJobRequestError(f"A file named {name} already exists in the destination folder.")
+        elif target.is_dir() and not target.is_symlink():
+            raise InvalidJobRequestError(f"A folder named {name} already exists in the destination folder.")
         for folder in (source.parent, dest):
             if not os.access(folder, os.W_OK | os.X_OK):
                 raise InvalidJobRequestError(

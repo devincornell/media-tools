@@ -666,7 +666,7 @@ class MoveItemHandler(_MoveRunner):
             raise PermanentJobError("The gallery root can't be moved.", code="invalid_path")
         if not dest_dir.is_dir():
             raise PermanentJobError(f"Destination folder not found: {req.dest}", code="not_found")
-        dest = dest_dir / source.name
+        dest = dest_dir / (req.name or source.name)
         gone = not os.path.lexists(source)
         if gone:
             if ctx.job.attempt_count <= 1:
