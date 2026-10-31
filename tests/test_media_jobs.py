@@ -15,7 +15,7 @@ import pymongo
 import pytest
 
 from apps.api.composition import Services, build_services
-from apps.api.settings import TEMPLATES_DIR, ServerConfig, Settings
+from apps.api.settings import ServerConfig, Settings
 from mediatools.application import DirectoryNotIndexedError, InvalidJobRequestError
 from mediatools.contracts import (
     CleanupRequest,
@@ -424,7 +424,7 @@ def test_api_end_to_end(tree: dict[str, Path]):
     from apps.api.main import create_app
 
     db_name = f"test_media_api_{uuid.uuid4().hex[:8]}"
-    settings = settings_for(tree, db_name, site_template_path=TEMPLATES_DIR / "gallery.html")
+    settings = settings_for(tree, db_name)
     try:
         with TestClient(create_app(settings)) as client:
             assert "text/html" in client.get("/jobs").headers["content-type"]

@@ -11,14 +11,14 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from apps.api.dependencies import get_browser, get_gallery, get_picker, get_renderer
+from apps.api.dependencies import get_browser, get_favorites, get_gallery, get_picker, get_renderer
 from apps.api.main import create_app
 from apps.api.rendering import PageRenderer
-from apps.api.settings import TEMPLATES_DIR
 from mediatools.application.folder_picker import FolderPicker
 from mediatools.application import (
     BrowserService,
     DirectoryNotIndexedError,
+    FavoriteService,
     GalleryService,
     MediaFileNotFoundError,
     PathOutsideRootError,
@@ -73,6 +73,25 @@ class FakeVideos:
             raise VideoFileNotFoundError(file_hash)
 
 
+class FakeFavorites:
+    def __init__(self) -> None:
+        self.paths: list[str] = []
+
+    async def add(self, rel_path: str) -> None:
+        if rel_path not in self.paths:
+            self.paths.insert(0, rel_path)
+
+    async def remove(self, rel_path: str) -> None:
+        if rel_path in self.paths:
+            self.paths.remove(rel_path)
+
+    async def among(self, rel_paths) -> set[str]:
+        return set(rel_paths) & set(self.paths)
+
+    async def list_all(self) -> list[str]:
+        return list(self.paths)
+
+
 def _probe(path: Path, duration: float) -> ProbeInfo:
     return ProbeInfo(
         fname=str(path), nb_streams=1, nb_programs=0, format_name="mp4", format_long_name="MP4",
@@ -98,7 +117,12 @@ def media_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def gallery(media_root: Path) -> GalleryService:
+def favorites() -> FakeFavorites:
+    return FakeFavorites()
+
+
+@pytest.fixture
+def gallery(media_root: Path, favorites: FakeFavorites) -> GalleryService:
     root = media_root
     stat = FileStatResult.read_from_path
     vids = {
@@ -133,6 +157,7 @@ def gallery(media_root: Path) -> GalleryService:
         max_clip_duration=10.0,
         dirs=FakeDirs([root_doc, trip_doc]),
         videos=FakeVideos(video_docs),
+        favorites=favorites,
     )
 
 
@@ -142,12 +167,13 @@ def browser(gallery: GalleryService) -> BrowserService:
 
 
 @pytest.fixture
-def client(gallery: GalleryService, browser: BrowserService) -> TestClient:
+def client(gallery: GalleryService, browser: BrowserService, favorites: FakeFavorites) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_gallery] = lambda: gallery
+    app.dependency_overrides[get_favorites] = lambda: FavoriteService(gallery.root_path, favorites)
     app.dependency_overrides[get_browser] = lambda: browser
     app.dependency_overrides[get_picker] = lambda: FolderPicker(gallery.root_path, ())
-    app.dependency_overrides[get_renderer] = lambda: PageRenderer(TEMPLATES_DIR / "gallery.html", TEMPLATES_DIR / "reels.html")
+    app.dependency_overrides[get_renderer] = lambda: PageRenderer()
     return TestClient(app)  # not entered as a context manager, so lifespan (MongoDB) is skipped
 
 
@@ -295,6 +321,65 @@ def test_thumb(client: TestClient):
 def test_plaintext_listings(client: TestClient):
     assert set(client.get("/list_directories").text.splitlines()) == {".", "trip"}
     assert "trip/beach.mp4" in client.get("/list_videos").text.splitlines()
+
+
+# ---------------------------------------------------------------------------
+# Favorites
+# ---------------------------------------------------------------------------
+
+def test_favorites_sort_first_and_are_flagged(tmp_path: Path, favorites: FakeFavorites):
+    root = tmp_path / "lib"
+    root.mkdir()
+    stat = FileStatResult.read_from_path
+    names = ["a.mp4", "b.mp4", "c.jpg", "d.jpg"]
+    for n in names:
+        (root / n).write_bytes(b"x")
+    doc = MediaDirIndexDoc(
+        path_str=str(root), subpaths={},
+        video_files={n: IndexVideoFile(path_str=str(root / n), stat=stat(root / n), file_hash=f"h_{n}") for n in names[:2]},
+        image_files={n: IndexImageFile(path_str=str(root / n), stat=stat(root / n), res=(10, 10)) for n in names[2:]},
+        other_files={},
+    )
+    videos = FakeVideos([
+        VideoIndexDoc(path_str=str(root / n), file_hash=f"h_{n}", probe=_probe(root / n, 1.0), stat=stat(root / n))
+        for n in names[:2]
+    ])
+    svc = GalleryService(root_path=root, thumb_path=tmp_path, max_clip_duration=10.0,
+                         dirs=FakeDirs([doc]), videos=videos, favorites=favorites)
+    page = asyncio.run(svc.directory_page("."))
+    assert [c.vid_path_rel for c in page.clips] == ["a.mp4", "b.mp4"]
+
+    asyncio.run(FavoriteService(root, favorites).add("b.mp4"))
+    asyncio.run(FavoriteService(root, favorites).add("d.jpg"))
+    page = asyncio.run(svc.directory_page("."))
+    assert [(c.vid_path_rel, c.is_favorite) for c in page.clips] == [("b.mp4", True), ("a.mp4", False)]
+    assert [(i.img_path_rel, i.is_favorite) for i in page.images] == [("d.jpg", True), ("c.jpg", False)]
+
+
+def test_favorite_endpoints(client: TestClient):
+    r = client.put("/api/favorites/trip/beach.mp4")
+    assert r.status_code == 200
+    assert r.json() == {"path": "trip/beach.mp4", "is_favorite": True}
+    client.put("/api/favorites/photo.jpg")
+    assert client.get("/api/favorites").json() == {"paths": ["photo.jpg", "trip/beach.mp4"]}
+    assert client.get("/api/directory/.").json()["images"][0]["is_favorite"] is True
+
+    r = client.delete("/api/favorites/photo.jpg")
+    assert r.json() == {"path": "photo.jpg", "is_favorite": False}
+    assert client.get("/api/favorites").json() == {"paths": ["trip/beach.mp4"]}
+
+
+def test_favorite_rejects_missing_and_outside_paths(client: TestClient):
+    assert client.put("/api/favorites/nope.mp4").status_code == 404
+    assert client.put("/api/favorites/..%2Fsecret.txt").status_code == 404
+    assert client.delete("/api/favorites/..%2Fsecret.txt").status_code == 404
+    assert client.get("/api/favorites").json() == {"paths": []}
+
+
+def test_gallery_page_renders_favorite_state(client: TestClient):
+    client.put("/api/favorites/photo.jpg")
+    html = client.get("/page/").text
+    assert 'data-favorite="true"' in html and 'data-favorite="false"' in html
 
 
 # ---------------------------------------------------------------------------

@@ -12,8 +12,6 @@ from .settings import Settings
 def main() -> None:
     parser = argparse.ArgumentParser(description="Start the media gallery server. Unset options fall back to SITE_* env vars / .env.")
     parser.add_argument("--root-path", type=Path, help="Root directory containing media files")
-    parser.add_argument("--template-path", type=Path, help="Path to the gallery HTML template")
-    parser.add_argument("--reels-template-path", type=Path, help="Path to the reels HTML template")
     parser.add_argument("--thumb-path", type=Path, help="Directory containing thumbnail GIFs")
     parser.add_argument("--mongodb-url", type=str, help="MongoDB connection URL")
     parser.add_argument("-d", "--database-name", type=str, help="MongoDB database name")

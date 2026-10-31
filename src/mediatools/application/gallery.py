@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import logging
 import re
+from collections.abc import Collection
 from pathlib import Path
 from typing import Protocol
 
@@ -33,6 +34,10 @@ class VideoIndexReader(Protocol):
     async def find_by_hash(self, file_hash: str) -> VideoIndexDoc: ...
 
 
+class FavoriteReader(Protocol):
+    async def among(self, rel_paths: Collection[str]) -> set[str]: ...
+
+
 @dataclasses.dataclass(frozen=True)
 class GalleryService:
     '''Read-only browsing use cases over an indexed media directory tree.'''
@@ -42,6 +47,7 @@ class GalleryService:
     max_clip_duration: float
     dirs: DirectoryIndexReader
     videos: VideoIndexReader
+    favorites: FavoriteReader
 
     def resolve_under_root(self, rel_path: str) -> Path:
         return resolve_under_root(self.root_path, rel_path)
@@ -87,18 +93,24 @@ class GalleryService:
         return (self.thumb_path / f"{file_hash}.gif").exists()
 
     async def _build_page(self, dir_doc: MediaDirIndexDoc, subdirs: list[MediaDirIndexDoc]) -> DirectoryPage:
+        favorites = await self.favorites.among(
+            [self._rel(f.path) for f in (*dir_doc.video_files.values(), *dir_doc.image_files.values())]
+        )
         video_items: list[VideoSummary] = []
         for ivf in sorted(dir_doc.video_files.values(), key=lambda v: v.name.lower()):
             try:
                 vid_doc = await self.videos.find_by_hash(ivf.file_hash)
-                video_items.append(self._video_summary(ivf, vid_doc))
+                video_items.append(self._video_summary(ivf, vid_doc, self._rel(ivf.path) in favorites))
             except Exception:
                 logger.warning("Skipping video %s", ivf.path_str, exc_info=True)
 
         images = [
-            self._image_summary(iif)
+            self._image_summary(iif, self._rel(iif.path) in favorites)
             for iif in sorted(dir_doc.image_files.values(), key=lambda i: i.name.lower())
         ]
+        # Stable sorts: favorites first, name order within each group.
+        video_items.sort(key=lambda v: not v.is_favorite)
+        images.sort(key=lambda i: not i.is_favorite)
         subpages = [
             await self._subdir_summary(sd)
             for sd in sorted(subdirs, key=lambda d: d.path.name.lower())
@@ -121,7 +133,10 @@ class GalleryService:
             num_subpages=len(subdirs),
         )
 
-    def _video_summary(self, ivf: IndexVideoFile, vid_doc: VideoIndexDoc) -> VideoSummary:
+    def _rel(self, path: Path) -> str:
+        return str(path.relative_to(self.root_path))
+
+    def _video_summary(self, ivf: IndexVideoFile, vid_doc: VideoIndexDoc, is_favorite: bool) -> VideoSummary:
         vid_path = ivf.path
         tags = vid_doc.probe.tags or {}
         created_ts: datetime.datetime | None = None
@@ -153,14 +168,16 @@ class GalleryService:
             is_clip=vid_doc.probe.duration < self.max_clip_duration,
             created_ts=created_ts.timestamp() if created_ts is not None else None,
             created=created_ts.strftime("%Y-%m-%d %H:%M:%S") if created_ts is not None else None,
+            is_favorite=is_favorite,
         )
 
-    def _image_summary(self, iif: IndexImageFile) -> ImageSummary:
+    def _image_summary(self, iif: IndexImageFile, is_favorite: bool) -> ImageSummary:
         width, height = iif.res
         return ImageSummary(
             img_path_rel=str(iif.path.relative_to(self.root_path)),
             title=fname_to_title(iif.path.stem),
             aspect=width / height if height else 1.0,
+            is_favorite=is_favorite,
         )
 
     async def _subdir_summary(self, sd: MediaDirIndexDoc) -> SubdirectorySummary:

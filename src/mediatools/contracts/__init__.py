@@ -2,6 +2,7 @@ from .browser import FileEntry, FolderFiles, FolderNode, FolderTree
 from .gallery import (
     DirectoryPage,
     ErrorResponse,
+    FavoriteState,
     ImageSummary,
     PathList,
     SubdirectorySummary,
@@ -30,6 +31,7 @@ __all__ = [
     "ConvertMp4Request",
     "DirectoryPage",
     "ErrorResponse",
+    "FavoriteState",
     "FileEntry",
     "FolderFiles",
     "FolderNode",

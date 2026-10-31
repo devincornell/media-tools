@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         services = await build_services(config, mongo_client[config.database_name])
         app.state.gallery = services.gallery
+        app.state.favorites = services.favorites
         app.state.browser = services.browser
         app.state.picker = services.picker
         app.state.uploads = services.uploads
@@ -40,10 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             copy_source_roots=[str(p) for p in config.copy_source_roots],
             worker_enabled=config.run_worker,
         )
-        app.state.renderer = PageRenderer(
-            template_path=config.template_path,
-            reels_template_path=config.reels_template_path,
-        )
+        app.state.renderer = PageRenderer()
         if config.run_worker:
             worker_task = asyncio.create_task(services.worker.run(stop))
         logger.info("Serving %s (database %r, job worker %s)", config.root_path, config.database_name,

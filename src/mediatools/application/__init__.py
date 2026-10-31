@@ -12,12 +12,16 @@ from .errors import (
     UploadPermissionError,
     UploadStorageFullError,
 )
-from .gallery import DirectoryIndexReader, GalleryService, VideoIndexReader
+from .favorites import FavoriteService, FavoriteStore
+from .gallery import DirectoryIndexReader, FavoriteReader, GalleryService, VideoIndexReader
 
 __all__ = [
     "BrowserService",
     "DirectoryIndexReader",
     "DirectoryNotIndexedError",
+    "FavoriteReader",
+    "FavoriteService",
+    "FavoriteStore",
     "FolderIndexReader",
     "GalleryError",
     "GalleryService",

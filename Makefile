@@ -48,7 +48,6 @@ test_mongo_down:
 serve_dwhost: SERVE_ROOT = /mnt/hdd-b/.sys/
 serve_dwhost: SERVE_THUMBS = /mnt/hdd-b/.dwhelper_thumbs/
 serve_dwhost: SERVE_DB = dwhost
-serve_dwhost: SERVE_TEMPLATE = scripts/templates/gpt_multi_v09.html
 serve_dwhost: SERVE_PORT = 6969
 serve_dwhost: SERVE_COPY_ROOTS = /mnt/hdd-b/
 serve_dwhost: SERVE_SUDO = 
@@ -56,7 +55,6 @@ serve_dwhost: SERVE_SUDO =
 serve_gopro: SERVE_ROOT = /mnt/hdd-a/gopro/gopro_raw_organized
 serve_gopro: SERVE_THUMBS = /mnt/hdd-a/gopro/gopro_raw_organized_thumbs
 serve_gopro: SERVE_DB = gopro
-serve_gopro: SERVE_TEMPLATE = scripts/templates/gpt_multi_v07_crazy.html
 serve_gopro: SERVE_PORT = 8000
 serve_gopro: SERVE_COPY_ROOTS =
 
@@ -69,8 +67,6 @@ serve_dwhost serve_gopro:
 		--root-path "$(SERVE_ROOT)" \
 		--thumb-path "$(SERVE_THUMBS)" \
 		--database-name $(SERVE_DB) \
-		--template-path $(SERVE_TEMPLATE) \
-		--reels-template-path scripts/templates/reels.html \
 		$(foreach r,$(SERVE_COPY_ROOTS),--copy-source-root "$(r)") \
 		$(if $(SERVE_WORKERS),--worker-concurrency $(SERVE_WORKERS)) \
 		--port $(SERVE_PORT)

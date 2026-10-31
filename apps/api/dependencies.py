@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from mediatools.application import BrowserService, GalleryService
+from mediatools.application import BrowserService, FavoriteService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
 from mediatools.application.media_jobs import MediaJobService
 from mediatools.application.uploads import UploadService
@@ -20,6 +20,10 @@ def get_gallery(request: Request) -> GalleryService:
 
 def get_browser(request: Request) -> BrowserService:
     return request.app.state.browser
+
+
+def get_favorites(request: Request) -> FavoriteService:
+    return request.app.state.favorites
 
 
 def get_picker(request: Request) -> FolderPicker:
@@ -48,6 +52,7 @@ def get_job_config(request: Request) -> JobConfigView:
 
 GalleryDep = Annotated[GalleryService, Depends(get_gallery)]
 BrowserDep = Annotated[BrowserService, Depends(get_browser)]
+FavoritesDep = Annotated[FavoriteService, Depends(get_favorites)]
 PickerDep = Annotated[FolderPicker, Depends(get_picker)]
 UploadDep = Annotated[UploadService, Depends(get_uploads)]
 RendererDep = Annotated[PageRenderer, Depends(get_renderer)]

@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+{% macro fav_btn(is_favorite) -%}
+<button type="button" class="fav-btn{{ ' active' if is_favorite }}" onclick="toggleFavorite(event, this)" title="Favorite" aria-label="Toggle favorite">
+    <i class="{{ 'fas' if is_favorite else 'far' }} fa-star"></i>
+</button>
+{%- endmacro %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -384,6 +389,40 @@
             background: var(--accent-primary);
             color: white;
             border-color: var(--accent-primary);
+        }
+
+        /* Favorites */
+        .fav-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            z-index: 5;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fav-btn:hover {
+            color: #facc15;
+            transform: scale(1.15);
+        }
+
+        .fav-btn.active {
+            color: #facc15;
+            border-color: #facc15;
+        }
+
+        .fav-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
         }
 
         /* Video Player Modal */
@@ -993,6 +1032,8 @@
                     {% for vid in vids %}
                         <div class="thumbnail" 
                              data-type="video"
+                             data-path="{{ vid.vid_path_rel }}"
+                             data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
@@ -1000,6 +1041,7 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                            {{ fav_btn(vid.is_favorite) }}
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
@@ -1025,6 +1067,8 @@
                     {% for vid in clips %}
                         <div class="thumbnail" 
                              data-type="clip"
+                             data-path="{{ vid.vid_path_rel }}"
+                             data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
                              data-video-title="{{ vid.vid_title }}"
@@ -1032,6 +1076,7 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                            {{ fav_btn(vid.is_favorite) }}
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
@@ -1055,10 +1100,11 @@
                 </h2>
                 <div class="gallery" id="imagesGallery">
                     {% for img in images %}
-                        <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}">
+                        <div class="thumbnail" data-type="image" data-path="{{ img.img_path_rel }}" data-favorite="{{ 'true' if img.is_favorite else 'false' }}" data-name="{{img.title|lower if img.title else 'image'}}">
                             <a href="/file/{{img.img_path_rel}}" onclick="openImageLightbox(event, this)">
                                 <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
                             </a>
+                            {{ fav_btn(img.is_favorite) }}
                         </div>
                     {% endfor %}
                 </div>
@@ -1225,46 +1271,56 @@
         }
 
         // Sort Media
-        function sortMedia() {
-            const sortValue = document.getElementById('sortSelect').value;
-            if (!sortValue) return;
+        // Favorites always come first; the selected sort applies within each group.
+        function sortGallery(gallery) {
+            const sortValue = document.getElementById('sortSelect').value || 'name-asc';
+            const isFav = el => el.dataset.favorite === 'true';
+            const thumbnails = Array.from(gallery.querySelectorAll('.thumbnail'));
 
-            const galleries = ['videosGallery', 'clipsGallery'];
-            
-            galleries.forEach(galleryId => {
-                const gallery = document.getElementById(galleryId);
-                if (!gallery) return;
+            thumbnails.sort((a, b) => {
+                if (isFav(a) !== isFav(b)) return isFav(a) ? -1 : 1;
 
-                const thumbnails = Array.from(gallery.querySelectorAll('.thumbnail'));
-                
-                thumbnails.sort((a, b) => {
-                    const aName = a.dataset.videoTitle || '';
-                    const bName = b.dataset.videoTitle || '';
-                    
-                    if (sortValue.startsWith('name')) {
-                        if (sortValue === 'name-asc') {
-                            return aName.localeCompare(bName);
-                        } else {
-                            return bName.localeCompare(aName);
-                        }
-                    } else if (sortValue.startsWith('duration')) {
-                        const aDuration = parseFloat(a.dataset.videoDuration) || 0;
-                        const bDuration = parseFloat(b.dataset.videoDuration) || 0;
-                        
-                        if (sortValue === 'duration-asc') {
-                            return aDuration - bDuration;
-                        } else {
-                            return bDuration - aDuration;
-                        }
-                    }
-                    return 0;
-                });
-
-                // Re-append sorted thumbnails
-                thumbnails.forEach(thumbnail => {
-                    gallery.appendChild(thumbnail);
-                });
+                if (sortValue.startsWith('duration')) {
+                    const aDuration = parseFloat(a.dataset.videoDuration) || 0;
+                    const bDuration = parseFloat(b.dataset.videoDuration) || 0;
+                    return sortValue === 'duration-asc' ? aDuration - bDuration : bDuration - aDuration;
+                }
+                const aName = a.dataset.name || '';
+                const bName = b.dataset.name || '';
+                return sortValue === 'name-desc' ? bName.localeCompare(aName) : aName.localeCompare(bName);
             });
+
+            thumbnails.forEach(thumbnail => gallery.appendChild(thumbnail));
+        }
+
+        function sortMedia() {
+            if (!document.getElementById('sortSelect').value) return;
+            ['videosGallery', 'clipsGallery', 'imagesGallery'].forEach(galleryId => {
+                const gallery = document.getElementById(galleryId);
+                if (gallery) sortGallery(gallery);
+            });
+        }
+
+        async function toggleFavorite(event, button) {
+            event.stopPropagation();
+            event.preventDefault();
+            const card = button.closest('.thumbnail');
+            const makeFavorite = card.dataset.favorite !== 'true';
+            const url = '/api/favorites/' + card.dataset.path.split('/').map(encodeURIComponent).join('/');
+
+            button.disabled = true;
+            try {
+                const response = await fetch(url, { method: makeFavorite ? 'PUT' : 'DELETE' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                card.dataset.favorite = String(makeFavorite);
+                button.classList.toggle('active', makeFavorite);
+                button.firstElementChild.className = (makeFavorite ? 'fas' : 'far') + ' fa-star';
+                sortGallery(card.closest('.gallery'));
+            } catch (err) {
+                alert(`Could not update favorite: ${err.message}`);
+            } finally {
+                button.disabled = false;
+            }
         }
 
         // Parse duration string to seconds for sorting

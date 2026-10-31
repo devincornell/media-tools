@@ -22,8 +22,6 @@ import mediatools
 | `SITE_THUMB_PATH` | yes | Directory of `<hash>.gif` thumbnails. |
 | `SITE_MONGODB_URL` | yes | MongoDB connection URL. |
 | `SITE_DATABASE_NAME` | yes | MongoDB database holding the index. |
-| `SITE_TEMPLATE_PATH` | no | Gallery template (default `apps/api/templates/gallery.html`). |
-| `SITE_REELS_TEMPLATE_PATH` | no | Reels template (default `apps/api/templates/reels.html`). |
 | `SITE_PORT` | no | Port for `python -m apps.api` and the Compose host port (default 8000). |
 | `SITE_MAX_CLIP_DURATION` | no | Videos shorter than this many seconds are listed as clips (default 0). |
 | `SITE_COPY_SOURCE_ROOTS` | no | JSON list of directories move jobs may read from, e.g. `'["/mnt/incoming"]'`. Empty (default) disables move jobs. |

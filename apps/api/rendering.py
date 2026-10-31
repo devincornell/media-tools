@@ -8,6 +8,11 @@ import jinja2
 
 from mediatools.contracts import DirectoryPage
 
+from .settings import TEMPLATES_DIR
+
+GALLERY_TEMPLATE = TEMPLATES_DIR / "gallery.html"
+REELS_TEMPLATE = TEMPLATES_DIR / "reels.html"
+
 
 def _load_template(path: Path) -> jinja2.Template:
     # One environment per file so same-named templates in different dirs can't shadow each other.
@@ -19,14 +24,11 @@ def _load_template(path: Path) -> jinja2.Template:
 class PageRenderer:
     '''Renders directory pages to HTML. Templates are re-read on each render so edits apply without a restart.'''
 
-    template_path: Path
-    reels_template_path: Path
-
     def render_gallery(self, page: DirectoryPage) -> str:
-        return self._render(self.template_path, page)
+        return self._render(GALLERY_TEMPLATE, page)
 
     def render_reels(self, page: DirectoryPage) -> str:
-        return self._render(self.reels_template_path, page)
+        return self._render(REELS_TEMPLATE, page)
 
     @staticmethod
     def _render(path: Path, page: DirectoryPage) -> str:

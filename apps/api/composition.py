@@ -4,7 +4,7 @@ import dataclasses
 
 from pymongo.asynchronous.database import AsyncDatabase
 
-from mediatools.application import BrowserService, GalleryService
+from mediatools.application import BrowserService, FavoriteService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
 from mediatools.application.media_jobs import (
     MediaJobDeps,
@@ -12,7 +12,7 @@ from mediatools.application.media_jobs import (
     build_handlers,
 )
 from mediatools.application.uploads import UploadService
-from mediatools.index_db import MediaIndexDB, MediaJobCollection
+from mediatools.index_db import FavoriteCollection, MediaIndexDB, MediaJobCollection
 from mediatools.jobs import JobManager, JobWorker, MongoJobLogStore, MongoJobRepository
 
 from .settings import ServerConfig
@@ -21,6 +21,7 @@ from .settings import ServerConfig
 @dataclasses.dataclass(frozen=True)
 class Services:
     gallery: GalleryService
+    favorites: FavoriteService
     browser: BrowserService
     picker: FolderPicker
     uploads: UploadService
@@ -37,6 +38,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
     log_store = MongoJobLogStore.from_database(database)
     await log_store.create_indexes()
     records = MediaJobCollection.from_database(database)
+    favorites = FavoriteCollection.from_database(database)
     # Jobs are scoped to the gallery root they operate on.
     manager = JobManager(repo, scope_id=str(config.root_path), log_store=log_store)
     deps = MediaJobDeps(
@@ -53,7 +55,9 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
             max_clip_duration=config.max_clip_duration,
             dirs=index.dirs,
             videos=index.videos,
+            favorites=favorites,
         ),
+        favorites=FavoriteService(root_path=config.root_path, store=favorites),
         browser=BrowserService(root_path=config.root_path, dirs=index.dirs),
         picker=FolderPicker(gallery_root=config.root_path, source_roots=config.copy_source_roots),
         uploads=UploadService(root_path=config.root_path),
