@@ -18,6 +18,7 @@ from ...contracts import (
     CleanupRequest,
     ConvertMp4Request,
     MontageRequest,
+    MoveItemRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -40,7 +41,7 @@ from ..errors import PathOutsideRootError
 from ..paths import resolve_allowed_source, resolve_under_root
 from . import fileops
 from .locks import PathLocks
-from .types import CLEANUP, CONVERT_MP4, MONTAGE, MOVE, REINDEX, THUMBNAILS
+from .types import CLEANUP, CONVERT_MP4, MONTAGE, MOVE, MOVE_ITEM, REINDEX, THUMBNAILS
 
 logger = logging.getLogger(__name__)
 
@@ -515,29 +516,8 @@ class MoveIncompleteError(Exception):
     '''Some entries could not be moved, so the source folder still exists. Retried, as the cause may be transient.'''
 
 
-class MoveHandler(_Base):
-    async def execute(self, job_id: str, ctx: JobContext) -> str | None:
-        req = await self._load(job_id, MoveRequest)
-        try:
-            source = resolve_allowed_source(req.source, self.deps.copy_source_roots)
-        except PathOutsideRootError as e:
-            raise PermanentJobError(str(e), code="invalid_source") from e
-        if fileops.is_protected_root(source, self.deps.copy_source_roots):
-            raise PermanentJobError(
-                "A copy source root itself can't be moved, because the source folder is removed afterwards.",
-                code="protected_source",
-            )
-        if not source.is_dir():
-            if ctx.job.attempt_count <= 1:
-                raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
-            ctx.log("The source folder is already gone (emptied by an earlier attempt)")
-        dest = self._target(req.dest)
-        # Lock the real locations too, so a symlink alias can't dodge another job's lock.
-        async with self._locked(ctx, [source, source.resolve(), dest, dest.resolve()], exclusive=True):
-            await self._run(job_id, req, source, dest, ctx)
-        return None
-
-    async def _run(self, job_id: str, req: MoveRequest, source: Path, dest: Path, ctx: JobContext) -> None:
+class _MoveRunner(_Base):
+    async def _run(self, job_id: str, workers: int, source: Path, dest: Path, ctx: JobContext) -> None:
         root = self.deps.root_path
         # Index entries live under the source's path as the gallery sees it, which may be a link or its target.
         in_gallery = [p for p in dict.fromkeys((source, Path(os.path.realpath(source)))) if p.is_relative_to(root)]
@@ -551,7 +531,7 @@ class MoveHandler(_Base):
             files, others = await asyncio.to_thread(fileops.list_source_files, source)
         total_bytes = sum(f.stat().st_size for f in files) or 1
         ctx.log(f"Moving {len(files)} files ({total_bytes / 1e9:.2f} GB) and {len(others)} link(s) to {self._rel(dest)} "
-                f"with {req.workers} parallel transfers")
+                f"with {workers} parallel transfers")
         dest.mkdir(parents=True, exist_ok=True)
         tally = dict.fromkeys(fileops.MoveOutcome, 0)
         renamed: list[str] = []
@@ -586,7 +566,7 @@ class MoveHandler(_Base):
                 processed_bytes += size
             note(rel, moved)
 
-        await _bounded(files, one, req.workers, ctx, lambda n: (80 * processed_bytes / total_bytes, f"Moving files {n}/{len(files)}"))
+        await _bounded(files, one, workers, ctx, lambda n: (80 * processed_bytes / total_bytes, f"Moving files {n}/{len(files)}"))
         links_moved = 0
         for link in others:
             rel = link.relative_to(source)
@@ -652,6 +632,88 @@ class MoveHandler(_Base):
         return {"directories": 0, "directories_removed": removed, "videos": 0, "videos_new": 0, "errors": [], "error_count": 0}
 
 
+class MoveHandler(_MoveRunner):
+    async def execute(self, job_id: str, ctx: JobContext) -> str | None:
+        req = await self._load(job_id, MoveRequest)
+        try:
+            source = resolve_allowed_source(req.source, self.deps.copy_source_roots)
+        except PathOutsideRootError as e:
+            raise PermanentJobError(str(e), code="invalid_source") from e
+        if fileops.is_protected_root(source, self.deps.copy_source_roots):
+            raise PermanentJobError(
+                "A copy source root itself can't be moved, because the source folder is removed afterwards.",
+                code="protected_source",
+            )
+        if not source.is_dir():
+            if ctx.job.attempt_count <= 1:
+                raise PermanentJobError(f"Source directory not found: {source}", code="not_found")
+            ctx.log("The source folder is already gone (emptied by an earlier attempt)")
+        dest = self._target(req.dest)
+        # Lock the real locations too, so a symlink alias can't dodge another job's lock.
+        async with self._locked(ctx, [source, source.resolve(), dest, dest.resolve()], exclusive=True):
+            await self._run(job_id, req.workers, source, dest, ctx)
+        return None
+
+
+class MoveItemHandler(_MoveRunner):
+    '''Moves one gallery file or folder into another gallery folder.'''
+
+    async def execute(self, job_id: str, ctx: JobContext) -> str | None:
+        req = await self._load(job_id, MoveItemRequest)
+        source, dest_dir = self._target(req.path), self._target(req.dest)
+        if source == self.deps.root_path:
+            raise PermanentJobError("The gallery root can't be moved.", code="invalid_path")
+        if not dest_dir.is_dir():
+            raise PermanentJobError(f"Destination folder not found: {req.dest}", code="not_found")
+        dest = dest_dir / source.name
+        gone = not os.path.lexists(source)
+        if gone:
+            if ctx.job.attempt_count <= 1:
+                raise PermanentJobError(f"Not found: {req.path}", code="not_found")
+            ctx.log("The item is already gone (moved by an earlier attempt)")
+        # A symlink is moved as a link; only real folders are merged file by file.
+        is_folder = (not gone and source.is_dir() and not source.is_symlink()) or (gone and dest.is_dir())
+        async with self._locked(ctx, [source, source.resolve(), dest_dir, dest_dir.resolve()], exclusive=True):
+            if is_folder:
+                await self._run(job_id, req.workers, source, dest, ctx)
+            else:
+                await self._run_single(job_id, source, dest, ctx)
+        return None
+
+    async def _run_single(self, job_id: str, source: Path, dest: Path, ctx: JobContext) -> None:
+        result: Result = {"source": self._rel(source), "dest": self._rel(dest), "warnings": []}
+        if os.path.lexists(source):
+            ctx.log(f"Moving {self._rel(source)} to {self._rel(dest.parent)}")
+            await ctx.checkpoint(0, "Moving file", force=True)
+            try:
+                if source.is_file() and not source.is_symlink():
+                    moved = await asyncio.to_thread(fileops.move_file, source, dest, job_id[:8], True)
+                else:
+                    moved = await asyncio.to_thread(fileops.move_entry, source, dest)
+            except OSError as e:
+                raise MoveIncompleteError(f"Could not move {self._rel(source)}: {e.strerror or e}") from e
+            result["dest"] = self._rel(moved.path)
+            result["outcome"] = moved.outcome.value
+            if moved.outcome is fileops.MoveOutcome.RENAMED:
+                result["warnings"] = [f"Something else is already at the destination; kept as {moved.path.name}."]
+            ctx.log(f"{moved.outcome.value}: {self._rel(source)} -> {self._rel(moved.path)}")
+        await self.deps.records.set_result(job_id, result)
+
+        # Rescan both sides; when one contains the other, the outer rescan covers it.
+        parent, target = source.parent, dest.parent
+        if parent.is_relative_to(target):
+            parent = target
+        elif target.is_relative_to(parent):
+            target = parent
+        if parent != target:
+            ctx.log(f"Rescanning {self._rel(parent)}")
+            result["source_reindex"] = await self._reindex(parent, ctx, 10, 50)
+            await self.deps.records.set_result(job_id, result)
+        ctx.log(f"Rescanning {self._rel(target)}")
+        result["reindex"] = await self._reindex(target, ctx, 50 if parent != target else 10, 100)
+        await self.deps.records.set_result(job_id, result)
+
+
 def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
     return {
         REINDEX: ReindexHandler(deps),
@@ -659,5 +721,6 @@ def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
         CLEANUP: CleanupHandler(deps),
         CONVERT_MP4: ConvertMp4Handler(deps),
         MOVE: MoveHandler(deps),
+        MOVE_ITEM: MoveItemHandler(deps),
         MONTAGE: MontageHandler(deps),
     }

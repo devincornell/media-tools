@@ -3,6 +3,7 @@ THUMBNAILS = "media.thumbnails.v1"
 CLEANUP = "media.cleanup.v1"
 CONVERT_MP4 = "media.convert_mp4.v1"
 MOVE = "media.move_rescan.v1"
+MOVE_ITEM = "media.move_item.v1"
 MONTAGE = "media.montage.v1"
 
 KIND_BY_TYPE = {
@@ -11,6 +12,7 @@ KIND_BY_TYPE = {
     CLEANUP: "cleanup",
     CONVERT_MP4: "convert_mp4",
     MOVE: "move",
+    MOVE_ITEM: "move_item",
     MONTAGE: "montage",
 }
 TYPE_BY_KIND = {kind: job_type for job_type, kind in KIND_BY_TYPE.items()}

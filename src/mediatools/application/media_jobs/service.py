@@ -12,6 +12,7 @@ from ...contracts import (
     MediaJobPage,
     MediaJobView,
     MontageRequest,
+    MoveItemRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -27,12 +28,15 @@ from .types import (
     KIND_BY_TYPE,
     MONTAGE,
     MOVE,
+    MOVE_ITEM,
     REINDEX,
     THUMBNAILS,
     TYPE_BY_KIND,
 )
 
-MediaJobRequest = ReindexRequest | ThumbnailsRequest | CleanupRequest | ConvertMp4Request | MoveRequest | MontageRequest
+MediaJobRequest = (
+    ReindexRequest | ThumbnailsRequest | CleanupRequest | ConvertMp4Request | MoveRequest | MoveItemRequest | MontageRequest
+)
 
 _TYPE_BY_REQUEST: dict[type, str] = {
     ReindexRequest: REINDEX,
@@ -40,6 +44,7 @@ _TYPE_BY_REQUEST: dict[type, str] = {
     CleanupRequest: CLEANUP,
     ConvertMp4Request: CONVERT_MP4,
     MoveRequest: MOVE,
+    MoveItemRequest: MOVE_ITEM,
     MontageRequest: MONTAGE,
 }
 
@@ -111,6 +116,8 @@ class MediaJobService:
         '''Check paths up front so bad requests fail fast; returns the target directory.'''
         if isinstance(request, MoveRequest):
             return self._validate_move(request)
+        if isinstance(request, MoveItemRequest):
+            return self._validate_move_item(request)
         if isinstance(request, MontageRequest):
             return self._validate_montage(request)
         target = self._under_root(request.path)
@@ -155,6 +162,29 @@ class MediaJobService:
             raise InvalidJobRequestError(
                 f"The server can't write to {existing} (owned by {fileops.user_name(existing.stat().st_uid)})."
             )
+        return dest
+
+    def _validate_move_item(self, request: MoveItemRequest) -> Path:
+        source = self._under_root(request.path)
+        if source == self.root_path:
+            raise InvalidJobRequestError("The gallery root can't be moved.")
+        if not os.path.lexists(source):
+            raise InvalidJobRequestError(f"Not found: {request.path}")
+        dest = self._under_root(request.dest)
+        if not dest.is_dir():
+            raise InvalidJobRequestError(f"Destination folder not found: {request.dest}")
+        if dest.resolve() == source.parent.resolve():
+            raise InvalidJobRequestError("The item is already in that folder.")
+        if source.is_dir() and (dest.resolve() == source.resolve() or dest.resolve().is_relative_to(source.resolve())):
+            raise InvalidJobRequestError("A folder can't be moved into itself.")
+        clash = dest / source.name
+        if source.is_dir() and os.path.lexists(clash) and not clash.is_dir():
+            raise InvalidJobRequestError(f"A file named {source.name} already exists in the destination folder.")
+        for folder in (source.parent, dest):
+            if not os.access(folder, os.W_OK | os.X_OK):
+                raise InvalidJobRequestError(
+                    f"The server can't write to {folder} (owned by {fileops.user_name(folder.stat().st_uid)})."
+                )
         return dest
 
     def _under_root(self, rel: str) -> Path:

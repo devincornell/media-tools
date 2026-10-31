@@ -4,6 +4,11 @@
     <i class="{{ 'fas' if is_favorite else 'far' }} fa-star"></i>
 </button>
 {%- endmacro %}
+{% macro move_btn() -%}
+<button type="button" class="move-btn" onclick="startMove(event, this)" title="Move to..." aria-label="Move to">
+    <i class="fas fa-share"></i>
+</button>
+{%- endmacro %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -576,7 +581,8 @@
         }
 
         /* Favorites */
-        .fav-btn {
+        .fav-btn,
+        .move-btn {
             position: absolute;
             bottom: 0.35rem;
             right: 0.35rem;
@@ -611,9 +617,141 @@
             cursor: wait;
         }
 
-        /* Keep long titles clear of the star */
+        .move-btn {
+            right: calc(0.35rem + 26px + 0.3rem);
+        }
+
+        .move-btn:hover {
+            color: #fff;
+            background: var(--accent-primary);
+            transform: scale(1.15);
+        }
+
+        .thumbnail.moving {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Keep long titles clear of the star and move buttons */
         .thumbnail-image-wrapper:has(.fav-btn) .thumbnail-overlay-bottom {
-            padding-right: 2.5rem;
+            padding-right: 4.8rem;
+        }
+
+        /* Jobs viewer */
+        .jp-hidden { display: none !important; }
+
+        .jobs-fab {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 1500;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .jobs-fab.busy {
+            background: var(--accent-primary);
+        }
+
+        .jobs-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 20px;
+            padding: 0 5px;
+            border-radius: 10px;
+            background: #ef4444;
+            font-size: 0.72rem;
+            line-height: 20px;
+        }
+
+        .jobs-panel {
+            position: fixed;
+            right: 1rem;
+            bottom: 4.5rem;
+            z-index: 1500;
+            width: min(420px, calc(100vw - 2rem));
+            max-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-heavy);
+            font-size: 0.85rem;
+        }
+
+        .jobs-panel-head {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .jobs-panel-head strong { flex: 1; }
+        .jobs-panel-head a { color: var(--accent-secondary); text-decoration: none; }
+
+        .jobs-list { overflow-y: auto; }
+
+        .jobs-empty { padding: 1rem; color: var(--text-secondary); }
+
+        .job-row {
+            padding: 0.55rem 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .job-row:last-child { border-bottom: none; }
+
+        .job-line {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .job-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .job-sub { color: var(--text-secondary); font-size: 0.78rem; margin-top: 0.15rem; overflow-wrap: anywhere; }
+        .job-sub.err { color: #f87171; }
+
+        .job-badge {
+            padding: 0.05rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: #6b7280;
+        }
+
+        .job-badge.running { background: #3b82f6; }
+        .job-badge.succeeded { background: #22c55e; color: #000; }
+        .job-badge.failed { background: #ef4444; }
+        .job-badge.canceled { background: #f59e0b; color: #000; }
+
+        .job-bar {
+            height: 5px;
+            margin-top: 0.3rem;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .job-bar > div { height: 100%; background: #3b82f6; }
+
+        .job-cancel {
+            padding: 0.1rem 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.75rem;
+            cursor: pointer;
         }
 
         /* Video Player Modal */
@@ -1298,6 +1436,7 @@
                                     <div class="thumbnail-overlay-top-right"><i class="fas fa-video"></i> {{cp.num_vids}}</div>
                                     <div class="thumbnail-overlay-bottom">{{cp.name}}</div>
                                     {{ fav_btn(cp.is_favorite) }}
+                                    {{ move_btn() }}
                                 </div>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
@@ -1325,6 +1464,7 @@
                         <div class="thumbnail" 
                              data-type="video"
                              data-hash="{{ vid.hash }}"
+                             data-path="{{ vid.vid_path_rel }}"
                              data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
@@ -1345,6 +1485,7 @@
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
                                 {{ fav_btn(vid.is_favorite) }}
+                                {{ move_btn() }}
                             </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
@@ -1372,6 +1513,7 @@
                         <div class="thumbnail" 
                              data-type="clip"
                              data-hash="{{ vid.hash }}"
+                             data-path="{{ vid.vid_path_rel }}"
                              data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
@@ -1392,6 +1534,7 @@
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
                                 {{ fav_btn(vid.is_favorite) }}
+                                {{ move_btn() }}
                             </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
@@ -1547,6 +1690,20 @@
         </div>
     </div>
 
+    <!-- Jobs viewer -->
+    <button type="button" class="jobs-fab" id="jobsFab" onclick="toggleJobsPanel()" title="Background jobs" aria-label="Background jobs">
+        <i class="fas fa-list-check"></i>
+        <span class="jobs-badge jp-hidden" id="jobsBadge">0</span>
+    </button>
+    <div class="jobs-panel jp-hidden" id="jobsPanel">
+        <div class="jobs-panel-head">
+            <strong>Jobs</strong>
+            <a href="/jobs?path={{ page_path_rel | urlencode }}">All jobs</a>
+        </div>
+        <div class="jobs-list" id="jobsList"></div>
+    </div>
+
+    <script src="/static/picker.js"></script>
     <script>
         // Subfolder thumbnails data
         const subfolderThumbs = {
@@ -1704,6 +1861,152 @@
                 button.disabled = false;
             }
         }
+
+        // ------------------------------------------------------------ Move to... + jobs viewer
+        const pendingMoves = new Map();  // job id -> card being moved
+
+        async function apiError(response) {
+            const body = await response.json().catch(() => null);
+            return typeof body?.detail === 'string' ? body.detail : `HTTP ${response.status}`;
+        }
+
+        function startMove(event, button) {
+            event.stopPropagation();
+            event.preventDefault();
+            const card = button.closest('.thumbnail');
+            const path = card.dataset.path;
+            const parent = path.split('/').slice(0, -1).join('/');
+            const name = path.split('/').pop();
+            FolderPicker.open({
+                scope: 'gallery',
+                title: `Move "${name}" to...`,
+                startRel: parent,
+                note: (listing) => `will move into ${listing.rel || '.'}`,
+                onChoose: (listing) => submitMove(card, path, listing.rel || '.'),
+            });
+        }
+
+        async function submitMove(card, path, dest) {
+            try {
+                const response = await fetch('/api/jobs/move-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, dest }),
+                });
+                if (!response.ok) throw new Error(await apiError(response));
+                const accepted = await response.json();
+                card.classList.add('moving');
+                pendingMoves.set(accepted.job_id, card);
+                setJobsPanel(true);
+            } catch (err) {
+                alert(`Could not start the move: ${err.message}`);
+            }
+        }
+
+        const JOB_KIND_LABEL = {
+            reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert',
+            move: 'Move + rescan', move_item: 'Move', montage: 'Montage',
+        };
+        const JOB_ACTIVE = new Set(['queued', 'running']);
+        let jobsTimer = null;
+
+        function jobTarget(item) {
+            if (item.kind === 'move_item') return `${item.params.path} \u2192 ${item.params.dest}`;
+            if (item.kind === 'move') return `${item.params.source} \u2192 ${item.target}`;
+            return item.target ?? '';
+        }
+
+        function jobEl(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text != null) node.textContent = text;
+            return node;
+        }
+
+        function jobRow(item) {
+            const job = item.job;
+            const row = jobEl('div', 'job-row');
+            const line = jobEl('div', 'job-line');
+            const title = jobEl('span', 'job-title', `${JOB_KIND_LABEL[item.kind] || item.kind}: ${jobTarget(item)}`);
+            title.title = title.textContent;
+            line.append(title, jobEl('span', `job-badge ${job.status}`,
+                job.cancel_requested && job.status === 'running' ? 'canceling' : job.status));
+            if (JOB_ACTIVE.has(job.status) && !job.cancel_requested) {
+                const cancel = jobEl('button', 'job-cancel', 'Cancel');
+                cancel.type = 'button';
+                cancel.onclick = async () => {
+                    const response = await fetch(`/v1/jobs/${encodeURIComponent(job.id)}/cancel`, { method: 'POST' });
+                    if (!response.ok) alert(await apiError(response));
+                    refreshJobs();
+                };
+                line.append(cancel);
+            }
+            row.append(line);
+            if (job.status === 'running') {
+                const pct = job.progress_percent ?? 0;
+                const fill = jobEl('div');
+                fill.style.width = `${pct}%`;
+                const bar = jobEl('div', 'job-bar');
+                bar.append(fill);
+                row.append(bar, jobEl('div', 'job-sub', `${pct}% \u00b7 ${job.progress_stage || 'starting'}`));
+            } else if (job.status === 'queued') {
+                row.append(jobEl('div', 'job-sub', job.progress_stage || 'Waiting for a worker'));
+            }
+            if (job.error_message && job.status !== 'succeeded') {
+                row.append(jobEl('div', 'job-sub err', job.error_message));
+            }
+            for (const warning of item.result?.warnings || []) row.append(jobEl('div', 'job-sub', warning));
+            return row;
+        }
+
+        function applyFinishedMoves(items) {
+            for (const item of items) {
+                const card = pendingMoves.get(item.job.id);
+                if (!card) continue;
+                if (item.job.status === 'succeeded') {
+                    card.remove();
+                } else if (item.job.status === 'failed' || item.job.status === 'canceled') {
+                    card.classList.remove('moving');
+                } else {
+                    continue;
+                }
+                pendingMoves.delete(item.job.id);
+            }
+        }
+
+        function setJobsPanel(open) {
+            document.getElementById('jobsPanel').classList.toggle('jp-hidden', !open);
+            if (open) refreshJobs();
+        }
+
+        function toggleJobsPanel() {
+            setJobsPanel(document.getElementById('jobsPanel').classList.contains('jp-hidden'));
+        }
+
+        async function refreshJobs() {
+            clearTimeout(jobsTimer);
+            const panelOpen = !document.getElementById('jobsPanel').classList.contains('jp-hidden');
+            let delay = panelOpen ? 5000 : 15000;
+            try {
+                const response = await fetch('/api/media-jobs?limit=15');
+                if (!response.ok) throw new Error(await apiError(response));
+                const items = (await response.json()).items;
+                const active = items.filter(i => JOB_ACTIVE.has(i.job.status)).length;
+                const badge = document.getElementById('jobsBadge');
+                badge.textContent = active;
+                badge.classList.toggle('jp-hidden', active === 0);
+                document.getElementById('jobsFab').classList.toggle('busy', active > 0);
+                applyFinishedMoves(items);
+                const list = document.getElementById('jobsList');
+                list.replaceChildren(...(items.length ? items.map(jobRow) : [jobEl('div', 'jobs-empty', 'No jobs yet.')]));
+                if (active) delay = 2000;
+            } catch (err) {
+                document.getElementById('jobsList').replaceChildren(jobEl('div', 'jobs-empty', `Could not load jobs: ${err.message}`));
+            }
+            jobsTimer = setTimeout(refreshJobs, delay);
+        }
+
+        refreshJobs();
 
         // Parse duration string to seconds for sorting
         function parseDuration(durationStr) {

@@ -20,6 +20,7 @@ from mediatools.application import DirectoryNotIndexedError, InvalidJobRequestEr
 from mediatools.contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    MoveItemRequest,
     MoveRequest,
     ReindexRequest,
     ThumbnailsRequest,
@@ -286,6 +287,66 @@ def test_move_creates_new_folder_linked_into_parent(tree: dict[str, Path]):
         assert "imported" in [sp.page_path_rel for sp in root_page.subpages]
         root_doc = await s.gallery.dirs.find_by_path(tree["root"])
         assert root_doc is not None and "imported" in root_doc.subpaths
+
+    run_services(tree, body)
+
+
+def test_move_item_file_between_gallery_folders(tree: dict[str, Path]):
+    root = tree["root"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+        (root / "trip2" / "x.mp4").write_bytes(b"something else with a clashing name")
+
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip/x.mp4", dest="trip2"))
+        r = out["result"]
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert r["outcome"] == "renamed" and r["dest"] == "trip2/x (1).mp4" and len(r["warnings"]) == 1
+        assert not (root / "trip" / "x.mp4").exists()
+        assert (root / "trip2" / "x.mp4").read_bytes() == b"something else with a clashing name"
+        assert (root / "trip2" / "x (1).mp4").stat().st_size > 100
+        assert [v.vid_path_rel for v in (await s.gallery.directory_page("trip")).vids] == []
+        assert "trip2/x (1).mp4" in [v.vid_path_rel for v in (await s.gallery.directory_page("trip2")).vids]
+
+    run_services(tree, body)
+
+
+def test_move_item_folder_between_gallery_folders(tree: dict[str, Path]):
+    root = tree["root"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+
+        status, out = await submit_and_run(s, MoveItemRequest(path="trip", dest="b"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert not (root / "trip").exists() and (root / "b" / "trip" / "x.mp4").is_file()
+        assert (root / "b" / "trip" / "batch" / "dupe.mp4").is_file()
+        dirs = set(await s.gallery.list_directories())
+        assert not {"trip", "trip/batch"} & dirs and {"b/trip", "b/trip/batch"} <= dirs
+        assert "trip" not in [sp.page_path_rel for sp in (await s.gallery.directory_page(".")).subpages]
+        assert "b/trip" in [sp.page_path_rel for sp in (await s.gallery.directory_page("b")).subpages]
+
+    run_services(tree, body)
+
+
+def test_move_item_validation(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        (tree["root"] / "trip2" / "trip").write_text("a file where the folder would go")
+        bad = [
+            MoveItemRequest(path="trip", dest="trip2"),  # a file with the folder's name is in the way
+            MoveItemRequest(path=".", dest="a"),
+            MoveItemRequest(path="nope.mp4", dest="a"),
+            MoveItemRequest(path="a/clip1.mp4", dest="missing"),
+            MoveItemRequest(path="a/clip1.mp4", dest="a"),  # already there
+            MoveItemRequest(path="trip", dest="trip/batch"),  # into itself
+            MoveItemRequest(path="trip", dest="trip"),
+            MoveItemRequest(path="trip/x.mp4", dest="../outside"),
+            MoveItemRequest(path="../incoming", dest="a"),
+        ]
+        for req in bad:
+            with pytest.raises(InvalidJobRequestError):
+                await s.media_jobs.submit(req)
+        assert (await s.media_jobs.list()).total == 0
 
     run_services(tree, body)
 

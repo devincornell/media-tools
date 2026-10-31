@@ -403,6 +403,12 @@ def test_gallery_page_renders_favorite_state(client: TestClient):
     assert html.count('class="fav-btn') == 3  # two videos and the `trip` folder, no image stars
 
 
+def test_gallery_page_has_move_buttons_and_jobs_viewer(client: TestClient):
+    html = client.get("/page/").text
+    assert html.count('class="move-btn"') == 3  # two videos and the `trip` folder
+    assert 'data-path="long_video.mp4"' in html and 'id="jobsPanel"' in html
+
+
 def test_favorite_folders_sort_first(tmp_path: Path):
     root = tmp_path / "lib"
     names = ["a", "b", "c"]
