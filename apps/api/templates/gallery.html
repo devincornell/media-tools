@@ -837,6 +837,72 @@
             cursor: pointer;
         }
 
+        /* Random clip stream: stacked videos, one visible, the others buffering the next clips */
+        .clip-stage {
+            position: relative;
+            width: 100%;
+            height: 70vh;
+            background: #000;
+        }
+
+        .clip-stage video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            visibility: hidden;
+        }
+
+        .clip-stage video.active {
+            visibility: visible;
+        }
+
+        .clip-wait {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .clip-progress {
+            height: 3px;
+            background: var(--bg-tertiary);
+        }
+
+        .clip-progress > div {
+            width: 0;
+            height: 100%;
+            background: var(--accent-primary);
+        }
+
+        .clip-length {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .clip-length input {
+            width: 4.5rem;
+            padding: 0.1rem 0.3rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font: inherit;
+        }
+
+        .clip-open {
+            color: var(--text-secondary);
+        }
+
         /* Video Player Modal */
         .video-player {
             display: none;
@@ -1472,6 +1538,9 @@
                 <i class="fas fa-expand" style="color: var(--text-secondary); font-size: 1rem;"></i>
             </div>
             <div class="view-toggle">
+                <button class="view-btn" id="clipStreamBtn" data-folder="{{ page_path_rel }}" onclick="openClipStream(this.dataset.folder)" title="Random clips from this folder and all subfolders">
+                    <i class="fas fa-shuffle"></i>
+                </button>
                 <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
                     <i class="fas fa-eye"></i>
                 </button>
@@ -1772,6 +1841,46 @@
             <a href="/jobs?path={{ page_path_rel | urlencode }}">All jobs</a>
         </div>
         <div class="jobs-list" id="jobsList"></div>
+    </div>
+
+    <!-- Random clip stream -->
+    <div class="video-player" id="clipStream">
+        <div class="player-container">
+            <button class="player-close" onclick="closeClipStream()" title="Close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="player-info">
+                <h2 class="player-title" id="clipStreamTitle">Random clips</h2>
+                <p class="player-details" id="clipStreamInfo"></p>
+            </div>
+            <div class="player-main">
+                <div class="video-container">
+                    <div class="clip-stage" id="clipStage">
+                        <div class="clip-wait" id="clipWait"><i class="fas fa-spinner fa-spin"></i> Buffering clips...</div>
+                    </div>
+                    <div class="clip-progress"><div id="clipProgress"></div></div>
+                    <div class="player-controls">
+                        <button class="nav-btn" id="clipPauseBtn" onclick="toggleClipStreamPause()" title="Pause (Space)">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="nav-btn" onclick="nextClip()" title="Next clip (N)">
+                            <i class="fas fa-forward-step"></i>
+                        </button>
+                        <label class="clip-length" title="Seconds per clip">
+                            <i class="fas fa-stopwatch"></i>
+                            <input type="number" id="clipLength" min="1" max="600" step="0.5" value="4"> s
+                        </label>
+                        <label class="autoplay-label" title="Keep playing the current video instead of jumping to new clips">
+                            <input type="checkbox" id="clipHold" class="autoplay-checkbox">
+                            <span class="autoplay-text">Stay on this video</span>
+                        </label>
+                        <a class="clip-open" id="clipOpenLink" href="#" target="_blank" title="Open the current video in a new tab">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Move confirmation -->
@@ -2249,6 +2358,248 @@
         document.getElementById('moveDialogBrowse').addEventListener('click', browseFromMoveDialog);
 
         refreshJobs();
+
+        // ------------------------------------------------------------ Random clip stream
+        // Several <video> elements are stacked: one plays the current clip while the others load and seek
+        // to upcoming clips in parallel, so switching is instant. A finished buffer is refilled right away.
+        const CLIP_BUFFERS = 3;
+        const clipStream = {
+            open: false, gen: 0, sources: [], cumulative: [], total: 0,
+            slots: [], active: null, waiting: false, paused: false,
+        };
+
+        function encodeMediaPath(path) {
+            return path.split('/').map(encodeURIComponent).join('/');
+        }
+
+        function clockTime(seconds) {
+            const total = Math.floor(seconds);
+            const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+            const pad = (n) => String(n).padStart(2, '0');
+            return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+        }
+
+        function clipLength() {
+            const value = parseFloat(document.getElementById('clipLength').value);
+            return Number.isFinite(value) && value >= 0.5 ? value : 4;
+        }
+
+        function clipEnd(slot) {
+            return Math.min(slot.clip.start + clipLength(), slot.clip.src.duration - 0.05);
+        }
+
+        function pickClip() {
+            // Weighted by duration, so every second of footage is equally likely to be shown.
+            const s = clipStream;
+            const r = Math.random() * s.total;
+            let lo = 0, hi = s.cumulative.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (s.cumulative[mid] > r) hi = mid; else lo = mid + 1;
+            }
+            const src = s.sources[lo];
+            const start = Math.random() * Math.max(0, src.duration - clipLength());
+            return { src, start };
+        }
+
+        function loadSlot(slot, attempt = 0) {
+            const token = ++slot.token;
+            const video = slot.video;
+            slot.ready = false;
+            slot.clip = pickClip();
+            video.onerror = () => {
+                // An unplayable file (e.g. a codec the browser lacks): try another clip.
+                if (token !== slot.token || attempt >= 20) return;
+                setTimeout(() => { if (token === slot.token && clipStream.open) loadSlot(slot, attempt + 1); }, 300);
+            };
+            video.onloadedmetadata = () => {
+                if (token === slot.token) video.currentTime = slot.clip.start;
+            };
+            video.onseeked = () => {
+                if (token !== slot.token || slot.ready) return;
+                const done = () => {
+                    if (token !== slot.token || slot.ready) return;
+                    slot.ready = true;
+                    slot.readyAt = performance.now();
+                    onClipReady(slot);
+                };
+                if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) done();
+                else video.addEventListener('canplay', done, { once: true });
+            };
+            video.src = `/video/${encodeMediaPath(slot.clip.src.path)}`;
+            video.load();
+        }
+
+        function onClipReady(slot) {
+            if (!clipStream.open) return;
+            if (!clipStream.active || clipStream.waiting) activateClip(slot);
+        }
+
+        async function playClipVideo(video) {
+            try {
+                await video.play();
+            } catch (err) {
+                // Without a fresh click some browsers only allow muted playback.
+                if (err.name === 'NotAllowedError' && !video.muted) {
+                    video.muted = true;
+                    video.play().catch(() => {});
+                }
+            }
+        }
+
+        function activateClip(slot) {
+            const s = clipStream;
+            const prev = s.active;
+            s.active = slot;
+            s.waiting = false;
+            const video = slot.video;
+            if (prev) {
+                video.muted = prev.video.muted;
+                video.volume = prev.video.volume;
+                video.playbackRate = prev.video.playbackRate;
+            }
+            video.controls = true;
+            video.classList.add('active');
+            if (prev && prev !== slot) {
+                prev.video.classList.remove('active');
+                prev.video.controls = false;
+                prev.video.pause();
+                loadSlot(prev);
+            }
+            const { src, start } = slot.clip;
+            document.getElementById('clipStreamTitle').textContent = src.path.split('/').pop();
+            document.getElementById('clipStreamInfo').textContent =
+                `${src.path} \u00b7 from ${clockTime(start)} of ${clockTime(src.duration)} \u00b7 ` +
+                `${s.sources.length.toLocaleString()} videos, ${clockTime(s.total)} of footage`;
+            document.getElementById('clipOpenLink').href = `/video/${encodeMediaPath(src.path)}#t=${Math.floor(start)}`;
+            if (!s.paused) playClipVideo(video);
+        }
+
+        function nextClip() {
+            const s = clipStream;
+            if (!s.open) return;
+            const ready = s.slots.filter(slot => slot !== s.active && slot.ready);
+            if (ready.length) {
+                activateClip(ready.reduce((a, b) => (a.readyAt <= b.readyAt ? a : b)));
+            } else {
+                s.waiting = true;  // the current clip keeps playing until a buffer is ready
+            }
+        }
+
+        function setClipPaused(paused) {
+            clipStream.paused = paused;
+            document.getElementById('clipPauseBtn').firstElementChild.className = paused ? 'fas fa-play' : 'fas fa-pause';
+        }
+
+        function toggleClipStreamPause() {
+            const video = clipStream.active?.video;
+            setClipPaused(!clipStream.paused);
+            if (!video) return;
+            if (clipStream.paused) video.pause(); else playClipVideo(video);
+        }
+
+        function clipTick(gen) {
+            const s = clipStream;
+            if (!s.open || gen !== s.gen) return;
+            const slot = s.active;
+            const hold = document.getElementById('clipHold').checked;
+            let progress = 0;
+            if (slot) {
+                const video = slot.video;
+                const end = clipEnd(slot);
+                const span = Math.max(0.1, end - slot.clip.start);
+                progress = hold ? 0 : Math.min(1, Math.max(0, (video.currentTime - slot.clip.start) / span));
+                if (!hold && !s.waiting && !video.paused && video.currentTime >= end) nextClip();
+            }
+            document.getElementById('clipProgress').style.width = `${progress * 100}%`;
+            document.getElementById('clipWait').style.display =
+                !slot || (s.waiting && slot.video.ended) ? 'flex' : 'none';
+            requestAnimationFrame(() => clipTick(gen));
+        }
+
+        function buildClipSlots() {
+            const stage = document.getElementById('clipStage');
+            for (let i = 0; i < CLIP_BUFFERS; i++) {
+                const video = document.createElement('video');
+                video.preload = 'auto';
+                video.playsInline = true;
+                const slot = { video, token: 0, ready: false, readyAt: 0, clip: null };
+                video.addEventListener('ended', () => { if (clipStream.active === slot) nextClip(); });
+                // Follow the native controls too, so their pause button also stops new clips.
+                video.addEventListener('pause', () => {
+                    if (clipStream.active === slot && !video.ended) setClipPaused(true);
+                });
+                video.addEventListener('play', () => { if (clipStream.active === slot) setClipPaused(false); });
+                stage.append(video);
+                clipStream.slots.push(slot);
+            }
+        }
+
+        async function openClipStream(folder) {
+            const s = clipStream;
+            const gen = ++s.gen;
+            s.open = true;
+            s.active = null;
+            s.waiting = false;
+            setClipPaused(false);
+            document.getElementById('clipStreamTitle').textContent = 'Random clips';
+            document.getElementById('clipStreamInfo').textContent = 'Loading the video list...';
+            document.getElementById('clipStream').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            try {
+                const response = await fetch(`/api/stream-sources/${encodeMediaPath(folder === '.' ? '' : folder)}`);
+                if (!response.ok) throw new Error(await apiError(response));
+                const data = await response.json();
+                if (gen !== s.gen || !s.open) return;
+                if (!data.items.length) {
+                    document.getElementById('clipStreamInfo').textContent = 'No playable videos (mp4, m4v, mov, webm) in this folder.';
+                    document.getElementById('clipWait').style.display = 'none';
+                    return;
+                }
+                s.sources = data.items;
+                s.total = data.total_duration;
+                let sum = 0;
+                s.cumulative = data.items.map(item => (sum += item.duration));
+            } catch (err) {
+                if (gen === s.gen) document.getElementById('clipStreamInfo').textContent = `Could not load videos: ${err.message}`;
+                return;
+            }
+            if (!s.slots.length) buildClipSlots();
+            s.slots.forEach(slot => loadSlot(slot));
+            requestAnimationFrame(() => clipTick(gen));
+        }
+
+        function closeClipStream() {
+            const s = clipStream;
+            if (!s.open) return;
+            s.open = false;
+            s.gen++;
+            s.active = null;
+            for (const slot of s.slots) {
+                slot.token++;
+                slot.ready = false;
+                slot.video.pause();
+                slot.video.classList.remove('active');
+                slot.video.controls = false;
+                slot.video.removeAttribute('src');
+                slot.video.load();  // aborts any download still in flight
+            }
+            document.getElementById('clipStream').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        const clipLengthInput = document.getElementById('clipLength');
+        clipLengthInput.value = localStorage.getItem('clipStreamSeconds') || clipLengthInput.value;
+        clipLengthInput.addEventListener('change', () => localStorage.setItem('clipStreamSeconds', String(clipLength())));
+
+        window.addEventListener('keydown', (e) => {
+            if (!clipStream.open || e.target.closest('input, select, textarea')) return;
+            if (e.key === 'Escape') closeClipStream();
+            else if (e.code === 'Space') toggleClipStreamPause();
+            else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowRight') nextClip();
+            else return;
+            e.preventDefault();
+        });
 
         // Parse duration string to seconds for sorting
         function parseDuration(durationStr) {

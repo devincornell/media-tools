@@ -417,6 +417,19 @@ def test_move_item_merges_folder_into_the_gallery_root(tree: dict[str, Path]):
     run_services(tree, body)
 
 
+def test_stream_sources_from_real_index(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+        sources = await s.gallery.stream_sources(".")
+        # b/clip2.mkv isn't browser-playable; empty/bad/conflict files have no probe entry.
+        assert [i.path for i in sources.items] == ["a/clip1.mp4", "a/clip1_copy.mp4", "trip/batch/dupe.mp4", "trip/x.mp4", "trip2/y.mp4"]
+        assert all(i.duration > 0.5 for i in sources.items)
+        assert sources.total_duration == pytest.approx(sum(i.duration for i in sources.items))
+        assert [i.path for i in (await s.gallery.stream_sources("trip")).items] == ["trip/batch/dupe.mp4", "trip/x.mp4"]
+
+    run_services(tree, body)
+
+
 def test_move_item_folder_between_gallery_folders(tree: dict[str, Path]):
     root = tree["root"]
 

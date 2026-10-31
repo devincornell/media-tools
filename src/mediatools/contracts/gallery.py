@@ -72,6 +72,21 @@ class PathList(_Contract):
     paths: Annotated[list[str], Field(description="Paths relative to the gallery root.")]
 
 
+class StreamSource(_Contract):
+    '''One video a random-clip stream can sample from.'''
+
+    path: Annotated[str, Field(description="Video path relative to the gallery root (serve it from `/video/{path}`).")]
+    duration: Annotated[float, Field(description="Length in seconds.")]
+
+
+class StreamSources(_Contract):
+    '''Browser-playable videos in a folder and all its subfolders.'''
+
+    folder: Annotated[str, Field(description="Folder relative to the gallery root.")]
+    items: Annotated[list[StreamSource], Field(description="Videos with a known duration.")]
+    total_duration: Annotated[float, Field(description="Sum of all durations in seconds.")]
+
+
 class FavoriteState(_Contract):
     '''Favorite status of one video.'''
 

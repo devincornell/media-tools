@@ -9,6 +9,7 @@ from mediatools.contracts import (
     FolderFiles,
     FolderTree,
     PathList,
+    StreamSources,
 )
 
 from ..dependencies import BrowserDep, GalleryDep
@@ -42,6 +43,12 @@ async def list_videos(gallery: GalleryDep) -> PathList:
 @api_router.get("/directory/{dir_path:path}", responses={404: {"model": ErrorResponse}})
 async def get_directory(dir_path: str, gallery: GalleryDep) -> DirectoryPage:
     return await gallery.directory_page(dir_path)
+
+
+@api_router.get("/stream-sources/{dir_path:path}", responses={404: {"model": ErrorResponse}})
+async def stream_sources(dir_path: str, gallery: GalleryDep) -> StreamSources:
+    '''Videos under a folder (recursively) with durations, for the random-clip stream.'''
+    return await gallery.stream_sources(dir_path or ".")
 
 
 @api_router.get("/browse/tree")

@@ -73,6 +73,21 @@ class VideoIndexCollection:
         if doc is None:
             raise VideoFileNotFoundError(f'Video file with hash not found: {file_hash}')
         return VideoIndexDoc.model_validate(doc) # Pydantic v2 model validation
+
+    async def durations(self, file_hashes: typing.Collection[str]) -> dict[str, float]:
+        '''Durations in seconds by hash, for the given hashes that are indexed with a known duration.'''
+        if not file_hashes:
+            return {}
+        cursor = self._collection.find(
+            {'file_hash': {'$in': list(file_hashes)}}, projection={'file_hash': 1, 'probe.dur': 1, '_id': 0},
+        )
+        result: dict[str, float] = {}
+        async for doc in cursor:
+            try:
+                result[doc['file_hash']] = float(doc['probe']['dur'])
+            except (KeyError, TypeError, ValueError):
+                pass
+        return result
     
     async def find_created_at_projection(self, path_prefix: pathlib.Path|str = '/') -> list[VideoIndexCreationTimeProjection]:
         '''Find the creation time of all VideoIndexDocs where the path starts with the given root_path.'''

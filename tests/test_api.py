@@ -80,6 +80,9 @@ class FakeVideos:
         except KeyError:
             raise VideoFileNotFoundError(file_hash)
 
+    async def durations(self, file_hashes) -> dict[str, float]:
+        return {h: self.docs[h].probe.duration for h in file_hashes if h in self.docs}
+
 
 class FakeFavorites:
     def __init__(self) -> None:
@@ -410,8 +413,27 @@ def test_gallery_page_renders_favorite_state(client: TestClient):
     assert html.count('class="card-menu-btn"') == 3  # two videos and the `trip` folder, no menu on images
 
 
+def test_stream_sources_are_recursive_with_durations(client: TestClient, gallery: GalleryService, media_root: Path):
+    beach = media_root / "trip" / "beach.mp4"
+    gallery.videos.docs["hash_beach"] = VideoIndexDoc(  # type: ignore[attr-defined]
+        path_str=str(beach), file_hash="hash_beach", probe=_probe(beach, 7.5), stat=FileStatResult.read_from_path(beach),
+    )
+    r = client.get("/api/stream-sources/")
+    assert r.status_code == 200
+    body = r.json()
+    # missing.mp4 is skipped: it has no video index entry, so no duration.
+    assert body["folder"] == "."
+    assert [(i["path"], i["duration"]) for i in body["items"]] == [
+        ("long_video.mp4", 120.0), ("short_clip.mp4", 3.0), ("trip/beach.mp4", 7.5),
+    ]
+    assert body["total_duration"] == 130.5
+    assert [i["path"] for i in client.get("/api/stream-sources/trip").json()["items"]] == ["trip/beach.mp4"]
+    assert client.get("/api/stream-sources/nope").status_code == 404
+
+
 def test_gallery_page_has_card_menus_and_jobs_viewer(client: TestClient):
     html = client.get("/page/").text
+    assert 'id="clipStream"' in html and "openClipStream(" in html
     assert html.count('class="card-menu-btn"') == 3  # two videos and the `trip` folder
     assert 'data-path="long_video.mp4"' in html and 'id="jobsPanel"' in html
 

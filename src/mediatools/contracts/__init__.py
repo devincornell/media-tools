@@ -6,6 +6,8 @@ from .gallery import (
     FolderFavoriteState,
     ImageSummary,
     PathList,
+    StreamSource,
+    StreamSources,
     SubdirectorySummary,
     VideoSummary,
 )
@@ -56,6 +58,8 @@ __all__ = [
     "MoveRequest",
     "PathList",
     "ReindexRequest",
+    "StreamSource",
+    "StreamSources",
     "SubdirectorySummary",
     "ThumbnailsRequest",
     "VideoSummary",

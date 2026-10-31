@@ -8,7 +8,14 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import Protocol
 
-from ..contracts import DirectoryPage, ImageSummary, SubdirectorySummary, VideoSummary
+from ..contracts import (
+    DirectoryPage,
+    ImageSummary,
+    StreamSource,
+    StreamSources,
+    SubdirectorySummary,
+    VideoSummary,
+)
 from ..index_db import MediaDirIndexDoc, MediaDirIndexNotFoundError, VideoIndexDoc
 from ..index_db.mediadir_index_collection import IndexImageFile, IndexVideoFile
 from ..util import fname_to_id, fname_to_title, format_memory
@@ -22,6 +29,8 @@ from .paths import resolve_under_root
 logger = logging.getLogger(__name__)
 
 _THUMB_ID = re.compile(r"[A-Za-z0-9_-]+(?:\.gif)?")
+# Containers browsers commonly play natively; others (mkv, avi, ...) would stall a clip stream.
+STREAMABLE_SUFFIXES = frozenset({".mp4", ".m4v", ".mov", ".webm"})
 
 
 class DirectoryIndexReader(Protocol):
@@ -32,6 +41,7 @@ class DirectoryIndexReader(Protocol):
 
 class VideoIndexReader(Protocol):
     async def find_by_hash(self, file_hash: str) -> VideoIndexDoc: ...
+    async def durations(self, file_hashes: Collection[str]) -> dict[str, float]: ...
 
 
 class FavoriteReader(Protocol):
@@ -75,6 +85,36 @@ class GalleryService:
             for doc in docs
             for ivf in doc.video_files.values()
         ]
+
+    async def stream_sources(self, rel_path: str = ".") -> StreamSources:
+        '''Browser-playable videos under a folder (recursively) with their durations, for random-clip streams.'''
+        path = self.resolve_under_root(rel_path)
+        try:
+            dir_doc = await self.dirs.find_by_path(path)
+        except MediaDirIndexNotFoundError:
+            dir_doc = None
+        if dir_doc is None:
+            raise DirectoryNotIndexedError(f"Page not found: {rel_path}")
+        files = [
+            ivf
+            for doc in await self.dirs.find_by_path_prefix(path)
+            for ivf in doc.video_files.values()
+            if ivf.path.suffix.lower() in STREAMABLE_SUFFIXES
+        ]
+        durations = await self.videos.durations({ivf.file_hash for ivf in files})
+        items = sorted(
+            (
+                StreamSource(path=str(ivf.path.relative_to(self.root_path)), duration=durations[ivf.file_hash])
+                for ivf in files
+                if durations.get(ivf.file_hash, 0) > 0
+            ),
+            key=lambda s: s.path,
+        )
+        return StreamSources(
+            folder=str(path.relative_to(self.root_path)),
+            items=items,
+            total_duration=sum(s.duration for s in items),
+        )
 
     def media_file(self, rel_path: str) -> Path:
         path = self.resolve_under_root(rel_path)
