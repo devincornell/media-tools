@@ -75,21 +75,21 @@ class FakeVideos:
 
 class FakeFavorites:
     def __init__(self) -> None:
-        self.paths: list[str] = []
+        self.hashes: list[str] = []
 
-    async def add(self, rel_path: str) -> None:
-        if rel_path not in self.paths:
-            self.paths.insert(0, rel_path)
+    async def add(self, file_hash: str) -> None:
+        if file_hash not in self.hashes:
+            self.hashes.insert(0, file_hash)
 
-    async def remove(self, rel_path: str) -> None:
-        if rel_path in self.paths:
-            self.paths.remove(rel_path)
+    async def remove(self, file_hash: str) -> None:
+        if file_hash in self.hashes:
+            self.hashes.remove(file_hash)
 
-    async def among(self, rel_paths) -> set[str]:
-        return set(rel_paths) & set(self.paths)
+    async def among(self, file_hashes) -> set[str]:
+        return set(file_hashes) & set(self.hashes)
 
     async def list_all(self) -> list[str]:
-        return list(self.paths)
+        return list(self.hashes)
 
 
 def _probe(path: Path, duration: float) -> ProbeInfo:
@@ -170,7 +170,7 @@ def browser(gallery: GalleryService) -> BrowserService:
 def client(gallery: GalleryService, browser: BrowserService, favorites: FakeFavorites) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_gallery] = lambda: gallery
-    app.dependency_overrides[get_favorites] = lambda: FavoriteService(gallery.root_path, favorites)
+    app.dependency_overrides[get_favorites] = lambda: FavoriteService(favorites, gallery.videos)
     app.dependency_overrides[get_browser] = lambda: browser
     app.dependency_overrides[get_picker] = lambda: FolderPicker(gallery.root_path, ())
     app.dependency_overrides[get_renderer] = lambda: PageRenderer()
@@ -327,59 +327,68 @@ def test_plaintext_listings(client: TestClient):
 # Favorites
 # ---------------------------------------------------------------------------
 
-def test_favorites_sort_first_and_are_flagged(tmp_path: Path, favorites: FakeFavorites):
-    root = tmp_path / "lib"
-    root.mkdir()
+def test_favorite_videos_sort_first_and_survive_a_move(tmp_path: Path, favorites: FakeFavorites):
     stat = FileStatResult.read_from_path
-    names = ["a.mp4", "b.mp4", "c.jpg", "d.jpg"]
-    for n in names:
-        (root / n).write_bytes(b"x")
-    doc = MediaDirIndexDoc(
-        path_str=str(root), subpaths={},
-        video_files={n: IndexVideoFile(path_str=str(root / n), stat=stat(root / n), file_hash=f"h_{n}") for n in names[:2]},
-        image_files={n: IndexImageFile(path_str=str(root / n), stat=stat(root / n), res=(10, 10)) for n in names[2:]},
-        other_files={},
-    )
-    videos = FakeVideos([
-        VideoIndexDoc(path_str=str(root / n), file_hash=f"h_{n}", probe=_probe(root / n, 1.0), stat=stat(root / n))
-        for n in names[:2]
-    ])
-    svc = GalleryService(root_path=root, thumb_path=tmp_path, max_clip_duration=10.0,
-                         dirs=FakeDirs([doc]), videos=videos, favorites=favorites)
-    page = asyncio.run(svc.directory_page("."))
+    names = ["a.mp4", "b.mp4"]
+
+    def service(root: Path) -> GalleryService:
+        root.mkdir(exist_ok=True)
+        for n in names:
+            (root / n).write_bytes(b"x")
+        doc = MediaDirIndexDoc(
+            path_str=str(root), subpaths={},
+            video_files={n: IndexVideoFile(path_str=str(root / n), stat=stat(root / n), file_hash=f"h_{n[0]}") for n in names},
+            image_files={}, other_files={},
+        )
+        videos = FakeVideos([
+            VideoIndexDoc(path_str=str(root / n), file_hash=f"h_{n[0]}", probe=_probe(root / n, 1.0), stat=stat(root / n))
+            for n in names
+        ])
+        return GalleryService(root_path=root, thumb_path=tmp_path, max_clip_duration=10.0,
+                              dirs=FakeDirs([doc]), videos=videos, favorites=favorites)
+
+    old = service(tmp_path / "old")
+    page = asyncio.run(old.directory_page("."))
     assert [c.vid_path_rel for c in page.clips] == ["a.mp4", "b.mp4"]
 
-    asyncio.run(FavoriteService(root, favorites).add("b.mp4"))
-    asyncio.run(FavoriteService(root, favorites).add("d.jpg"))
-    page = asyncio.run(svc.directory_page("."))
+    asyncio.run(FavoriteService(favorites, old.videos).add("h_b"))
+    page = asyncio.run(old.directory_page("."))
     assert [(c.vid_path_rel, c.is_favorite) for c in page.clips] == [("b.mp4", True), ("a.mp4", False)]
-    assert [(i.img_path_rel, i.is_favorite) for i in page.images] == [("d.jpg", True), ("c.jpg", False)]
+
+    # Same content under a different root: the star follows the hash, not the path.
+    page = asyncio.run(service(tmp_path / "new").directory_page("."))
+    assert [(c.vid_path_rel, c.is_favorite) for c in page.clips] == [("b.mp4", True), ("a.mp4", False)]
 
 
 def test_favorite_endpoints(client: TestClient):
-    r = client.put("/api/favorites/trip/beach.mp4")
-    assert r.status_code == 200
-    assert r.json() == {"path": "trip/beach.mp4", "is_favorite": True}
-    client.put("/api/favorites/photo.jpg")
-    assert client.get("/api/favorites").json() == {"paths": ["photo.jpg", "trip/beach.mp4"]}
-    assert client.get("/api/directory/.").json()["images"][0]["is_favorite"] is True
+    r = client.put("/api/favorites/hash_short")
+    assert r.status_code == 200 and r.json() == {"file_hash": "hash_short", "is_favorite": True}
+    assert client.put("/api/favorites/hash_short").status_code == 200  # idempotent
+    client.put("/api/favorites/hash_long")
+    assert client.get("/api/favorites").json() == {"paths": ["hash_long", "hash_short"]}
+    assert [v["is_favorite"] for v in client.get("/api/directory/.").json()["vids"]] == [True]
+    assert "is_favorite" not in client.get("/api/directory/.").json()["images"][0]
 
-    r = client.delete("/api/favorites/photo.jpg")
-    assert r.json() == {"path": "photo.jpg", "is_favorite": False}
-    assert client.get("/api/favorites").json() == {"paths": ["trip/beach.mp4"]}
+    r = client.delete("/api/favorites/hash_long")
+    assert r.json() == {"file_hash": "hash_long", "is_favorite": False}
+    assert client.get("/api/favorites").json() == {"paths": ["hash_short"]}
 
 
-def test_favorite_rejects_missing_and_outside_paths(client: TestClient):
-    assert client.put("/api/favorites/nope.mp4").status_code == 404
-    assert client.put("/api/favorites/..%2Fsecret.txt").status_code == 404
-    assert client.delete("/api/favorites/..%2Fsecret.txt").status_code == 404
-    assert client.get("/api/favorites").json() == {"paths": []}
+def test_favorite_unknown_video_rejected_but_stale_favorite_removable(client: TestClient, favorites: FakeFavorites):
+    assert client.put("/api/favorites/hash_nope").status_code == 404
+    assert client.put("/api/favorites/..").status_code in (404, 405)
+    assert favorites.hashes == []
+
+    favorites.hashes.append("hash_gone")  # video no longer in the index
+    assert client.delete("/api/favorites/hash_gone").status_code == 200
+    assert favorites.hashes == []
 
 
 def test_gallery_page_renders_favorite_state(client: TestClient):
-    client.put("/api/favorites/photo.jpg")
+    client.put("/api/favorites/hash_long")
     html = client.get("/page/").text
     assert 'data-favorite="true"' in html and 'data-favorite="false"' in html
+    assert html.count('class="fav-btn') == 2  # videos only, no image stars
 
 
 # ---------------------------------------------------------------------------

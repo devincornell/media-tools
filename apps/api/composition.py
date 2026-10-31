@@ -57,7 +57,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
             videos=index.videos,
             favorites=favorites,
         ),
-        favorites=FavoriteService(root_path=config.root_path, store=favorites),
+        favorites=FavoriteService(store=favorites, videos=index.videos),
         browser=BrowserService(root_path=config.root_path, dirs=index.dirs),
         picker=FolderPicker(gallery_root=config.root_path, source_roots=config.copy_source_roots),
         uploads=UploadService(root_path=config.root_path),

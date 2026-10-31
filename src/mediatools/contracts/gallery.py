@@ -35,7 +35,6 @@ class ImageSummary(_Contract):
     img_path_rel: Annotated[str, Field(description="Image path relative to the gallery root; also the `/file/{path}` URL suffix.")]
     title: Annotated[str, Field(description="Human-readable title derived from the file name.")]
     aspect: Annotated[float, Field(description="Width divided by height; 1.0 if unknown.")]
-    is_favorite: Annotated[bool, Field(description="Whether the image is starred.")] = False
 
 
 class SubdirectorySummary(_Contract):
@@ -59,7 +58,7 @@ class DirectoryPage(_Contract):
     files_size_str: Annotated[str, Field(description="Human-readable total size of videos and images directly in this directory.")]
     vids: Annotated[list[VideoSummary], Field(description="Videos in this directory at or above the clip threshold, favorites first, then sorted by name.")]
     clips: Annotated[list[VideoSummary], Field(description="Videos in this directory shorter than the clip threshold, favorites first, then sorted by name.")]
-    images: Annotated[list[ImageSummary], Field(description="Images in this directory, favorites first, then sorted by name.")]
+    images: Annotated[list[ImageSummary], Field(description="Images in this directory, sorted by name.")]
     subpages: Annotated[list[SubdirectorySummary], Field(description="Direct subdirectories, sorted by name.")]
     num_vids: Annotated[int, Field(description="Number of indexed videos directly in this directory, including any missing from the video index.")]
     num_imgs: Annotated[int, Field(description="Number of images directly in this directory.")]
@@ -73,10 +72,10 @@ class PathList(_Contract):
 
 
 class FavoriteState(_Contract):
-    '''Favorite status of one media file.'''
+    '''Favorite status of one video.'''
 
-    path: Annotated[str, Field(description="Normalised path relative to the gallery root.")]
-    is_favorite: Annotated[bool, Field(description="Whether the file is starred after the request.")]
+    file_hash: Annotated[str, Field(description="Index hash of the video.")]
+    is_favorite: Annotated[bool, Field(description="Whether the video is starred after the request.")]
 
 
 class ErrorResponse(_Contract):

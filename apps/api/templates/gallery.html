@@ -27,6 +27,10 @@
             --shadow-heavy: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.1);
+            --card-min-width: 220px;
+            --thumbnail-height: 200px;
+            --list-thumb-width: 100px;
+            --list-thumb-height: 65px;
         }
 
         * {
@@ -227,6 +231,47 @@
             border-color: var(--accent-primary);
         }
 
+        .size-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.5rem 1rem;
+        }
+
+        .size-slider {
+            -webkit-appearance: none;
+            width: 100px;
+            height: 4px;
+            background: var(--bg-secondary);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .size-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Overlay toggles */
+        body.hide-card-overlays .thumbnail-overlay-top-right,
+        body.hide-card-overlays .thumbnail-overlay-bottom,
+        body.hide-card-overlays .thumbnail-info-btn {
+            display: none !important;
+        }
+
         .view-toggle {
             display: flex;
             background: var(--bg-tertiary);
@@ -266,39 +311,86 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
+            gap: 0.375rem;
             margin-bottom: 2rem;
         }
 
         .gallery.list-view {
             grid-template-columns: 1fr;
+            gap: 0.25rem;
         }
 
         .gallery.list-view .thumbnail {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.5rem;
-            padding: 0.5rem;
+            padding: 0.2rem;
+            border-radius: 8px;
         }
 
-        .gallery.list-view .thumbnail img,
-        .gallery.list-view .thumbnail video {
-            width: 120px;
-            height: 80px;
-            object-fit: cover;
+        .gallery.list-view .thumbnail > a {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            width: 100%;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .gallery.list-view .thumbnail-image-wrapper {
+            width: var(--list-thumb-width);
+            height: var(--list-thumb-height);
+            flex-shrink: 0;
+            position: relative;
+            background-color: #000;
+            border-radius: 4px;
         }
 
         /* Images in list view preserve aspect ratio */
-        .gallery.list-view #imagesGallery .thumbnail img {
-            height: auto;
-            max-height: 80px;
+        .gallery.list-view #imagesGallery .thumbnail-image-wrapper img {
+            height: 100%;
             object-fit: contain;
+        }
+
+        .gallery.list-view .thumbnail-content {
+            padding: 0.1rem 0;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .gallery.list-view .thumbnail-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .gallery.list-view .thumbnail-info {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        /* Hide overlay elements in list view */
+        .gallery.list-view .thumbnail-overlay-bottom,
+        .gallery.list-view .thumbnail-overlay-top-right,
+        .gallery.list-view .thumbnail-info-btn {
+            display: none !important;
+        }
+
+        /* Hide regular title and info in grid view */
+        .gallery:not(.list-view) .thumbnail-title,
+        .gallery:not(.list-view) .thumbnail-info {
+            display: none;
         }
 
         /* Thumbnail Cards */
         .thumbnail {
-            background: linear-gradient(135deg, var(--glass-bg), rgba(0, 0, 0, 0.3));
+            background: #000;
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 16px;
@@ -314,23 +406,117 @@
             border-color: var(--accent-primary);
         }
 
-        .thumbnail img,
-        .thumbnail video {
+        .thumbnail-image-wrapper {
+            position: relative;
             width: 100%;
-            height: 200px;
+            height: var(--thumbnail-height);
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        .thumbnail-image-wrapper img,
+        .thumbnail-image-wrapper video {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             transition: all 0.3s ease;
+            display: block;
         }
 
         /* Images preserve their aspect ratio */
-        #imagesGallery .thumbnail img {
-            height: auto;
+        #imagesGallery .thumbnail-image-wrapper img {
             object-fit: contain;
         }
 
-        .thumbnail:hover img,
-        .thumbnail:hover video {
+        .thumbnail:hover .thumbnail-image-wrapper img,
+        .thumbnail:hover .thumbnail-image-wrapper video {
             transform: scale(1.05);
+        }
+
+        .thumbnail-overlay-top-right {
+            position: absolute;
+            top: 0.35rem;
+            right: 0.35rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: #94a3b8;
+            padding: 0.15rem 0.35rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 2;
+            transition: opacity 0.2s ease;
+        }
+
+        .thumbnail-info-btn {
+            position: absolute;
+            top: 0.35rem;
+            left: 0.35rem;
+            right: auto;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: #94a3b8;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            cursor: pointer;
+            z-index: 3;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .thumbnail-info-btn:hover {
+            background: var(--accent-primary);
+            color: #fff;
+            transform: scale(1.1);
+        }
+
+        .thumbnail-info-popover {
+            display: none;
+            position: absolute;
+            top: 2rem;
+            left: 0.35rem;
+            right: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            box-shadow: var(--shadow-heavy);
+            z-index: 10;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.5;
+            min-width: 150px;
+            backdrop-filter: blur(10px);
+        }
+
+        .thumbnail-info-popover.show {
+            display: block;
+        }
+
+        .thumbnail-overlay-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+            color: #94a3b8;
+            padding: 1.5rem 0.5rem 0.5rem 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            pointer-events: none;
+            z-index: 2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: opacity 0.2s ease;
         }
 
         .thumbnail-content {
@@ -345,11 +531,9 @@
             line-height: 1.4;
         }
 
+        /* Hide regular metadata info in card content */
         .thumbnail-info {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
+            display: none;
         }
 
         .thumbnail-actions {
@@ -394,18 +578,20 @@
         /* Favorites */
         .fav-btn {
             position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            z-index: 5;
-            width: 36px;
-            height: 36px;
+            bottom: 0.35rem;
+            right: 0.35rem;
+            z-index: 4;
+            width: 26px;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.55);
-            border: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid transparent;
             border-radius: 50%;
-            color: var(--text-secondary);
+            font-size: 0.8rem;
+            color: #94a3b8;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -425,6 +611,11 @@
             cursor: wait;
         }
 
+        /* Keep long titles clear of the star */
+        .thumbnail-image-wrapper:has(.fav-btn) .thumbnail-overlay-bottom {
+            padding-right: 2.5rem;
+        }
+
         /* Video Player Modal */
         .video-player {
             display: none;
@@ -437,29 +628,31 @@
             backdrop-filter: blur(10px);
             z-index: 2000;
             padding: 2rem;
+            overflow-y: auto;
         }
 
         .player-container {
             position: relative;
             width: 100%;
-            height: 100%;
+            min-height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            padding-bottom: 2rem;
         }
 
         .player-main {
             display: flex;
+            flex-direction: column;
+            align-items: center;
             width: 100%;
-            height: 100%;
-            gap: 1rem;
+            gap: 2rem;
         }
 
         .video-container {
-            flex: 1;
-            max-width: 70%;
-            max-height: 80vh;
+            width: 100%;
+            max-width: 1000px;
             display: flex;
             flex-direction: column;
             background: var(--glass-bg);
@@ -473,18 +666,18 @@
         .player-video {
             width: 100%;
             height: 100%;
-            max-height: calc(80vh - 100px);
+            max-height: 70vh;
             object-fit: contain;
             border-radius: 0;
             box-shadow: none;
         }
 
         .video-playlist {
-            width: 300px;
+            width: 100%;
+            max-width: 1000px;
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 16px;
             display: flex;
             flex-direction: column;
             transition: all 0.3s ease;
@@ -492,7 +685,7 @@
         }
 
         .video-playlist.collapsed {
-            width: 50px;
+            height: 60px;
         }
 
         .video-playlist.collapsed .playlist-content {
@@ -535,27 +728,26 @@
 
         .playlist-content {
             flex: 1;
-            overflow-y: auto;
-            padding: 0.5rem;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.375rem;
         }
 
         .playlist-item {
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
+            flex-direction: column;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s ease;
+            overflow: hidden;
         }
 
         .playlist-item:hover {
             background: var(--accent-primary);
             border-color: var(--accent-primary);
-            transform: translateX(4px);
+            transform: translateY(-2px);
         }
 
         .playlist-item.active {
@@ -565,20 +757,19 @@
         }
 
         .playlist-thumbnail {
-            width: 60px;
-            height: 40px;
-            border-radius: 8px;
+            width: 100%;
+            height: 120px;
             object-fit: cover;
-            flex-shrink: 0;
+            background-color: #000;
         }
 
         .playlist-info {
-            flex: 1;
-            min-width: 0;
+            padding: 0.5rem;
+            width: 100%;
         }
 
         .playlist-title {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 500;
             color: var(--text-primary);
             margin: 0 0 0.25rem 0;
@@ -588,7 +779,7 @@
         }
 
         .playlist-duration {
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             margin: 0;
         }
@@ -597,16 +788,77 @@
             position: relative;
             background: var(--bg-tertiary);
             border-top: 1px solid var(--glass-border);
-            padding: 1rem;
+            padding: 0.35rem 0.75rem;
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             align-items: center;
             flex-wrap: wrap;
             justify-content: center;
         }
 
-        .player-close {
+        .dropdown-menu-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-toggle-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            width: 40px;
+            height: 32px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dropdown-toggle-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .dropdown-content {
+            display: none;
             position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--shadow-heavy);
+            z-index: 2020;
+            min-width: 140px;
+            overflow: hidden;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-content a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: background 0.2s ease;
+        }
+
+        .dropdown-content a:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .player-close {
+            position: fixed;
             top: 2rem;
             right: 2rem;
             background: linear-gradient(135deg, #ef4444, #dc2626);
@@ -621,6 +873,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 2010;
         }
 
         .player-close:hover {
@@ -867,6 +1120,10 @@
             to { transform: translateX(0); }
         }
 
+        #lightboxImage {
+            cursor: pointer;
+        }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -920,6 +1177,12 @@
                 <a href="/list_videos" class="nav-link">
                     <i class="fas fa-play-circle"></i>
                     <!-- <span>List Videos</span> -->
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="/reel/{{page_path_rel}}" class="nav-link">
+                    <i class="fas fa-mobile-alt"></i>
+                    <!-- <span>Reels</span> -->
                 </a>
             </div>
             <div class="nav-item">
@@ -982,11 +1245,27 @@
                     <option value="duration-desc">Duration (Long-Short)</option>
                 </select>
             </div>
+            <div class="size-slider-container">
+                <i class="fas fa-compress" style="color: var(--text-secondary); font-size: 0.8rem;"></i>
+                <input type="range" id="cardSizeSlider" class="size-slider" min="120" max="400" value="220" oninput="updateCardSize(this.value)">
+                <i class="fas fa-expand" style="color: var(--text-secondary); font-size: 1rem;"></i>
+            </div>
             <div class="view-toggle">
-                <button class="view-btn active" onclick="setViewMode('grid')">
+                <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <div class="global-autoplay-container" style="display: flex; align-items: center; padding: 0 0.5rem; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); margin: 0 0.25rem;">
+                    <label class="autoplay-label" style="margin: 0;">
+                        <input type="checkbox" id="globalAutoplayCheckbox" class="autoplay-checkbox">
+                        <span class="autoplay-text" style="font-size: 0.9rem;">
+                            <i class="fas fa-play-circle"></i> Auto
+                        </span>
+                    </label>
+                </div>
+                <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')" title="Grid View">
                     <i class="fas fa-th"></i>
                 </button>
-                <button class="view-btn" onclick="setViewMode('list')">
+                <button class="view-btn" data-mode="list" onclick="setViewMode('list')" title="List View">
                     <i class="fas fa-list"></i>
                 </button>
             </div>
@@ -1002,16 +1281,28 @@
                     {% for cp in subpages %}
                         <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
-                                <img src="/file/{{ cp.subfolder_thumb }}" 
-                                     loading="lazy"
-                                     data-subfolder-name="{{ cp.name }}"
-                                     class="subfolder-thumb"
-                                     id="subfolder-{{ loop.index0 }}">
+                                <div class="thumbnail-image-wrapper">
+                                    <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                        <i class="fas fa-info"></i>
+                                    </button>
+                                    <div class="thumbnail-info-popover">
+                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
+                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
+                                        <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
+                                    </div>
+                                    <img src="/file/{{ cp.subfolder_thumb }}" 
+                                         loading="lazy"
+                                         data-subfolder-name="{{ cp.name }}"
+                                         class="subfolder-thumb"
+                                         id="subfolder-{{ loop.index0 }}">
+                                    <div class="thumbnail-overlay-top-right"><i class="fas fa-video"></i> {{cp.num_vids}}</div>
+                                    <div class="thumbnail-overlay-bottom">{{cp.name}}</div>
+                                </div>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
                                     <div class="thumbnail-info">
-                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
-                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
+                                        <i class="fas fa-video"></i> {{cp.num_vids}} videos &bull;
+                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders &bull;
                                         <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
                                     </div>
                                 </div>
@@ -1032,7 +1323,7 @@
                     {% for vid in vids %}
                         <div class="thumbnail" 
                              data-type="video"
-                             data-path="{{ vid.vid_path_rel }}"
+                             data-hash="{{ vid.hash }}"
                              data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
@@ -1040,14 +1331,26 @@
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
-                            {{ fav_btn(vid.is_favorite) }}
+                            <div class="thumbnail-image-wrapper">
+                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                                <div class="thumbnail-info-popover">
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-calendar-alt"></i> {{ vid.created }}
+                                </div>
+                                <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                                <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
+                                <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
+                                {{ fav_btn(vid.is_favorite) }}
+                            </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-clock"></i> {{ vid.duration_str }}<br>
-                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
-                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-clock"></i> {{ vid.duration_str }} &bull;
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }} &bull;
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }} &bull;
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
                                 </div>
                             </div>
@@ -1067,7 +1370,7 @@
                     {% for vid in clips %}
                         <div class="thumbnail" 
                              data-type="clip"
-                             data-path="{{ vid.vid_path_rel }}"
+                             data-hash="{{ vid.hash }}"
                              data-favorite="{{ 'true' if vid.is_favorite else 'false' }}"
                              data-name="{{ vid.vid_title|lower }}"
                              data-video-src="/video/{{ vid.vid_path_rel }}"
@@ -1075,13 +1378,25 @@
                              data-video-info="{{ vid.duration_str }} | {{ vid.vid_size_str }} | {{ vid.res_str }}"
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
-                            <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
-                            {{ fav_btn(vid.is_favorite) }}
+                            <div class="thumbnail-image-wrapper">
+                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
+                                    <i class="fas fa-info"></i>
+                                </button>
+                                <div class="thumbnail-info-popover">
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
+                                    <i class="fas fa-calendar-alt"></i> {{ vid.created }}
+                                </div>
+                                <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
+                                <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
+                                <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
+                                {{ fav_btn(vid.is_favorite) }}
+                            </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
                                 <div class="thumbnail-info">
-                                    <i class="fas fa-clock"></i> {{ vid.duration_str }}<br>
-                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
+                                    <i class="fas fa-clock"></i> {{ vid.duration_str }} &bull;
+                                    <i class="fas fa-hdd"></i> {{ vid.vid_size_str }} &bull;
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
                                     <i class="fas fa-calendar-alt"></i> {{ vid.created }}
                                 </div>
@@ -1100,11 +1415,20 @@
                 </h2>
                 <div class="gallery" id="imagesGallery">
                     {% for img in images %}
-                        <div class="thumbnail" data-type="image" data-path="{{ img.img_path_rel }}" data-favorite="{{ 'true' if img.is_favorite else 'false' }}" data-name="{{img.title|lower if img.title else 'image'}}">
+                        <div class="thumbnail" data-type="image" data-name="{{img.title|lower if img.title else 'image'}}">
                             <a href="/file/{{img.img_path_rel}}" onclick="openImageLightbox(event, this)">
-                                <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
+                                <div class="thumbnail-image-wrapper">
+                                    <img src="/file/{{img.img_path_rel}}" loading="lazy"/>
+                                    {% if img.title %}
+                                    <div class="thumbnail-overlay-bottom">{{ img.title }}</div>
+                                    {% endif %}
+                                </div>
+                                {% if img.title %}
+                                <div class="thumbnail-content">
+                                    <div class="thumbnail-title">{{ img.title }}</div>
+                                </div>
+                                {% endif %}
                             </a>
-                            {{ fav_btn(img.is_favorite) }}
                         </div>
                     {% endfor %}
                 </div>
@@ -1137,7 +1461,7 @@
             <div class="player-main">
                 <div class="video-container">
                     <video controls id="videoElement" class="player-video" autoplay>
-                        <source id="videoSource" src="">
+                        <source id="videoSource" src="" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     
@@ -1147,22 +1471,21 @@
                 </button>
                 
                 <select id="speedSelect" class="speed-control">
+                    <option value="0.125">0.125×</option>
                     <option value="0.25">0.25×</option>
                     <option value="0.5">0.5×</option>
-                    <option value="0.75">0.75×</option>
                     <option value="1" selected>1×</option>
-                    <option value="1.25">1.25×</option>
                     <option value="1.5">1.5×</option>
                     <option value="2">2×</option>
-                    <option value="3">3×</option>
                     <option value="4">4×</option>
+                    <option value="8">8×</option>
                 </select>
                 
                 <div class="autoplay-control">
                     <label class="autoplay-label">
                         <input type="checkbox" id="autoplayCheckbox" class="autoplay-checkbox">
                         <span class="autoplay-text">
-                            <i class="fas fa-play-circle"></i> Auto-play next
+                            <i class="fas fa-play-circle"></i> 
                         </span>
                     </label>
                 </div>
@@ -1171,22 +1494,28 @@
                     <i class="fas fa-chevron-right"></i>
                 </button>
                 
-                <a id="downloadLink" href="" download class="action-btn">
-                    <i class="fas fa-download"></i> Download
-                </a>
-                
-                <a id="openLink" href="" class="action-btn secondary">
-                    <i class="fas fa-external-link-alt"></i> Open
-                </a>
+                <div class="dropdown-menu-container">
+                    <button class="dropdown-toggle-btn" onclick="toggleActionMenu(event)" title="More Options">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="dropdown-content" id="actionMenuDropdown">
+                        <a id="downloadLink" href="" download>
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        <a id="openLink" href="" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> Open
+                        </a>
+                    </div>
+                </div>
                     </div>
                 </div>
                 
-                <!-- Video Playlist Sidebar -->
+                <!-- Video Playlist -->
                 <div class="video-playlist" id="videoPlaylist">
                     <div class="playlist-header">
                         <h3>Playlist</h3>
                         <button class="playlist-toggle" onclick="togglePlaylist()" title="Toggle Playlist">
-                            <i class="fas fa-chevron-right"></i>
+                            <i class="fas fa-chevron-up"></i>
                         </button>
                     </div>
                     <div class="playlist-content" id="playlistContent">
@@ -1237,11 +1566,18 @@
         // View Mode Toggle
         function setViewMode(mode) {
             currentViewMode = mode;
+            localStorage.setItem('viewMode', mode);
+
             const galleries = document.querySelectorAll('.gallery');
-            const viewBtns = document.querySelectorAll('.view-btn');
+            const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
             
-            viewBtns.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            viewBtns.forEach(btn => {
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
             
             galleries.forEach(gallery => {
                 if (mode === 'list') {
@@ -1250,6 +1586,48 @@
                     gallery.classList.remove('list-view');
                 }
             });
+
+            // Restore/apply slider value for the active view mode
+            const savedSize = localStorage.getItem(mode === 'list' ? 'listCardSize' : 'gridCardSize') || '220';
+            const slider = document.getElementById('cardSizeSlider');
+            if (slider) {
+                slider.value = savedSize;
+            }
+            updateCardSize(savedSize);
+        }
+
+        // Toggle Card Overlays (names, info button, duration)
+        function toggleCardOverlays() {
+            document.body.classList.toggle('hide-card-overlays');
+            const isHidden = document.body.classList.contains('hide-card-overlays');
+            const toggleBtn = document.getElementById('overlayToggleBtn');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (isHidden) {
+                    icon.className = 'fas fa-eye-slash';
+                    toggleBtn.classList.add('active');
+                } else {
+                    icon.className = 'fas fa-eye';
+                    toggleBtn.classList.remove('active');
+                }
+            }
+            localStorage.setItem('hideCardOverlays', isHidden);
+        }
+
+        // Update Card Size
+        function updateCardSize(value) {
+            const numValue = parseFloat(value);
+            if (currentViewMode === 'list') {
+                localStorage.setItem('listCardSize', numValue);
+                const listWidth = Math.floor(numValue * 0.45);
+                const listHeight = Math.floor(numValue * 0.3);
+                document.documentElement.style.setProperty('--list-thumb-width', `${listWidth}px`);
+                document.documentElement.style.setProperty('--list-thumb-height', `${listHeight}px`);
+            } else {
+                localStorage.setItem('gridCardSize', numValue);
+                document.documentElement.style.setProperty('--card-min-width', `${numValue}px`);
+                document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(numValue * 0.9)}px`);
+            }
         }
 
         // Search and Filter
@@ -1295,7 +1673,7 @@
 
         function sortMedia() {
             if (!document.getElementById('sortSelect').value) return;
-            ['videosGallery', 'clipsGallery', 'imagesGallery'].forEach(galleryId => {
+            ['videosGallery', 'clipsGallery'].forEach(galleryId => {
                 const gallery = document.getElementById(galleryId);
                 if (gallery) sortGallery(gallery);
             });
@@ -1306,7 +1684,7 @@
             event.preventDefault();
             const card = button.closest('.thumbnail');
             const makeFavorite = card.dataset.favorite !== 'true';
-            const url = '/api/favorites/' + card.dataset.path.split('/').map(encodeURIComponent).join('/');
+            const url = '/api/favorites/' + encodeURIComponent(card.dataset.hash);
 
             button.disabled = true;
             try {
@@ -1451,9 +1829,49 @@
             video.removeEventListener('ended', handleVideoEnd);
             // Clean up countdown
             cancelAutoplay();
+            // Close dropdown if open
+            const dropdown = document.getElementById('actionMenuDropdown');
+            if (dropdown) dropdown.classList.remove('show');
             document.body.style.overflow = 'auto';
+            
             currentThumbnail = null;
         }
+
+        // Action Menu Dropdown Toggle
+        function toggleActionMenu(event) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('actionMenuDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Info Popover Toggle
+        function toggleInfoPopover(event, btnElement) {
+            event.stopPropagation();
+            event.preventDefault();
+            const popover = btnElement.nextElementSibling;
+            const isShowing = popover.classList.contains('show');
+            
+            // Close all open popovers first
+            document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
+            
+            if (!isShowing) {
+                popover.classList.add('show');
+            }
+        }
+
+        // Close dropdowns and popovers when clicking outside
+        window.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('actionMenuDropdown');
+            if (dropdown && dropdown.classList.contains('show')) {
+                if (!e.target.closest('.dropdown-menu-container')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+            
+            if (!e.target.closest('.thumbnail-info-popover') && !e.target.closest('.thumbnail-info-btn')) {
+                document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
+            }
+        });
 
         // Image Lightbox Functions
         let currentImageThumbnail = null;
@@ -1520,21 +1938,17 @@
             
             allVideoThumbnails.forEach((thumbnail, index) => {
                 const videoTitle = thumbnail.dataset.videoTitle;
-                const videoDuration = thumbnail.dataset.videoDuration;
                 const thumbnailImg = thumbnail.querySelector('img');
                 const thumbnailSrc = thumbnailImg ? thumbnailImg.src : '';
                 
                 const playlistItem = document.createElement('div');
                 playlistItem.className = 'playlist-item';
                 playlistItem.dataset.videoIndex = index;
+                playlistItem.title = videoTitle;
                 playlistItem.onclick = () => selectVideoFromPlaylist(thumbnail);
                 
                 playlistItem.innerHTML = `
                     <img src="${thumbnailSrc}" class="playlist-thumbnail" loading="lazy">
-                    <div class="playlist-info">
-                        <div class="playlist-title">${videoTitle}</div>
-                        <div class="playlist-duration">${formatDuration(videoDuration)}</div>
-                    </div>
                 `;
                 
                 playlistContent.appendChild(playlistItem);
@@ -1572,9 +1986,9 @@
             playlist.classList.toggle('collapsed');
             
             if (playlist.classList.contains('collapsed')) {
-                toggleIcon.className = 'fas fa-chevron-left';
+                toggleIcon.className = 'fas fa-chevron-down';
             } else {
-                toggleIcon.className = 'fas fa-chevron-right';
+                toggleIcon.className = 'fas fa-chevron-up';
             }
         }
 
@@ -1698,6 +2112,76 @@
             video.playbackRate = parseFloat(e.target.value);
         });
 
+        // Click video to toggle play/pause (no navigation)
+        video.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (this.paused) {
+                this.play();
+            } else {
+                this.pause();
+            }
+        });
+
+        // Click left/right side of image to navigate previous/next
+        const lightboxImage = document.getElementById('lightboxImage');
+        lightboxImage.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const rect = this.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            if (clickX < rect.width / 2) {
+                navigateImage(-1);
+            } else {
+                navigateImage(1);
+            }
+        });
+
+        // Touch Swipe Gestures (up / down) for player & lightbox
+        function setupSwipeGestures() {
+            let touchStartY = 0;
+            let touchStartX = 0;
+            let touchStartTime = 0;
+
+            ['videoPlayer', 'imageLightbox'].forEach(id => {
+                const modal = document.getElementById(id);
+                if (!modal) return;
+
+                modal.addEventListener('touchstart', function(e) {
+                    if (e.touches.length === 1) {
+                        touchStartY = e.touches[0].clientY;
+                        touchStartX = e.touches[0].clientX;
+                        touchStartTime = Date.now();
+                    }
+                }, { passive: true });
+
+                modal.addEventListener('touchend', function(e) {
+                    if (e.changedTouches.length === 1) {
+                        const deltaY = e.changedTouches[0].clientY - touchStartY;
+                        const deltaX = e.changedTouches[0].clientX - touchStartX;
+                        const elapsedTime = Date.now() - touchStartTime;
+
+                        // Ignore if swipe started inside the playlist or controls
+                        if (e.target.closest('#videoPlaylist') || e.target.closest('.player-controls')) return;
+
+                        if (elapsedTime < 800 && Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
+                            if (id === 'videoPlayer' && modal.style.display === 'block') {
+                                if (deltaY < 0) {
+                                    navigateVideo(1); // Swipe Up -> Next
+                                } else {
+                                    navigateVideo(-1); // Swipe Down -> Prev
+                                }
+                            } else if (id === 'imageLightbox' && modal.style.display === 'block') {
+                                if (deltaY < 0) {
+                                    navigateImage(1); // Swipe Up -> Next
+                                } else {
+                                    navigateImage(-1); // Swipe Down -> Prev
+                                }
+                            }
+                        }
+                    }
+                }, { passive: true });
+            });
+        }
+
         // Close modals when clicking outside
         document.getElementById('videoPlayer').addEventListener('click', function(e) {
             // Close if clicking on the video player background or player container
@@ -1725,16 +2209,50 @@
             
             // Restore autoplay checkbox state
             const autoplayCheckbox = document.getElementById('autoplayCheckbox');
-            const savedAutoplayState = localStorage.getItem('videoAutoplay');
-            if (savedAutoplayState === 'true') {
-                autoplayCheckbox.checked = true;
-            }
+            const globalAutoplayCheckbox = document.getElementById('globalAutoplayCheckbox');
+            const savedAutoplayState = localStorage.getItem('videoAutoplay') === 'true';
+            
+            if (autoplayCheckbox) autoplayCheckbox.checked = savedAutoplayState;
+            if (globalAutoplayCheckbox) globalAutoplayCheckbox.checked = savedAutoplayState;
             
             // Save autoplay state when changed
-            autoplayCheckbox.addEventListener('change', function() {
-                localStorage.setItem('videoAutoplay', this.checked);
-            });
+            const handleAutoplayChange = function(e) {
+                const isChecked = e.target.checked;
+                localStorage.setItem('videoAutoplay', isChecked);
+                if (autoplayCheckbox) autoplayCheckbox.checked = isChecked;
+                if (globalAutoplayCheckbox) globalAutoplayCheckbox.checked = isChecked;
+            };
+            
+            if (autoplayCheckbox) autoplayCheckbox.addEventListener('change', handleAutoplayChange);
+            if (globalAutoplayCheckbox) globalAutoplayCheckbox.addEventListener('change', handleAutoplayChange);
+
+            // Restore overlay visibility state
+            if (localStorage.getItem('hideCardOverlays') === 'true') {
+                toggleCardOverlays();
+            }
+
+            // Restore sizes for both grid and list views
+            const savedGridSize = localStorage.getItem('gridCardSize') || '220';
+            const savedListSize = localStorage.getItem('listCardSize') || '220';
+            document.documentElement.style.setProperty('--card-min-width', `${savedGridSize}px`);
+            document.documentElement.style.setProperty('--thumbnail-height', `${Math.floor(parseFloat(savedGridSize) * 0.9)}px`);
+            document.documentElement.style.setProperty('--list-thumb-width', `${Math.floor(parseFloat(savedListSize) * 0.45)}px`);
+            document.documentElement.style.setProperty('--list-thumb-height', `${Math.floor(parseFloat(savedListSize) * 0.3)}px`);
+
+            // Restore saved view mode (grid or list)
+            const savedViewMode = localStorage.getItem('viewMode') || 'grid';
+            setViewMode(savedViewMode);
+
+            // Initialize swipe gestures
+            setupSwipeGestures();
         });
+
+        // Handle missing/broken image thumbnails gracefully
+        document.addEventListener('error', function(e) {
+            if (e.target && e.target.tagName && e.target.tagName.toLowerCase() === 'img') {
+                e.target.style.opacity = '0';
+            }
+        }, true);
 
         // Lazy loading for images
         if ('IntersectionObserver' in window) {
