@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         services = await build_services(config, mongo_client[config.database_name])
         app.state.gallery = services.gallery
         app.state.favorites = services.favorites
+        app.state.folder_favorites = services.folder_favorites
         app.state.browser = services.browser
         app.state.picker = services.picker
         app.state.uploads = services.uploads

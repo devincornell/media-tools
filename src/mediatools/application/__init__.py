@@ -12,7 +12,7 @@ from .errors import (
     UploadPermissionError,
     UploadStorageFullError,
 )
-from .favorites import FavoriteService, FavoriteStore
+from .favorites import FavoriteService, FavoriteStore, FolderFavoriteService
 from .gallery import DirectoryIndexReader, FavoriteReader, GalleryService, VideoIndexReader
 
 __all__ = [
@@ -22,6 +22,7 @@ __all__ = [
     "FavoriteReader",
     "FavoriteService",
     "FavoriteStore",
+    "FolderFavoriteService",
     "FolderIndexReader",
     "GalleryError",
     "GalleryService",

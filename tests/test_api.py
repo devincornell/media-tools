@@ -11,7 +11,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from apps.api.dependencies import get_browser, get_favorites, get_gallery, get_picker, get_renderer
+from apps.api.dependencies import get_browser, get_favorites, get_folder_favorites, get_gallery, get_picker, get_renderer
 from apps.api.main import create_app
 from apps.api.rendering import PageRenderer
 from mediatools.application.folder_picker import FolderPicker
@@ -19,6 +19,7 @@ from mediatools.application import (
     BrowserService,
     DirectoryNotIndexedError,
     FavoriteService,
+    FolderFavoriteService,
     GalleryService,
     MediaFileNotFoundError,
     PathOutsideRootError,
@@ -122,7 +123,12 @@ def favorites() -> FakeFavorites:
 
 
 @pytest.fixture
-def gallery(media_root: Path, favorites: FakeFavorites) -> GalleryService:
+def folder_favorites() -> FakeFavorites:
+    return FakeFavorites()
+
+
+@pytest.fixture
+def gallery(media_root: Path, favorites: FakeFavorites, folder_favorites: FakeFavorites) -> GalleryService:
     root = media_root
     stat = FileStatResult.read_from_path
     vids = {
@@ -158,6 +164,7 @@ def gallery(media_root: Path, favorites: FakeFavorites) -> GalleryService:
         dirs=FakeDirs([root_doc, trip_doc]),
         videos=FakeVideos(video_docs),
         favorites=favorites,
+        favorite_folders=folder_favorites,
     )
 
 
@@ -167,10 +174,15 @@ def browser(gallery: GalleryService) -> BrowserService:
 
 
 @pytest.fixture
-def client(gallery: GalleryService, browser: BrowserService, favorites: FakeFavorites) -> TestClient:
+def client(
+    gallery: GalleryService, browser: BrowserService, favorites: FakeFavorites, folder_favorites: FakeFavorites,
+) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_gallery] = lambda: gallery
     app.dependency_overrides[get_favorites] = lambda: FavoriteService(favorites, gallery.videos)
+    app.dependency_overrides[get_folder_favorites] = lambda: FolderFavoriteService(
+        gallery.root_path, folder_favorites, gallery.dirs,
+    )
     app.dependency_overrides[get_browser] = lambda: browser
     app.dependency_overrides[get_picker] = lambda: FolderPicker(gallery.root_path, ())
     app.dependency_overrides[get_renderer] = lambda: PageRenderer()
@@ -345,7 +357,7 @@ def test_favorite_videos_sort_first_and_survive_a_move(tmp_path: Path, favorites
             for n in names
         ])
         return GalleryService(root_path=root, thumb_path=tmp_path, max_clip_duration=10.0,
-                              dirs=FakeDirs([doc]), videos=videos, favorites=favorites)
+                              dirs=FakeDirs([doc]), videos=videos, favorites=favorites, favorite_folders=FakeFavorites())
 
     old = service(tmp_path / "old")
     page = asyncio.run(old.directory_page("."))
@@ -388,7 +400,47 @@ def test_gallery_page_renders_favorite_state(client: TestClient):
     client.put("/api/favorites/hash_long")
     html = client.get("/page/").text
     assert 'data-favorite="true"' in html and 'data-favorite="false"' in html
-    assert html.count('class="fav-btn') == 2  # videos only, no image stars
+    assert html.count('class="fav-btn') == 3  # two videos and the `trip` folder, no image stars
+
+
+def test_favorite_folders_sort_first(tmp_path: Path):
+    root = tmp_path / "lib"
+    names = ["a", "b", "c"]
+    docs = [MediaDirIndexDoc(path_str=str(root), subpaths={n: str(root / n) for n in names},
+                             video_files={}, image_files={}, other_files={})]
+    docs += [MediaDirIndexDoc(path_str=str(root / n), subpaths={}, video_files={}, image_files={}, other_files={})
+             for n in names]
+    dirs, store = FakeDirs(docs), FakeFavorites()
+    svc = GalleryService(root_path=root, thumb_path=tmp_path, max_clip_duration=10.0, dirs=dirs,
+                         videos=FakeVideos([]), favorites=FakeFavorites(), favorite_folders=store)
+    assert [s.page_path_rel for s in asyncio.run(svc.directory_page(".")).subpages] == ["a", "b", "c"]
+
+    asyncio.run(FolderFavoriteService(root, store, dirs).add("c"))
+    subpages = asyncio.run(svc.directory_page(".")).subpages
+    assert [(s.page_path_rel, s.is_favorite) for s in subpages] == [("c", True), ("a", False), ("b", False)]
+
+
+def test_favorite_folder_endpoints(client: TestClient, folder_favorites: FakeFavorites):
+    r = client.put("/api/favorites/folders/trip")
+    assert r.status_code == 200 and r.json() == {"path": "trip", "is_favorite": True}
+    assert client.put("/api/favorites/folders/trip/").json()["path"] == "trip"  # normalised
+    assert client.get("/api/favorites/folders").json() == {"paths": ["trip"]}
+    assert client.get("/api/directory/.").json()["subpages"][0]["is_favorite"] is True
+    assert 'data-type="folder" data-path="trip" data-favorite="true"' in client.get("/page/").text
+
+    assert client.delete("/api/favorites/folders/trip").json() == {"path": "trip", "is_favorite": False}
+    assert folder_favorites.hashes == []
+
+
+def test_favorite_folder_rejects_unknown_and_outside_paths(client: TestClient, folder_favorites: FakeFavorites):
+    assert client.put("/api/favorites/folders/nope").status_code == 404
+    assert client.put("/api/favorites/folders/..%2F..").status_code == 404
+    assert client.delete("/api/favorites/folders/..%2F..").status_code == 404
+    assert folder_favorites.hashes == []
+
+    folder_favorites.hashes.append("gone")  # folder no longer in the index
+    assert client.delete("/api/favorites/folders/gone").status_code == 200
+    assert folder_favorites.hashes == []
 
 
 # ---------------------------------------------------------------------------

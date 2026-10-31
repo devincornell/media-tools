@@ -1279,7 +1279,7 @@
                 </h2>
                 <div class="gallery" id="foldersGallery">
                     {% for cp in subpages %}
-                        <div class="thumbnail" data-type="folder" data-name="{{cp.name|lower}}">
+                        <div class="thumbnail" data-type="folder" data-path="{{ cp.page_path_rel }}" data-favorite="{{ 'true' if cp.is_favorite else 'false' }}" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
                                 <div class="thumbnail-image-wrapper">
                                     <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
@@ -1297,6 +1297,7 @@
                                          id="subfolder-{{ loop.index0 }}">
                                     <div class="thumbnail-overlay-top-right"><i class="fas fa-video"></i> {{cp.num_vids}}</div>
                                     <div class="thumbnail-overlay-bottom">{{cp.name}}</div>
+                                    {{ fav_btn(cp.is_favorite) }}
                                 </div>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
@@ -1673,7 +1674,7 @@
 
         function sortMedia() {
             if (!document.getElementById('sortSelect').value) return;
-            ['videosGallery', 'clipsGallery'].forEach(galleryId => {
+            ['foldersGallery', 'videosGallery', 'clipsGallery'].forEach(galleryId => {
                 const gallery = document.getElementById(galleryId);
                 if (gallery) sortGallery(gallery);
             });
@@ -1684,7 +1685,10 @@
             event.preventDefault();
             const card = button.closest('.thumbnail');
             const makeFavorite = card.dataset.favorite !== 'true';
-            const url = '/api/favorites/' + encodeURIComponent(card.dataset.hash);
+            // Folders are keyed by path, videos by content hash.
+            const url = card.dataset.type === 'folder'
+                ? '/api/favorites/folders/' + card.dataset.path.split('/').map(encodeURIComponent).join('/')
+                : '/api/favorites/' + encodeURIComponent(card.dataset.hash);
 
             button.disabled = true;
             try {

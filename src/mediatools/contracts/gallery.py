@@ -47,6 +47,7 @@ class SubdirectorySummary(_Contract):
     num_imgs: Annotated[int, Field(description="Number of images directly in this subdirectory.")]
     num_subpages: Annotated[int, Field(description="Number of direct child directories of this subdirectory.")]
     subfolder_thumbs_all: Annotated[list[str], Field(description="Video hashes, recursively under this subdirectory, that have a thumbnail.")]
+    is_favorite: Annotated[bool, Field(description="Whether the folder is starred.")] = False
 
 
 class DirectoryPage(_Contract):
@@ -59,7 +60,7 @@ class DirectoryPage(_Contract):
     vids: Annotated[list[VideoSummary], Field(description="Videos in this directory at or above the clip threshold, favorites first, then sorted by name.")]
     clips: Annotated[list[VideoSummary], Field(description="Videos in this directory shorter than the clip threshold, favorites first, then sorted by name.")]
     images: Annotated[list[ImageSummary], Field(description="Images in this directory, sorted by name.")]
-    subpages: Annotated[list[SubdirectorySummary], Field(description="Direct subdirectories, sorted by name.")]
+    subpages: Annotated[list[SubdirectorySummary], Field(description="Direct subdirectories, favorites first, then sorted by name.")]
     num_vids: Annotated[int, Field(description="Number of indexed videos directly in this directory, including any missing from the video index.")]
     num_imgs: Annotated[int, Field(description="Number of images directly in this directory.")]
     num_subpages: Annotated[int, Field(description="Number of direct subdirectories.")]
@@ -76,6 +77,13 @@ class FavoriteState(_Contract):
 
     file_hash: Annotated[str, Field(description="Index hash of the video.")]
     is_favorite: Annotated[bool, Field(description="Whether the video is starred after the request.")]
+
+
+class FolderFavoriteState(_Contract):
+    '''Favorite status of one folder.'''
+
+    path: Annotated[str, Field(description="Folder path relative to the gallery root.")]
+    is_favorite: Annotated[bool, Field(description="Whether the folder is starred after the request.")]
 
 
 class ErrorResponse(_Contract):

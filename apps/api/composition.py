@@ -4,7 +4,7 @@ import dataclasses
 
 from pymongo.asynchronous.database import AsyncDatabase
 
-from mediatools.application import BrowserService, FavoriteService, GalleryService
+from mediatools.application import BrowserService, FavoriteService, FolderFavoriteService, GalleryService
 from mediatools.application.folder_picker import FolderPicker
 from mediatools.application.media_jobs import (
     MediaJobDeps,
@@ -22,6 +22,7 @@ from .settings import ServerConfig
 class Services:
     gallery: GalleryService
     favorites: FavoriteService
+    folder_favorites: FolderFavoriteService
     browser: BrowserService
     picker: FolderPicker
     uploads: UploadService
@@ -39,6 +40,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
     await log_store.create_indexes()
     records = MediaJobCollection.from_database(database)
     favorites = FavoriteCollection.from_database(database)
+    favorite_folders = FavoriteCollection.from_database(database, collection_name="favorite_folders")
     # Jobs are scoped to the gallery root they operate on.
     manager = JobManager(repo, scope_id=str(config.root_path), log_store=log_store)
     deps = MediaJobDeps(
@@ -56,8 +58,10 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
             dirs=index.dirs,
             videos=index.videos,
             favorites=favorites,
+            favorite_folders=favorite_folders,
         ),
         favorites=FavoriteService(store=favorites, videos=index.videos),
+        folder_favorites=FolderFavoriteService(root_path=config.root_path, store=favorite_folders, dirs=index.dirs),
         browser=BrowserService(root_path=config.root_path, dirs=index.dirs),
         picker=FolderPicker(gallery_root=config.root_path, source_roots=config.copy_source_roots),
         uploads=UploadService(root_path=config.root_path),

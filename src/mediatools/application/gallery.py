@@ -48,6 +48,7 @@ class GalleryService:
     dirs: DirectoryIndexReader
     videos: VideoIndexReader
     favorites: FavoriteReader
+    favorite_folders: FavoriteReader
 
     def resolve_under_root(self, rel_path: str) -> Path:
         return resolve_under_root(self.root_path, rel_path)
@@ -108,10 +109,12 @@ class GalleryService:
         ]
         # Stable sort: favorites first, name order within each group.
         video_items.sort(key=lambda v: not v.is_favorite)
+        favorite_folders = await self.favorite_folders.among([str(sd.path.relative_to(self.root_path)) for sd in subdirs])
         subpages = [
-            await self._subdir_summary(sd)
+            await self._subdir_summary(sd, str(sd.path.relative_to(self.root_path)) in favorite_folders)
             for sd in sorted(subdirs, key=lambda d: d.path.name.lower())
         ]
+        subpages.sort(key=lambda s: not s.is_favorite)
         total_size = sum(f.stat.size for f in dir_doc.video_files.values()) + sum(
             f.stat.size for f in dir_doc.image_files.values()
         )
@@ -173,7 +176,7 @@ class GalleryService:
             aspect=width / height if height else 1.0,
         )
 
-    async def _subdir_summary(self, sd: MediaDirIndexDoc) -> SubdirectorySummary:
+    async def _subdir_summary(self, sd: MediaDirIndexDoc, is_favorite: bool) -> SubdirectorySummary:
         all_docs = await self.dirs.find_by_path_prefix(sd.path)
         thumbs = [
             ivf.file_hash
@@ -189,4 +192,5 @@ class GalleryService:
             num_imgs=len(sd.image_files),
             num_subpages=len(sd.subpaths),
             subfolder_thumbs_all=thumbs,
+            is_favorite=is_favorite,
         )
