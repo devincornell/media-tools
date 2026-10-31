@@ -1,12 +1,8 @@
 <!DOCTYPE html>
-{% macro fav_btn(is_favorite) -%}
-<button type="button" class="fav-btn{{ ' active' if is_favorite }}" onclick="toggleFavorite(event, this)" title="Favorite" aria-label="Toggle favorite">
-    <i class="{{ 'fas' if is_favorite else 'far' }} fa-star"></i>
-</button>
-{%- endmacro %}
-{% macro move_btn() -%}
-<button type="button" class="move-btn" onclick="startMove(event, this)" title="Move to..." aria-label="Move to">
-    <i class="fas fa-share"></i>
+{% macro card_menu() -%}
+<span class="fav-badge" aria-hidden="true"><i class="fas fa-star"></i></span>
+<button type="button" class="card-menu-btn" onclick="openCardMenu(event, this)" title="Options" aria-label="Options" aria-haspopup="menu">
+    <i class="fas fa-ellipsis"></i>
 </button>
 {%- endmacro %}
 <html lang="en">
@@ -272,8 +268,7 @@
 
         /* Overlay toggles */
         body.hide-card-overlays .thumbnail-overlay-top-right,
-        body.hide-card-overlays .thumbnail-overlay-bottom,
-        body.hide-card-overlays .thumbnail-info-btn {
+        body.hide-card-overlays .thumbnail-overlay-bottom {
             display: none !important;
         }
 
@@ -382,8 +377,7 @@
 
         /* Hide overlay elements in list view */
         .gallery.list-view .thumbnail-overlay-bottom,
-        .gallery.list-view .thumbnail-overlay-top-right,
-        .gallery.list-view .thumbnail-info-btn {
+        .gallery.list-view .thumbnail-overlay-top-right {
             display: none !important;
         }
 
@@ -455,54 +449,9 @@
             transition: opacity 0.2s ease;
         }
 
-        .thumbnail-info-btn {
-            position: absolute;
-            top: 0.35rem;
-            left: 0.35rem;
-            right: auto;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            color: #94a3b8;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            cursor: pointer;
-            z-index: 3;
-            transition: all 0.2s ease;
-            border: none;
-        }
-
-        .thumbnail-info-btn:hover {
-            background: var(--accent-primary);
-            color: #fff;
-            transform: scale(1.1);
-        }
-
+        /* Holds the details shown by the card menu's Info item */
         .thumbnail-info-popover {
             display: none;
-            position: absolute;
-            top: 2rem;
-            left: 0.35rem;
-            right: auto;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.6rem 0.8rem;
-            box-shadow: var(--shadow-heavy);
-            z-index: 10;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            line-height: 1.5;
-            min-width: 150px;
-            backdrop-filter: blur(10px);
-        }
-
-        .thumbnail-info-popover.show {
-            display: block;
         }
 
         .thumbnail-overlay-bottom {
@@ -580,9 +529,8 @@
             border-color: var(--accent-primary);
         }
 
-        /* Favorites */
-        .fav-btn,
-        .move-btn {
+        /* Card menu: favorite, move, info, delete */
+        .card-menu-btn {
             position: absolute;
             bottom: 0.35rem;
             right: 0.35rem;
@@ -602,39 +550,103 @@
             transition: all 0.2s ease;
         }
 
-        .fav-btn:hover {
-            color: #facc15;
-            transform: scale(1.15);
-        }
-
-        .fav-btn.active {
-            color: #facc15;
-            border-color: #facc15;
-        }
-
-        .fav-btn:disabled {
-            opacity: 0.5;
-            cursor: wait;
-        }
-
-        .move-btn {
-            right: calc(0.35rem + 26px + 0.3rem);
-        }
-
-        .move-btn:hover {
+        .card-menu-btn:hover {
             color: #fff;
             background: var(--accent-primary);
             transform: scale(1.15);
         }
 
-        .thumbnail.moving {
+        .fav-badge {
+            display: none;
+            position: absolute;
+            top: 0.35rem;
+            left: 0.35rem;
+            z-index: 3;
+            width: 22px;
+            height: 22px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            color: #facc15;
+            font-size: 0.7rem;
+            pointer-events: none;
+        }
+
+        .thumbnail[data-favorite="true"] .fav-badge {
+            display: flex;
+        }
+
+        .thumbnail-image-wrapper:has(.card-menu-btn) .thumbnail-overlay-bottom {
+            padding-right: 2.5rem;
+        }
+
+        .thumbnail.busy-card {
             opacity: 0.4;
             pointer-events: none;
         }
 
-        /* Keep long titles clear of the star and move buttons */
-        .thumbnail-image-wrapper:has(.fav-btn) .thumbnail-overlay-bottom {
-            padding-right: 4.8rem;
+        .card-menu {
+            position: fixed;
+            z-index: 1600;
+            min-width: 200px;
+            max-width: 280px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: var(--shadow-heavy);
+            overflow: hidden;
+            font-size: 0.88rem;
+        }
+
+        .card-menu-title {
+            padding: 0.55rem 0.8rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .card-menu-info {
+            padding: 0.55rem 0.8rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.6;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            width: 100%;
+            padding: 0.5rem 0.8rem;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .card-menu-item i {
+            width: 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .card-menu-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .card-menu-item.fav i {
+            color: #facc15;
+        }
+
+        .card-menu-item.danger,
+        .card-menu-item.danger i {
+            color: #f87171;
         }
 
         /* Jobs viewer */
@@ -1420,9 +1432,6 @@
                         <div class="thumbnail" data-type="folder" data-path="{{ cp.page_path_rel }}" data-favorite="{{ 'true' if cp.is_favorite else 'false' }}" data-name="{{cp.name|lower}}">
                             <a href='/page/{{ cp.page_path_rel }}' style="text-decoration: none; color: inherit;">
                                 <div class="thumbnail-image-wrapper">
-                                    <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
-                                        <i class="fas fa-info"></i>
-                                    </button>
                                     <div class="thumbnail-info-popover">
                                         <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
                                         <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
@@ -1435,8 +1444,7 @@
                                          id="subfolder-{{ loop.index0 }}">
                                     <div class="thumbnail-overlay-top-right"><i class="fas fa-video"></i> {{cp.num_vids}}</div>
                                     <div class="thumbnail-overlay-bottom">{{cp.name}}</div>
-                                    {{ fav_btn(cp.is_favorite) }}
-                                    {{ move_btn() }}
+                                    {{ card_menu() }}
                                 </div>
                                 <div class="thumbnail-content">
                                     <div class="thumbnail-title">{{cp.name}}</div>
@@ -1473,9 +1481,6 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <div class="thumbnail-image-wrapper">
-                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
-                                    <i class="fas fa-info"></i>
-                                </button>
                                 <div class="thumbnail-info-popover">
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
@@ -1484,8 +1489,7 @@
                                 <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
-                                {{ fav_btn(vid.is_favorite) }}
-                                {{ move_btn() }}
+                                {{ card_menu() }}
                             </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
@@ -1522,9 +1526,6 @@
                              data-video-duration="{{ vid.duration }}"
                              onclick="openPlayer(this)">
                             <div class="thumbnail-image-wrapper">
-                                <button class="thumbnail-info-btn" onclick="toggleInfoPopover(event, this)" title="Info">
-                                    <i class="fas fa-info"></i>
-                                </button>
                                 <div class="thumbnail-info-popover">
                                     <i class="fas fa-hdd"></i> {{ vid.vid_size_str }}<br>
                                     <i class="fas fa-expand"></i> {{ vid.res_str }}<br>
@@ -1533,8 +1534,7 @@
                                 <img src="/thumb/{{vid.hash}}.gif" loading="lazy"/>
                                 <div class="thumbnail-overlay-top-right">{{ vid.duration_str }}</div>
                                 <div class="thumbnail-overlay-bottom">{{ vid.vid_title }}</div>
-                                {{ fav_btn(vid.is_favorite) }}
-                                {{ move_btn() }}
+                                {{ card_menu() }}
                             </div>
                             <div class="thumbnail-content">
                                 <div class="thumbnail-title">{{ vid.vid_title }}</div>
@@ -1837,81 +1837,135 @@
             });
         }
 
-        async function toggleFavorite(event, button) {
-            event.stopPropagation();
-            event.preventDefault();
-            const card = button.closest('.thumbnail');
+        async function toggleFavorite(card) {
             const makeFavorite = card.dataset.favorite !== 'true';
             // Folders are keyed by path, videos by content hash.
             const url = card.dataset.type === 'folder'
                 ? '/api/favorites/folders/' + card.dataset.path.split('/').map(encodeURIComponent).join('/')
                 : '/api/favorites/' + encodeURIComponent(card.dataset.hash);
 
-            button.disabled = true;
             try {
                 const response = await fetch(url, { method: makeFavorite ? 'PUT' : 'DELETE' });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 card.dataset.favorite = String(makeFavorite);
-                button.classList.toggle('active', makeFavorite);
-                button.firstElementChild.className = (makeFavorite ? 'fas' : 'far') + ' fa-star';
                 sortGallery(card.closest('.gallery'));
             } catch (err) {
                 alert(`Could not update favorite: ${err.message}`);
-            } finally {
-                button.disabled = false;
             }
         }
 
-        // ------------------------------------------------------------ Move to... + jobs viewer
-        const pendingMoves = new Map();  // job id -> card being moved
+        // ------------------------------------------------------------ Card menu, move/delete jobs, jobs viewer
+        const pendingCards = new Map();  // job id -> card the job is working on
+        let openMenu = null;
 
         async function apiError(response) {
             const body = await response.json().catch(() => null);
             return typeof body?.detail === 'string' ? body.detail : `HTTP ${response.status}`;
         }
 
-        function startMove(event, button) {
+        function closeCardMenu() {
+            openMenu?.remove();
+            openMenu = null;
+        }
+
+        function placeCardMenu(menu, button) {
+            const anchor = button.getBoundingClientRect();
+            const size = menu.getBoundingClientRect();
+            const left = Math.max(8, Math.min(anchor.right - size.width, window.innerWidth - size.width - 8));
+            const above = anchor.top - size.height - 6;
+            menu.style.left = `${left}px`;
+            menu.style.top = `${above >= 8 ? above : anchor.bottom + 6}px`;
+        }
+
+        function openCardMenu(event, button) {
             event.stopPropagation();
             event.preventDefault();
             const card = button.closest('.thumbnail');
+            const reopen = openMenu?.card !== card;
+            closeCardMenu();
+            if (!reopen) return;
+
+            const isFolder = card.dataset.type === 'folder';
+            const isFavorite = card.dataset.favorite === 'true';
+            const menu = jobEl('div', 'card-menu', null);
+            menu.card = card;
+            menu.setAttribute('role', 'menu');
+
+            const info = jobEl('div', 'card-menu-info');
+            info.hidden = true;
+            info.append(...Array.from(card.querySelector('.thumbnail-info-popover').childNodes, n => n.cloneNode(true)));
+
+            const item = (icon, label, className, action) => {
+                const btn = jobEl('button', `card-menu-item ${className}`);
+                btn.type = 'button';
+                btn.setAttribute('role', 'menuitem');
+                btn.append(jobEl('i', icon), label);
+                btn.onclick = action;
+                return btn;
+            };
+            const run = (fn) => () => { closeCardMenu(); fn(card); };
+
+            menu.append(
+                jobEl('div', 'card-menu-title', card.dataset.path.split('/').pop()),
+                info,
+                item(isFavorite ? 'fas fa-star' : 'far fa-star', isFavorite ? 'Remove favorite' : 'Add to favorites', 'fav', run(toggleFavorite)),
+                item('fas fa-share', 'Move to...', '', run(startMove)),
+                item('fas fa-circle-info', 'Info', '', () => { info.hidden = !info.hidden; placeCardMenu(menu, button); }),
+                item('fas fa-trash', isFolder ? 'Delete folder...' : 'Delete...', 'danger', run(startDelete)),
+            );
+            document.body.append(menu);
+            placeCardMenu(menu, button);
+            openMenu = menu;
+        }
+
+        function startMove(card) {
             const path = card.dataset.path;
             const parent = path.split('/').slice(0, -1).join('/');
-            const name = path.split('/').pop();
             FolderPicker.open({
                 scope: 'gallery',
-                title: `Move "${name}" to...`,
+                title: `Move "${path.split('/').pop()}" to...`,
                 startRel: parent,
                 note: (listing) => `will move into ${listing.rel || '.'}`,
-                onChoose: (listing) => submitMove(card, path, listing.rel || '.'),
+                onChoose: (listing) => queueCardJob(card, 'move-item', { path, dest: listing.rel || '.' }, 'move'),
             });
         }
 
-        async function submitMove(card, path, dest) {
+        function startDelete(card) {
+            const path = card.dataset.path;
+            const name = path.split('/').pop();
+            const what = card.dataset.type === 'folder' ? `the folder "${name}" and everything in it` : `"${name}"`;
+            if (confirm(`Permanently delete ${what}? This can't be undone.`)) {
+                queueCardJob(card, 'delete-item', { path }, 'delete');
+            }
+        }
+
+        async function queueCardJob(card, endpoint, body, label) {
             try {
-                const response = await fetch('/api/jobs/move-item', {
+                const response = await fetch(`/api/jobs/${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path, dest }),
+                    body: JSON.stringify(body),
                 });
                 if (!response.ok) throw new Error(await apiError(response));
                 const accepted = await response.json();
-                card.classList.add('moving');
-                pendingMoves.set(accepted.job_id, card);
+                card.classList.add('busy-card');
+                pendingCards.set(accepted.job_id, card);
                 setJobsPanel(true);
             } catch (err) {
-                alert(`Could not start the move: ${err.message}`);
+                alert(`Could not start the ${label}: ${err.message}`);
             }
         }
 
         const JOB_KIND_LABEL = {
             reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert',
-            move: 'Move + rescan', move_item: 'Move', montage: 'Montage',
+            move: 'Move + rescan', move_item: 'Move', delete_item: 'Delete', montage: 'Montage',
         };
         const JOB_ACTIVE = new Set(['queued', 'running']);
         let jobsTimer = null;
 
         function jobTarget(item) {
             if (item.kind === 'move_item') return `${item.params.path} \u2192 ${item.params.dest}`;
+            if (item.kind === 'delete_item') return item.params.path;
             if (item.kind === 'move') return `${item.params.source} \u2192 ${item.target}`;
             return item.target ?? '';
         }
@@ -1961,16 +2015,16 @@
 
         function applyFinishedMoves(items) {
             for (const item of items) {
-                const card = pendingMoves.get(item.job.id);
+                const card = pendingCards.get(item.job.id);
                 if (!card) continue;
                 if (item.job.status === 'succeeded') {
                     card.remove();
                 } else if (item.job.status === 'failed' || item.job.status === 'canceled') {
-                    card.classList.remove('moving');
+                    card.classList.remove('busy-card');
                 } else {
                     continue;
                 }
-                pendingMoves.delete(item.job.id);
+                pendingCards.delete(item.job.id);
             }
         }
 
@@ -2151,22 +2205,7 @@
             dropdown.classList.toggle('show');
         }
 
-        // Info Popover Toggle
-        function toggleInfoPopover(event, btnElement) {
-            event.stopPropagation();
-            event.preventDefault();
-            const popover = btnElement.nextElementSibling;
-            const isShowing = popover.classList.contains('show');
-            
-            // Close all open popovers first
-            document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
-            
-            if (!isShowing) {
-                popover.classList.add('show');
-            }
-        }
-
-        // Close dropdowns and popovers when clicking outside
+        // Close dropdowns and the card menu when clicking outside
         window.addEventListener('click', function(e) {
             const dropdown = document.getElementById('actionMenuDropdown');
             if (dropdown && dropdown.classList.contains('show')) {
@@ -2174,11 +2213,12 @@
                     dropdown.classList.remove('show');
                 }
             }
-            
-            if (!e.target.closest('.thumbnail-info-popover') && !e.target.closest('.thumbnail-info-btn')) {
-                document.querySelectorAll('.thumbnail-info-popover.show').forEach(p => p.classList.remove('show'));
-            }
+
+            if (!e.target.closest('.card-menu')) closeCardMenu();
         });
+        window.addEventListener('scroll', closeCardMenu, true);
+        window.addEventListener('resize', closeCardMenu);
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCardMenu(); });
 
         // Image Lightbox Functions
         let currentImageThumbnail = null;

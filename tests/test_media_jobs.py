@@ -20,6 +20,7 @@ from mediatools.application import DirectoryNotIndexedError, InvalidJobRequestEr
 from mediatools.contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    DeleteItemRequest,
     MoveItemRequest,
     MoveRequest,
     ReindexRequest,
@@ -344,6 +345,37 @@ def test_move_item_validation(tree: dict[str, Path]):
             MoveItemRequest(path="../incoming", dest="a"),
         ]
         for req in bad:
+            with pytest.raises(InvalidJobRequestError):
+                await s.media_jobs.submit(req)
+        assert (await s.media_jobs.list()).total == 0
+
+    run_services(tree, body)
+
+
+def test_delete_item_file_and_folder(tree: dict[str, Path]):
+    root = tree["root"]
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        await submit_and_run(s, ReindexRequest(path="."))
+
+        status, out = await submit_and_run(s, DeleteItemRequest(path="a/clip1_copy.mp4"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert out["result"]["deleted"] == 1 and not (root / "a" / "clip1_copy.mp4").exists()
+        assert "a/clip1_copy.mp4" not in [v.vid_path_rel for v in (await s.gallery.directory_page("a")).vids]
+
+        status, out = await submit_and_run(s, DeleteItemRequest(path="trip"))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert out["result"]["deleted"] == 3 and out["result"]["directories_removed"] == 2  # trip and trip/batch
+        assert not (root / "trip").exists() and (root / "trip2" / "y.mp4").is_file()  # trip2 is untouched
+        assert not {"trip", "trip/batch"} & set(await s.gallery.list_directories())
+        assert "trip" not in [sp.page_path_rel for sp in (await s.gallery.directory_page(".")).subpages]
+
+    run_services(tree, body)
+
+
+def test_delete_item_validation(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        for req in [DeleteItemRequest(path="."), DeleteItemRequest(path="nope.mp4"), DeleteItemRequest(path="../incoming")]:
             with pytest.raises(InvalidJobRequestError):
                 await s.media_jobs.submit(req)
         assert (await s.media_jobs.list()).total == 0

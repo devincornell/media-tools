@@ -7,6 +7,7 @@ from pathlib import Path
 from ...contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    DeleteItemRequest,
     JobAttemptView,
     JobView,
     MediaJobPage,
@@ -25,6 +26,7 @@ from . import fileops
 from .types import (
     CLEANUP,
     CONVERT_MP4,
+    DELETE_ITEM,
     KIND_BY_TYPE,
     MONTAGE,
     MOVE,
@@ -35,7 +37,14 @@ from .types import (
 )
 
 MediaJobRequest = (
-    ReindexRequest | ThumbnailsRequest | CleanupRequest | ConvertMp4Request | MoveRequest | MoveItemRequest | MontageRequest
+    ReindexRequest
+    | ThumbnailsRequest
+    | CleanupRequest
+    | ConvertMp4Request
+    | MoveRequest
+    | MoveItemRequest
+    | DeleteItemRequest
+    | MontageRequest
 )
 
 _TYPE_BY_REQUEST: dict[type, str] = {
@@ -45,6 +54,7 @@ _TYPE_BY_REQUEST: dict[type, str] = {
     ConvertMp4Request: CONVERT_MP4,
     MoveRequest: MOVE,
     MoveItemRequest: MOVE_ITEM,
+    DeleteItemRequest: DELETE_ITEM,
     MontageRequest: MONTAGE,
 }
 
@@ -118,6 +128,8 @@ class MediaJobService:
             return self._validate_move(request)
         if isinstance(request, MoveItemRequest):
             return self._validate_move_item(request)
+        if isinstance(request, DeleteItemRequest):
+            return self._validate_delete_item(request)
         if isinstance(request, MontageRequest):
             return self._validate_montage(request)
         target = self._under_root(request.path)
@@ -186,6 +198,18 @@ class MediaJobService:
                     f"The server can't write to {folder} (owned by {fileops.user_name(folder.stat().st_uid)})."
                 )
         return dest
+
+    def _validate_delete_item(self, request: DeleteItemRequest) -> Path:
+        source = self._under_root(request.path)
+        if source == self.root_path:
+            raise InvalidJobRequestError("The gallery root can't be deleted.")
+        if not os.path.lexists(source):
+            raise InvalidJobRequestError(f"Not found: {request.path}")
+        if not os.access(source.parent, os.W_OK | os.X_OK):
+            raise InvalidJobRequestError(
+                f"The server can't delete from {source.parent} (owned by {fileops.user_name(source.parent.stat().st_uid)})."
+            )
+        return source
 
     def _under_root(self, rel: str) -> Path:
         try:

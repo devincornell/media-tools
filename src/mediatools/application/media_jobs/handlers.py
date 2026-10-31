@@ -17,6 +17,7 @@ import pymongo.errors
 from ...contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    DeleteItemRequest,
     MontageRequest,
     MoveItemRequest,
     MoveRequest,
@@ -41,7 +42,7 @@ from ..errors import PathOutsideRootError
 from ..paths import resolve_allowed_source, resolve_under_root
 from . import fileops
 from .locks import PathLocks
-from .types import CLEANUP, CONVERT_MP4, MONTAGE, MOVE, MOVE_ITEM, REINDEX, THUMBNAILS
+from .types import CLEANUP, CONVERT_MP4, DELETE_ITEM, MONTAGE, MOVE, MOVE_ITEM, REINDEX, THUMBNAILS
 
 logger = logging.getLogger(__name__)
 
@@ -714,6 +715,62 @@ class MoveItemHandler(_MoveRunner):
         await self.deps.records.set_result(job_id, result)
 
 
+class DeleteItemHandler(_Base):
+    '''Permanently deletes one gallery file or folder.'''
+
+    async def execute(self, job_id: str, ctx: JobContext) -> str | None:
+        req = await self._load(job_id, DeleteItemRequest)
+        source = self._target(req.path)
+        if source == self.deps.root_path:
+            raise PermanentJobError("The gallery root can't be deleted.", code="invalid_path")
+        if not os.path.lexists(source):
+            if ctx.job.attempt_count <= 1:
+                raise PermanentJobError(f"Not found: {req.path}", code="not_found")
+            ctx.log("The item is already gone (deleted by an earlier attempt)")
+        async with self._locked(ctx, [source], exclusive=True):
+            result = await self._run(source, ctx)
+        await self.deps.records.set_result(job_id, result)
+        return None
+
+    async def _run(self, source: Path, ctx: JobContext) -> Result:
+        rel = self._rel(source)
+        is_folder = source.is_dir() and not source.is_symlink()
+        deleted = 0
+        if is_folder:
+            if blocked := await asyncio.to_thread(fileops.unwritable_dirs, source):
+                raise PermanentJobError(
+                    f"The server can't delete files in {len(blocked)} folder(s), e.g. {blocked[0]}. Nothing was deleted.",
+                    code="permission_denied",
+                )
+            ctx.log(f"Listing files in {rel} ...")
+            await ctx.checkpoint(0, "Listing files", force=True)
+            files, others = await asyncio.to_thread(fileops.list_source_files, source)
+            entries = [*files, *others]
+            ctx.log(f"Deleting {len(entries)} files from {rel}")
+            for i, path in enumerate(entries, 1):
+                await asyncio.to_thread(path.unlink, missing_ok=True)
+                deleted += 1
+                await ctx.checkpoint(_span(0, 80, i, len(entries)), f"Deleting {i}/{len(entries)}")
+            remaining = await asyncio.to_thread(fileops.remove_source_tree, source)
+            if remaining:
+                raise OSError(f"{len(remaining)} item(s) in {rel} could not be deleted, e.g. {remaining[0].name}")
+        elif os.path.lexists(source):
+            await ctx.checkpoint(0, "Deleting file", force=True)
+            await asyncio.to_thread(source.unlink)
+            deleted = 1
+        ctx.log(f"Deleted {rel} ({deleted} file(s))")
+
+        result: Result = {"path": rel, "deleted": deleted, "warnings": []}
+        if is_folder:
+            removed = await self.deps.index.dirs.delete_by_path_prefix(source)
+            await self._unlink_from_parent(source)
+            ctx.log(f"Removed {removed} directories from the index")
+            result["directories_removed"] = removed
+        else:
+            result["reindex"] = await self._reindex(source.parent, ctx, 80, 100)
+        return result
+
+
 def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
     return {
         REINDEX: ReindexHandler(deps),
@@ -722,5 +779,6 @@ def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
         CONVERT_MP4: ConvertMp4Handler(deps),
         MOVE: MoveHandler(deps),
         MOVE_ITEM: MoveItemHandler(deps),
+        DELETE_ITEM: DeleteItemHandler(deps),
         MONTAGE: MontageHandler(deps),
     }

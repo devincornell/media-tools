@@ -9,6 +9,7 @@ from mediatools.application.media_jobs import MediaJobRequest, MediaJobService
 from mediatools.contracts import (
     CleanupRequest,
     ConvertMp4Request,
+    DeleteItemRequest,
     ErrorResponse,
     JobAccepted,
     JobConfigView,
@@ -68,6 +69,12 @@ async def submit_move(request: MoveRequest, svc: MediaJobsDep) -> JobAccepted:
 @router.post("/api/jobs/move-item", status_code=202, responses=_INVALID)
 async def submit_move_item(request: MoveItemRequest, svc: MediaJobsDep) -> JobAccepted:
     '''Move a gallery file or folder into another gallery folder, then rescan both.'''
+    return await _submit(svc, request)
+
+
+@router.post("/api/jobs/delete-item", status_code=202, responses=_INVALID)
+async def submit_delete_item(request: DeleteItemRequest, svc: MediaJobsDep) -> JobAccepted:
+    '''Permanently delete a gallery file or folder, then rescan its parent.'''
     return await _submit(svc, request)
 
 

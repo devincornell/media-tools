@@ -127,6 +127,12 @@ class MoveItemRequest(_Contract):
     workers: Annotated[int, Field(ge=1, le=32, description="Files transferred concurrently when moving a folder.")] = 4
 
 
+class DeleteItemRequest(_Contract):
+    '''Permanently delete one file or folder (and everything in it) from the gallery, then rescan its parent.'''
+
+    path: Annotated[str, Field(description="File or folder to delete, relative to the gallery root.")]
+
+
 class MontageRequest(_Contract):
     '''Build one montage video from random clips of the videos found in the sources, optionally limited to a creation date range.'''
 
@@ -173,7 +179,7 @@ class MediaJobView(_Contract):
     '''A job together with its media-specific parameters and results.'''
 
     job: Annotated[JobView, Field(description="Generic lifecycle state.")]
-    kind: Annotated[str, Field(description="Short task name: reindex, thumbnails, cleanup, convert_mp4, move, move_item, montage.")]
+    kind: Annotated[str, Field(description="Short task name: reindex, thumbnails, cleanup, convert_mp4, move, move_item, delete_item, montage.")]
     target: Annotated[str | None, Field(description="Target directory relative to the gallery root.")]
     params: Annotated[dict[str, JsonValue], Field(description="Parameters the job was submitted with.")]
     result: Annotated[dict[str, JsonValue] | None, Field(description="Handler-written result summary, once available.")]

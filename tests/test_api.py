@@ -400,12 +400,12 @@ def test_gallery_page_renders_favorite_state(client: TestClient):
     client.put("/api/favorites/hash_long")
     html = client.get("/page/").text
     assert 'data-favorite="true"' in html and 'data-favorite="false"' in html
-    assert html.count('class="fav-btn') == 3  # two videos and the `trip` folder, no image stars
+    assert html.count('class="card-menu-btn"') == 3  # two videos and the `trip` folder, no menu on images
 
 
-def test_gallery_page_has_move_buttons_and_jobs_viewer(client: TestClient):
+def test_gallery_page_has_card_menus_and_jobs_viewer(client: TestClient):
     html = client.get("/page/").text
-    assert html.count('class="move-btn"') == 3  # two videos and the `trip` folder
+    assert html.count('class="card-menu-btn"') == 3  # two videos and the `trip` folder
     assert 'data-path="long_video.mp4"' in html and 'id="jobsPanel"' in html
 
 

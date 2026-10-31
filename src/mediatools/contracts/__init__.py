@@ -12,6 +12,7 @@ from .gallery import (
 from .jobs import (
     CleanupRequest,
     ConvertMp4Request,
+    DeleteItemRequest,
     JobAccepted,
     JobAttemptView,
     JobConfigView,
@@ -31,6 +32,7 @@ from .jobs import (
 __all__ = [
     "CleanupRequest",
     "ConvertMp4Request",
+    "DeleteItemRequest",
     "DirectoryPage",
     "ErrorResponse",
     "FavoriteState",

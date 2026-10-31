@@ -82,7 +82,7 @@ Jobs survive restarts: an interrupted job is resumed by the next worker once its
 
 Jobs run in parallel (`SITE_WORKER_CONCURRENCY`, default 4). Jobs that change the index or files (rescan, convert, move, and cleanup with deletes) wait for any other job in the same worker that touches an overlapping folder (the same folder, a parent, or a child). Thumbnails and dry-run cleanups only read, so they run alongside each other. Each job writes a live log (the per-directory output of a rescan, every file moved, and so on), shown under **Details** and available at `GET /v1/jobs/{id}/logs`. Logs are kept for 30 days.
 
-To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move,move-item}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
+To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move,move-item,delete-item}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
 
 The server has no authentication. Anyone who can reach it can start jobs, including deletes. Keep it on a trusted network.
 
