@@ -9,1620 +9,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Gallery</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0b0d12">
+    <title>{{ name }} · Media Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #0a0a0a;
-            --bg-secondary: #1a1a1a;
-            --bg-tertiary: #2a2a2a;
-            --accent-primary: #6366f1;
-            --accent-secondary: #8b5cf6;
-            --text-primary: #ffffff;
-            --text-secondary: #a3a3a3;
-            --text-muted: #6b7280;
-            --border-color: rgba(255, 255, 255, 0.1);
-            --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --shadow-heavy: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --card-min-width: 220px;
-            --thumbnail-height: 200px;
-            --list-thumb-width: 100px;
-            --list-thumb-height: 65px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 50px;
-            height: 100vh;
-            background: linear-gradient(180deg, var(--glass-bg) 0%, rgba(0, 0, 0, 0.8) 100%);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid var(--glass-border);
-            padding: 1rem 0.1rem;
-            z-index: 1000;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .sidebar-header {
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .sidebar-header h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .nav-item {
-            margin: 0.75rem 0;
-            transition: all 0.2s ease;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            border-radius: 12px;
-            transition: all 0.2s ease;
-            font-weight: 500;
-        }
-
-        .nav-link:hover {
-            background: var(--glass-bg);
-            color: var(--text-primary);
-            transform: translateX(4px);
-        }
-
-        .nav-link i {
-            width: 20px;
-            text-align: center;
-        }
-
-        .close-player-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            width: 100%;
-            padding: 0.75rem 1rem;
-            margin-top: 1rem;
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .close-player-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-medium);
-        }
-
-        /* Main Container */
-        .main-container {
-            margin-left: 50px;
-            padding: 2rem;
-            min-height: 100vh;
-        }
-
-        .header {
-            background: linear-gradient(135deg, var(--glass-bg), rgba(0, 0, 0, 0.3));
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 0.2rem;
-            margin-bottom: 0.5rem;
-            text-align: center;
-            box-shadow: var(--shadow-medium);
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .header-subtitle {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-
-        /* Search and Filter Bar */
-        .search-filter-bar {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 0.2rem;
-            margin-bottom: 2rem;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .search-box {
-            flex: 1;
-            min-width: 300px;
-            position: relative;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 0.75rem 1rem 0.75rem 3rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.2s ease;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
-
-        .sort-controls {
-            display: flex;
-            align-items: center;
-        }
-
-        .sort-select {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
-            color: var(--text-primary);
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            min-width: 160px;
-        }
-
-        .sort-select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .sort-select:hover {
-            border-color: var(--accent-primary);
-        }
-
-        .size-slider-container {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.5rem 1rem;
-        }
-
-        .size-slider {
-            -webkit-appearance: none;
-            width: 100px;
-            height: 4px;
-            background: var(--bg-secondary);
-            border-radius: 2px;
-            outline: none;
-        }
-
-        .size-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .size-slider::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-
-        /* Overlay toggles */
-        body.hide-card-overlays .thumbnail-overlay-top-right,
-        body.hide-card-overlays .thumbnail-overlay-bottom {
-            display: none !important;
-        }
-
-        .view-toggle {
-            display: flex;
-            background: var(--bg-tertiary);
-            border-radius: 12px;
-            padding: 0.25rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .view-btn {
-            padding: 0.5rem 1rem;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .view-btn.active {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        /* Gallery Sections */
-        .gallery-section {
-            margin-bottom: 3rem;
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            padding: 1rem 0;
-            border-bottom: 2px solid var(--accent-primary);
-            color: var(--text-primary);
-        }
-
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
-            gap: 0.375rem;
-            margin-bottom: 2rem;
-        }
-
-        .gallery.list-view {
-            grid-template-columns: 1fr;
-            gap: 0.25rem;
-        }
-
-        .gallery.list-view .thumbnail {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.5rem;
-            padding: 0.2rem;
-            border-radius: 8px;
-        }
-
-        .gallery.list-view .thumbnail > a {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.5rem;
-            width: 100%;
-            text-decoration: none;
-            color: inherit;
-        }
-
-        .gallery.list-view .thumbnail-image-wrapper {
-            width: var(--list-thumb-width);
-            height: var(--list-thumb-height);
-            flex-shrink: 0;
-            position: relative;
-            background-color: #000;
-            border-radius: 4px;
-        }
-
-        /* Images in list view preserve aspect ratio */
-        .gallery.list-view #imagesGallery .thumbnail-image-wrapper img {
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .gallery.list-view .thumbnail-content {
-            padding: 0.1rem 0;
-            flex: 1;
-            min-width: 0;
-        }
-
-        .gallery.list-view .thumbnail-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.2rem;
-            line-height: 1.3;
-            word-break: break-word;
-        }
-
-        .gallery.list-view .thumbnail-info {
-            display: block;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            line-height: 1.4;
-        }
-
-        /* Hide overlay elements in list view */
-        .gallery.list-view .thumbnail-overlay-bottom,
-        .gallery.list-view .thumbnail-overlay-top-right {
-            display: none !important;
-        }
-
-        /* Hide regular title and info in grid view */
-        .gallery:not(.list-view) .thumbnail-title,
-        .gallery:not(.list-view) .thumbnail-info {
-            display: none;
-        }
-
-        /* Thumbnail Cards */
-        .thumbnail {
-            background: #000;
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer;
-            position: relative;
-        }
-
-        .thumbnail:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: var(--shadow-heavy);
-            border-color: var(--accent-primary);
-        }
-
-        .thumbnail-image-wrapper {
-            position: relative;
-            width: 100%;
-            height: var(--thumbnail-height);
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        .thumbnail-image-wrapper img,
-        .thumbnail-image-wrapper video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: all 0.3s ease;
-            display: block;
-        }
-
-        /* Images preserve their aspect ratio */
-        #imagesGallery .thumbnail-image-wrapper img {
-            object-fit: contain;
-        }
-
-        .thumbnail:hover .thumbnail-image-wrapper img,
-        .thumbnail:hover .thumbnail-image-wrapper video {
-            transform: scale(1.05);
-        }
-
-        .thumbnail-overlay-top-right {
-            position: absolute;
-            top: 0.35rem;
-            right: 0.35rem;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            color: #94a3b8;
-            padding: 0.15rem 0.35rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            pointer-events: none;
-            z-index: 2;
-            transition: opacity 0.2s ease;
-        }
-
-        /* Holds the details shown by the card menu's Info item */
-        .thumbnail-info-popover {
-            display: none;
-        }
-
-        .thumbnail-overlay-bottom {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
-            color: #94a3b8;
-            padding: 1.5rem 0.5rem 0.5rem 0.5rem;
-            font-size: 0.85rem;
-            font-weight: 500;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
-            pointer-events: none;
-            z-index: 2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            transition: opacity 0.2s ease;
-        }
-
-        .thumbnail-content {
-            padding: 0.25rem;
-        }
-
-        .thumbnail-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.375rem;
-            line-height: 1.4;
-        }
-
-        /* Hide regular metadata info in card content */
-        .thumbnail-info {
-            display: none;
-        }
-
-        .thumbnail-actions {
-            display: flex;
-            gap: 0.375rem;
-            flex-wrap: wrap;
-        }
-
-        .action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.1rem 2rem;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-medium);
-        }
-
-        .action-btn.secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-        }
-
-        .action-btn.secondary:hover {
-            background: var(--accent-primary);
-            color: white;
-            border-color: var(--accent-primary);
-        }
-
-        /* Card menu: favorite, move, info, delete */
-        .card-menu-btn {
-            position: absolute;
-            bottom: 0.35rem;
-            right: 0.35rem;
-            z-index: 4;
-            width: 26px;
-            height: 26px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            border: 1px solid transparent;
-            border-radius: 50%;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .card-menu-btn:hover {
-            color: #fff;
-            background: var(--accent-primary);
-            transform: scale(1.15);
-        }
-
-        .fav-badge {
-            display: none;
-            position: absolute;
-            top: 0.35rem;
-            left: 0.35rem;
-            z-index: 3;
-            width: 22px;
-            height: 22px;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6);
-            color: #facc15;
-            font-size: 0.7rem;
-            pointer-events: none;
-        }
-
-        .thumbnail[data-favorite="true"] .fav-badge {
-            display: flex;
-        }
-
-        .thumbnail-image-wrapper:has(.card-menu-btn) .thumbnail-overlay-bottom {
-            padding-right: 2.5rem;
-        }
-
-        .thumbnail.busy-card {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        .card-menu {
-            position: fixed;
-            z-index: 1600;
-            min-width: 200px;
-            max-width: 280px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            box-shadow: var(--shadow-heavy);
-            overflow: hidden;
-            font-size: 0.88rem;
-        }
-
-        .card-menu-title {
-            padding: 0.55rem 0.8rem;
-            font-weight: 600;
-            border-bottom: 1px solid var(--border-color);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .card-menu-info {
-            padding: 0.55rem 0.8rem;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            line-height: 1.6;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .card-menu-item {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            width: 100%;
-            padding: 0.5rem 0.8rem;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font: inherit;
-            text-align: left;
-            cursor: pointer;
-        }
-
-        .card-menu-item i {
-            width: 1rem;
-            text-align: center;
-            color: var(--text-secondary);
-        }
-
-        .card-menu-item:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .card-menu-item.fav i {
-            color: #facc15;
-        }
-
-        .card-menu-item.danger,
-        .card-menu-item.danger i {
-            color: #f87171;
-        }
-
-        /* Move confirmation */
-        .move-dialog-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 1100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.6);
-        }
-
-        .move-dialog {
-            width: min(460px, 92vw);
-            padding: 1rem 1.1rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            box-shadow: var(--shadow-heavy);
-        }
-
-        .move-dialog h3 {
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
-            overflow-wrap: anywhere;
-        }
-
-        .move-dialog-path {
-            width: 100%;
-            padding: 0.5rem 0.6rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-family: ui-monospace, monospace;
-            font-size: 0.85rem;
-        }
-
-        .move-dialog-note {
-            min-height: 1.2rem;
-            margin-top: 0.4rem;
-            color: #f59e0b;
-            font-size: 0.8rem;
-        }
-
-        .move-dialog-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-        }
-
-        .move-dialog-actions button {
-            padding: 0.4rem 0.9rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font: inherit;
-            cursor: pointer;
-        }
-
-        .move-dialog-actions button.primary {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
-        }
-
-        .move-dialog-actions button:disabled {
-            opacity: 0.4;
-            cursor: default;
-        }
-
-        /* Multi-select */
-        .view-btn.select-on {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        .select-mode .thumbnail { cursor: pointer; }
-        .select-mode .card-menu-btn { display: none; }
-
-        .thumbnail.selected {
-            outline: 3px solid var(--accent-primary);
-            outline-offset: -3px;
-        }
-
-        .select-bar {
-            position: fixed;
-            left: 50%;
-            bottom: 1rem;
-            transform: translateX(-50%);
-            z-index: 1400;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            padding: 0.5rem 0.8rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            box-shadow: var(--shadow-heavy);
-        }
-
-        .select-bar button {
-            padding: 0.35rem 0.8rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font: inherit;
-            cursor: pointer;
-        }
-
-        .select-bar button:disabled { opacity: 0.4; cursor: default; }
-        .select-bar button.danger { color: #f87171; }
-
-        /* Jobs viewer */
-        .jp-hidden { display: none !important; }
-
-        .jobs-fab {
-            position: fixed;
-            right: 1rem;
-            bottom: 1rem;
-            z-index: 1500;
-            width: 46px;
-            height: 46px;
-            border-radius: 50%;
-            border: 1px solid var(--glass-border);
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            font-size: 1.1rem;
-            cursor: pointer;
-            box-shadow: var(--shadow-heavy);
-        }
-
-        .jobs-fab.busy {
-            background: var(--accent-primary);
-        }
-
-        .jobs-badge {
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 20px;
-            padding: 0 5px;
-            border-radius: 10px;
-            background: #ef4444;
-            font-size: 0.72rem;
-            line-height: 20px;
-        }
-
-        .jobs-panel {
-            position: fixed;
-            right: 1rem;
-            bottom: 4.5rem;
-            z-index: 1500;
-            width: min(420px, calc(100vw - 2rem));
-            max-height: 60vh;
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-secondary);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            box-shadow: var(--shadow-heavy);
-            font-size: 0.85rem;
-        }
-
-        .jobs-panel-head {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.6rem 0.9rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .jobs-panel-head strong { flex: 1; }
-        .jobs-panel-head a { color: var(--accent-secondary); text-decoration: none; }
-
-        .jobs-close {
-            background: none;
-            border: none;
-            padding: 0.1rem 0.3rem;
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-            cursor: pointer;
-        }
-
-        .jobs-close:hover { color: var(--text-primary); }
-
-        .jobs-list { overflow-y: auto; }
-
-        .jobs-empty { padding: 1rem; color: var(--text-secondary); }
-
-        .job-row {
-            padding: 0.55rem 0.9rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .job-row:last-child { border-bottom: none; }
-
-        .job-line {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .job-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .job-sub { color: var(--text-secondary); font-size: 0.78rem; margin-top: 0.15rem; overflow-wrap: anywhere; }
-        .job-sub.err { color: #f87171; }
-
-        .job-badge {
-            padding: 0.05rem 0.5rem;
-            border-radius: 999px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            background: #6b7280;
-        }
-
-        .job-badge.running { background: #3b82f6; }
-        .job-badge.succeeded { background: #22c55e; color: #000; }
-        .job-badge.failed { background: #ef4444; }
-        .job-badge.canceled { background: #f59e0b; color: #000; }
-
-        .job-bar {
-            height: 5px;
-            margin-top: 0.3rem;
-            background: var(--bg-tertiary);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .job-bar > div { height: 100%; background: #3b82f6; }
-
-        .job-cancel {
-            padding: 0.1rem 0.5rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font: inherit;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-
-        /* Random clip stream: stacked videos, one visible, the others buffering the next clips */
-        .clip-stage {
-            position: relative;
-            width: 100%;
-            height: 70vh;
-            background: #000;
-        }
-
-        .clip-stage video {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            visibility: hidden;
-        }
-
-        .clip-stage video.active {
-            visibility: visible;
-        }
-
-        .clip-wait {
-            position: absolute;
-            inset: 0;
-            z-index: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            color: var(--text-secondary);
-            pointer-events: none;
-        }
-
-        .clip-progress {
-            height: 3px;
-            background: var(--bg-tertiary);
-        }
-
-        .clip-progress > div {
-            width: 0;
-            height: 100%;
-            background: var(--accent-primary);
-        }
-
-        .clip-length {
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-
-        .clip-length input {
-            width: 4.5rem;
-            padding: 0.1rem 0.3rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font: inherit;
-        }
-
-        .clip-open {
-            color: var(--text-secondary);
-        }
-
-        /* Video Player Modal */
-        .video-player {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(10px);
-            z-index: 2000;
-            padding: 2rem;
-            overflow-y: auto;
-        }
-
-        .player-container {
-            position: relative;
-            width: 100%;
-            min-height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            padding-bottom: 2rem;
-        }
-
-        .player-main {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-            gap: 2rem;
-        }
-
-        .video-container {
-            width: 100%;
-            max-width: 1000px;
-            display: flex;
-            flex-direction: column;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: var(--shadow-heavy);
-        }
-
-        .player-video {
-            width: 100%;
-            height: 100%;
-            max-height: 70vh;
-            object-fit: contain;
-            border-radius: 0;
-            box-shadow: none;
-        }
-
-        .video-playlist {
-            width: 100%;
-            max-width: 1000px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-
-        .video-playlist.collapsed {
-            height: 60px;
-        }
-
-        .video-playlist.collapsed .playlist-content {
-            display: none;
-        }
-
-        .video-playlist.collapsed .playlist-header h3 {
-            display: none;
-        }
-
-        .playlist-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .playlist-header h3 {
-            margin: 0;
-            color: var(--text-primary);
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .playlist-toggle {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .playlist-toggle:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .playlist-content {
-            flex: 1;
-            padding: 1rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.375rem;
-        }
-
-        .playlist-item {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            overflow: hidden;
-        }
-
-        .playlist-item:hover {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
-            transform: translateY(-2px);
-        }
-
-        .playlist-item.active {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
-        }
-
-        .playlist-thumbnail {
-            width: 100%;
-            height: 120px;
-            object-fit: cover;
-            background-color: #000;
-        }
-
-        .playlist-info {
-            padding: 0.5rem;
-            width: 100%;
-        }
-
-        .playlist-title {
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin: 0 0 0.25rem 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .playlist-duration {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            margin: 0;
-        }
-
-        .player-controls {
-            position: relative;
-            background: var(--bg-tertiary);
-            border-top: 1px solid var(--glass-border);
-            padding: 0.35rem 0.75rem;
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .dropdown-menu-container {
-            position: relative;
-            display: inline-block;
-        }
-
-        .dropdown-toggle-btn {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-            width: 40px;
-            height: 32px;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 1.1rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .dropdown-toggle-btn:hover {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            right: 0;
-            margin-bottom: 0.5rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: var(--shadow-heavy);
-            z-index: 2020;
-            min-width: 140px;
-            overflow: hidden;
-        }
-
-        .dropdown-content.show {
-            display: block;
-        }
-
-        .dropdown-content a {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 1rem;
-            color: var(--text-primary);
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: background 0.2s ease;
-        }
-
-        .dropdown-content a:hover {
-            background: var(--accent-primary);
-            color: white;
-        }
-
-        .player-close {
-            position: fixed;
-            top: 2rem;
-            right: 2rem;
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2010;
-        }
-
-        .player-close:hover {
-            transform: scale(1.1);
-            box-shadow: var(--shadow-medium);
-        }
-
-        .nav-btn {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-            width: 40px;
-            height: 20px;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .nav-btn:hover {
-            background: var(--accent-primary);
-            color: white;
-            transform: scale(1.1);
-            box-shadow: var(--shadow-medium);
-        }
-
-        .image-nav-controls {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 2rem;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .image-nav-btn {
-            pointer-events: auto;
-        }
-
-        .speed-control {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.1rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-
-        .autoplay-control {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .autoplay-label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .autoplay-label:hover {
-            color: var(--accent-primary);
-        }
-
-        .autoplay-checkbox {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--accent-primary);
-            cursor: pointer;
-        }
-
-        .autoplay-text {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            white-space: nowrap;
-        }
-
-        .autoplay-countdown {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(20px);
-            border: 2px solid var(--accent-primary);
-            border-radius: 16px;
-            padding: 2rem;
-            text-align: center;
-            color: var(--text-primary);
-            font-size: 1.2rem;
-            font-weight: 600;
-            z-index: 100;
-            display: none;
-        }
-
-        .countdown-number {
-            font-size: 3rem;
-            color: var(--accent-primary);
-            margin: 1rem 0;
-            animation: pulse 1s infinite;
-        }
-
-        .countdown-actions {
-            margin-top: 1rem;
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-        }
-
-        .countdown-btn {
-            padding: 0.5rem 1rem;
-            background: var(--accent-primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .countdown-btn.secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-        }
-
-        .countdown-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-medium);
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .player-info {
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-
-        .player-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--text-primary);
-        }
-
-        .player-details {
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            
-            .main-container {
-                margin-left: 0;
-            }
-            
-            .mobile-menu-toggle {
-                display: block;
-                position: fixed;
-                top: 1rem;
-                left: 1rem;
-                z-index: 1001;
-                background: var(--accent-primary);
-                color: white;
-                border: none;
-                border-radius: 50%;
-                width: 48px;
-                height: 48px;
-                cursor: pointer;
-                font-size: 1.2rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .main-container {
-                padding: 1rem;
-            }
-            
-            .gallery {
-                grid-template-columns: 1fr;
-            }
-            
-            .search-filter-bar {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .search-box {
-                min-width: auto;
-            }
-        }
-
-        /* Loading States */
-        .loading-skeleton {
-            background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .slide-in {
-            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
-        }
-
-        #lightboxImage {
-            cursor: pointer;
-        }
-
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--accent-primary);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-secondary);
-        }
-    </style>
+    <link href="/static/ui.css" rel="stylesheet">
+    <link href="/static/gallery.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" onclick="toggleSidebar()">
-        <i class="fas fa-bars"></i>
-    </button>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2><i class="fas fa-photo-video"></i> <!-- Media Gallery --></h2>
-        </div>
-        <nav class="sidebar-nav">
-            <div class="nav-item">
-                <a href="../{{page_name}}" class="nav-link">
-                    <i class="fas fa-level-up-alt"></i>
-                    <!-- <span>Go Up</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/" class="nav-link">
-                    <i class="fas fa-home"></i>
-                    <!-- <span>Root</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/list_directories" class="nav-link">
-                    <i class="fas fa-list"></i>
-                    <!-- <span>List Directories</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/list_videos" class="nav-link">
-                    <i class="fas fa-play-circle"></i>
-                    <!-- <span>List Videos</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/reel/{{page_path_rel}}" class="nav-link">
-                    <i class="fas fa-mobile-alt"></i>
-                    <!-- <span>Reels</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/jobs?path={{ page_path_rel | urlencode }}" class="nav-link" title="Jobs: rescan / thumbnails for this folder">
-                    <i class="fas fa-sync-alt"></i>
-                    <!-- <span>Update</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/browse" class="nav-link" title="Browse all files">
-                    <i class="fas fa-folder-tree"></i>
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="/upload?dest={{ page_path_rel | urlencode }}" class="nav-link" title="Upload files to this folder">
-                    <i class="fas fa-cloud-arrow-up"></i>
-                </a>
-            </div>
-
-            <div class="nav-item">
-                <a href="#folders" class="nav-link">
-                    <i class="fas fa-folder"></i>
-                    <!-- <span>Folders</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="#videos" class="nav-link">
-                    <i class="fas fa-video"></i>
-                    <!-- <span>Videos</span> -->
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="#images" class="nav-link">
-                    <i class="fas fa-image"></i>
-                    <!-- <span>Images</span> -->
-                </a>
-            </div>
+    <header class="appbar">
+        <a class="brand" href="/page/" title="Media Gallery home">
+            <i class="fas fa-photo-film" aria-hidden="true"></i>
+            <span class="brand-name">Media Gallery</span>
+        </a>
+        <nav class="appnav" aria-label="Primary">
+            <a href="/page/{{ page_path_rel | urlencode }}" aria-current="page" title="Gallery">
+                <i class="fas fa-table-cells-large" aria-hidden="true"></i><span class="label">Gallery</span>
+            </a>
+            <a href="/reel/{{ page_path_rel | urlencode }}" title="Watch this folder as reels">
+                <i class="fas fa-mobile-screen" aria-hidden="true"></i><span class="label">Reels</span>
+            </a>
+            <a href="/browse" title="Browse all files">
+                <i class="fas fa-folder-tree" aria-hidden="true"></i><span class="label">Library</span>
+            </a>
+            <a href="/upload?dest={{ page_path_rel | urlencode }}" title="Upload files to this folder">
+                <i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span class="label">Upload</span>
+            </a>
+            <a href="/jobs?path={{ page_path_rel | urlencode }}" title="Rescan and thumbnails for this folder">
+                <i class="fas fa-list-check" aria-hidden="true"></i><span class="label">Jobs</span>
+            </a>
         </nav>
-    </div>
+    </header>
 
-    <!-- Main Content -->
-    <div class="main-container">
-        <!-- Header -->
-        <div class="header fade-in">
-            <h1>{{name}}</h1>
+    <main class="page" id="main">
+        {% set crumbs = [] if page_path_rel in ('.', '') else page_path_rel.split('/') %}
+        {% set trail = namespace(path='') %}
+        <div class="page-head">
+            <div>
+                <nav class="breadcrumbs" aria-label="Breadcrumb">
+                    {% if crumbs %}<a href="/page/">Library</a>{% else %}<span aria-current="page">Library</span>{% endif %}
+                    {% for part in crumbs %}
+                        {% set trail.path = (trail.path ~ '/' if trail.path else '') ~ part %}
+                        <i class="fas fa-chevron-right sep" aria-hidden="true"></i>
+                        {% if loop.last %}
+                            <span aria-current="page">{{ part }}</span>
+                        {% else %}
+                            <a href="/page/{{ trail.path | urlencode }}">{{ part }}</a>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+                <h1>{{ name }}</h1>
+                <p class="page-stats">
+                    {% if subpages|length > 0 %}<a href="#folders"><i class="fas fa-folder" aria-hidden="true"></i>{{ subpages|length }} {{ 'folder' if subpages|length == 1 else 'folders' }}</a>{% endif %}
+                    {% if vids|length > 0 %}<a href="#videos"><i class="fas fa-video" aria-hidden="true"></i>{{ vids|length }} {{ 'video' if vids|length == 1 else 'videos' }}</a>{% endif %}
+                    {% if clips|length > 0 %}<a href="#clips"><i class="fas fa-scissors" aria-hidden="true"></i>{{ clips|length }} {{ 'clip' if clips|length == 1 else 'clips' }}</a>{% endif %}
+                    {% if images|length > 0 %}<a href="#images"><i class="fas fa-image" aria-hidden="true"></i>{{ images|length }} {{ 'image' if images|length == 1 else 'images' }}</a>{% endif %}
+                    <span><i class="fas fa-hard-drive" aria-hidden="true"></i>{{ files_size_str }}</span>
+                </p>
+            </div>
+            <button type="button" class="btn btn-primary" id="clipStreamBtn" data-folder="{{ page_path_rel }}" onclick="openClipStream(this.dataset.folder)" title="Random clips from this folder and all subfolders">
+                <i class="fas fa-shuffle" aria-hidden="true"></i> Shuffle clips
+            </button>
         </div>
 
-        <!-- Search and Filter Bar -->
-        <div class="search-filter-bar fade-in">
+        <div class="toolbar" role="toolbar" aria-label="Gallery controls">
             <div class="search-box">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Search media files..." onkeyup="filterMedia()">
+                <i class="fas fa-search search-icon" aria-hidden="true"></i>
+                <input type="search" class="input search-input" id="searchInput" placeholder="Search this folder  ( / )" aria-label="Search this folder" autocomplete="off" oninput="filterMedia()">
             </div>
-            <div class="sort-controls">
-                <select id="sortSelect" class="sort-select" onchange="sortMedia()">
-                    <option value="">Sort by...</option>
-                    <option value="name-asc">Name (A-Z)</option>
-                    <option value="name-desc">Name (Z-A)</option>
-                    <option value="duration-asc">Duration (Short-Long)</option>
-                    <option value="duration-desc">Duration (Long-Short)</option>
-                </select>
+            <select id="sortSelect" class="select sort-select" aria-label="Sort by" onchange="sortMedia()">
+                <option value="">Sort by…</option>
+                <option value="name-asc">Name (A–Z)</option>
+                <option value="name-desc">Name (Z–A)</option>
+                <option value="duration-asc">Duration (short–long)</option>
+                <option value="duration-desc">Duration (long–short)</option>
+            </select>
+            <span class="toolbar-spacer"></span>
+            <div class="size-slider-container" title="Thumbnail size">
+                <i class="fas fa-image" style="font-size: 0.7rem" aria-hidden="true"></i>
+                <input type="range" id="cardSizeSlider" class="size-slider" min="120" max="400" value="220" aria-label="Thumbnail size" oninput="updateCardSize(this.value)">
+                <i class="fas fa-image" style="font-size: 1rem" aria-hidden="true"></i>
             </div>
-            <div class="size-slider-container">
-                <i class="fas fa-compress" style="color: var(--text-secondary); font-size: 0.8rem;"></i>
-                <input type="range" id="cardSizeSlider" class="size-slider" min="120" max="400" value="220" oninput="updateCardSize(this.value)">
-                <i class="fas fa-expand" style="color: var(--text-secondary); font-size: 1rem;"></i>
+            <div class="tool-group" role="group" aria-label="Display options">
+                <button type="button" class="view-btn" id="overlayToggleBtn" aria-pressed="false" onclick="toggleCardOverlays()" title="Hide file names and durations on thumbnails">
+                    <i class="fas fa-eye" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="view-btn" id="selectToggleBtn" aria-pressed="false" onclick="setSelectMode(!selectMode)" title="Select multiple items to move or delete">
+                    <i class="fas fa-square-check" aria-hidden="true"></i><span class="btn-label">Select</span>
+                </button>
             </div>
-            <div class="view-toggle">
-                <button class="view-btn" id="clipStreamBtn" data-folder="{{ page_path_rel }}" onclick="openClipStream(this.dataset.folder)" title="Random clips from this folder and all subfolders">
-                    <i class="fas fa-shuffle"></i>
+            <label class="toggle" title="Play the next video automatically">
+                <input type="checkbox" id="globalAutoplayCheckbox" class="autoplay-checkbox">
+                <span>Autoplay</span>
+            </label>
+            <div class="tool-group view-toggle" role="group" aria-label="Layout">
+                <button type="button" class="view-btn active" data-mode="grid" aria-pressed="true" onclick="setViewMode('grid')" title="Grid view">
+                    <i class="fas fa-table-cells" aria-hidden="true"></i><span class="visually-hidden">Grid view</span>
                 </button>
-                <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="view-btn" id="selectToggleBtn" onclick="setSelectMode(!selectMode)" title="Select multiple items to move or delete">
-                    <i class="fas fa-square-check"></i>
-                </button>
-                <div class="global-autoplay-container" style="display: flex; align-items: center; padding: 0 0.5rem; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); margin: 0 0.25rem;">
-                    <label class="autoplay-label" style="margin: 0;">
-                        <input type="checkbox" id="globalAutoplayCheckbox" class="autoplay-checkbox">
-                        <span class="autoplay-text" style="font-size: 0.9rem;">
-                            <i class="fas fa-play-circle"></i> Auto
-                        </span>
-                    </label>
-                </div>
-                <button class="view-btn active" data-mode="grid" onclick="setViewMode('grid')" title="Grid View">
-                    <i class="fas fa-th"></i>
-                </button>
-                <button class="view-btn" data-mode="list" onclick="setViewMode('list')" title="List View">
-                    <i class="fas fa-list"></i>
+                <button type="button" class="view-btn" data-mode="list" aria-pressed="false" onclick="setViewMode('list')" title="List view">
+                    <i class="fas fa-list" aria-hidden="true"></i><span class="visually-hidden">List view</span>
                 </button>
             </div>
         </div>
+
+        {% if subpages|length == 0 and vids|length == 0 and clips|length == 0 and images|length == 0 %}
+            <div class="empty-state">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
+                <h2>This folder is empty</h2>
+                <p>Upload files here, or run a rescan if you expect to see media.</p>
+                <p style="margin-top: 0.75rem">
+                    <a class="btn btn-primary" href="/upload?dest={{ page_path_rel | urlencode }}"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i> Upload files</a>
+                </p>
+            </div>
+        {% endif %}
 
         <!-- Folders Section -->
         {% if subpages|length > 0 %}
             <div class="gallery-section fade-in">
                 <h2 class="section-title" id="folders">
-                    <i class="fas fa-folder-open"></i> Folders ({{subpages|length}})
+                    <i class="fas fa-folder-open" aria-hidden="true"></i> Folders <span class="count">{{ subpages|length }}</span>
                 </h2>
                 <div class="gallery" id="foldersGallery">
                     {% for cp in subpages %}
@@ -1631,8 +139,8 @@
                                 <div class="thumbnail-image-wrapper">
                                     <div class="thumbnail-info-popover">
                                         <i class="fas fa-video"></i> {{cp.num_vids}} videos<br>
-                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders<br>
-                                        <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
+                                        <i class="fas fa-folder"></i> {{cp.num_subpages}} folders<br>
+                                        <i class="fas fa-image"></i> {{cp.num_imgs}} images
                                     </div>
                                     <img src="/file/{{ cp.subfolder_thumb }}" 
                                          loading="lazy"
@@ -1647,8 +155,8 @@
                                     <div class="thumbnail-title">{{cp.name}}</div>
                                     <div class="thumbnail-info">
                                         <i class="fas fa-video"></i> {{cp.num_vids}} videos &bull;
-                                        <i class="fas fa-folder"></i> {{cp.num_subfolders}} folders &bull;
-                                        <i class="fas fa-hdd"></i> {{cp.files_size_str}} total
+                                        <i class="fas fa-folder"></i> {{cp.num_subpages}} folders &bull;
+                                        <i class="fas fa-image"></i> {{cp.num_imgs}} images
                                     </div>
                                 </div>
                             </a>
@@ -1662,7 +170,7 @@
         {% if vids|length > 0 %}
             <div class="gallery-section fade-in">
                 <h2 class="section-title" id="videos">
-                    <i class="fas fa-video"></i> Videos ({{vids|length}})
+                    <i class="fas fa-video" aria-hidden="true"></i> Videos <span class="count">{{ vids|length }}</span>
                 </h2>
                 <div class="gallery" id="videosGallery">
                     {% for vid in vids %}
@@ -1707,7 +215,7 @@
         {% if clips|length > 0 %}
             <div class="gallery-section fade-in">
                 <h2 class="section-title" id="clips">
-                    <i class="fas fa-cut"></i> Clips ({{clips|length}})
+                    <i class="fas fa-scissors" aria-hidden="true"></i> Clips <span class="count">{{ clips|length }}</span>
                 </h2>
                 <div class="gallery" id="clipsGallery">
                     {% for vid in clips %}
@@ -1752,7 +260,7 @@
         {% if images|length > 0 %}
             <div class="gallery-section fade-in">
                 <h2 class="section-title" id="images">
-                    <i class="fas fa-image"></i> Images ({{images|length}})
+                    <i class="fas fa-image" aria-hidden="true"></i> Images <span class="count">{{ images|length }}</span>
                 </h2>
                 <div class="gallery" id="imagesGallery">
                     {% for img in images %}
@@ -1775,7 +283,19 @@
                 </div>
             </div>
         {% endif %}
-    </div>
+
+        <div class="empty-state" id="noResults" hidden>
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <h2>No matches</h2>
+            <p>Nothing in this folder matches your search.</p>
+        </div>
+
+        <footer class="page-footer">
+            <a href="/docs">API docs</a>
+            <a href="/list_directories">Directory list</a>
+            <a href="/list_videos">Video list</a>
+        </footer>
+    </main>
 
     <!-- Video Player Modal -->
     <div class="video-player" id="videoPlayer">
@@ -1977,26 +497,18 @@
         let currentThumbnail = null;
         let currentViewMode = 'grid';
 
-        // Sidebar Toggle for Mobile
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-        }
-
         // View Mode Toggle
         function setViewMode(mode) {
             currentViewMode = mode;
             localStorage.setItem('viewMode', mode);
 
             const galleries = document.querySelectorAll('.gallery');
-            const viewBtns = document.querySelectorAll('.view-toggle .view-btn:not(#overlayToggleBtn)');
+            const viewBtns = document.querySelectorAll('.view-toggle .view-btn');
             
             viewBtns.forEach(btn => {
-                if (btn.dataset.mode === mode) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
+                const isActive = btn.dataset.mode === mode;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', String(isActive));
             });
             
             galleries.forEach(gallery => {
@@ -2023,13 +535,9 @@
             const toggleBtn = document.getElementById('overlayToggleBtn');
             if (toggleBtn) {
                 const icon = toggleBtn.querySelector('i');
-                if (isHidden) {
-                    icon.className = 'fas fa-eye-slash';
-                    toggleBtn.classList.add('active');
-                } else {
-                    icon.className = 'fas fa-eye';
-                    toggleBtn.classList.remove('active');
-                }
+                icon.className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
+                toggleBtn.classList.toggle('active', isHidden);
+                toggleBtn.setAttribute('aria-pressed', String(isHidden));
             }
             localStorage.setItem('hideCardOverlays', isHidden);
         }
@@ -2052,20 +560,23 @@
 
         // Search and Filter
         function filterMedia() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const thumbnails = document.querySelectorAll('.thumbnail');
-            
-            thumbnails.forEach(thumbnail => {
+            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+            let anyVisible = false;
+
+            document.querySelectorAll('.thumbnail').forEach(thumbnail => {
                 const name = thumbnail.dataset.name || '';
                 const type = thumbnail.dataset.type || '';
-                
-                if (name.includes(searchTerm) || type.includes(searchTerm)) {
-                    thumbnail.style.display = 'block';
-                    thumbnail.classList.add('fade-in');
-                } else {
-                    thumbnail.style.display = 'none';
-                }
+                thumbnail.hidden = !(name.includes(searchTerm) || type.includes(searchTerm));
             });
+
+            document.querySelectorAll('.gallery-section').forEach(section => {
+                const hasMatch = section.querySelector('.thumbnail:not([hidden])') !== null;
+                section.hidden = !hasMatch;
+                anyVisible = anyVisible || hasMatch;
+            });
+
+            const noResults = document.getElementById('noResults');
+            if (noResults) noResults.hidden = anyVisible || !document.querySelector('.gallery-section');
         }
 
         // Sort Media
@@ -2437,6 +948,7 @@
             selectMode = on;
             document.body.classList.toggle('select-mode', on);
             document.getElementById('selectToggleBtn').classList.toggle('select-on', on);
+            document.getElementById('selectToggleBtn').setAttribute('aria-pressed', String(on));
             if (!on) clearSelection();
             updateSelectBar();
         }
@@ -3258,7 +1770,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             const sections = document.querySelectorAll('.gallery-section');
             sections.forEach((section, index) => {
-                section.style.animationDelay = `${index * 0.1}s`;
+                section.style.animationDelay = `${index * 0.05}s`;
+            });
+
+            // Video cards are divs with a click handler; make them reachable and operable by keyboard.
+            document.querySelectorAll('.thumbnail[data-video-src]').forEach(card => {
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', `Play ${card.dataset.videoTitle}`);
             });
             
             // Randomize subfolder thumbnails on page load
@@ -3302,6 +1821,20 @@
 
             // Initialize swipe gestures
             setupSwipeGestures();
+        });
+
+        // Keyboard: Enter/Space opens a focused video card; "/" jumps to search.
+        document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+            const typing = e.target.closest('input, select, textarea, button, a');
+            const modalOpen = Array.from(document.querySelectorAll('.video-player')).some(m => m.style.display === 'block');
+            if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.thumbnail[data-video-src]')) {
+                e.preventDefault();
+                e.target.click();
+            } else if (e.key === '/' && !typing && !modalOpen) {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
         });
 
         // Handle missing/broken image thumbnails gracefully

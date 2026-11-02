@@ -6,66 +6,77 @@
     <title>Upload</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/ui.css" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0a0a0a; --panel: #161616; --panel-2: #202020; --border: rgba(255,255,255,0.1);
-            --text: #fff; --muted: #a3a3a3; --accent: #6366f1; --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b; --run: #3b82f6;
-        }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
-        main { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
-        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        h1 { font-size: 1.5rem; margin: 0; }
-        h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
-        a { color: var(--accent); }
-        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
-        .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
-        label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
-        label.check { flex-direction: row; align-items: center; gap: 0.4rem; color: var(--text); font-size: 0.9rem; }
-        input, select, button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.7rem; }
-        input[type=text] { min-width: 24rem; }
-        input[type=number] { width: 5rem; }
-        button { cursor: pointer; }
-        button:disabled { opacity: 0.4; cursor: default; }
-        button.primary { background: var(--accent); border-color: var(--accent); }
-        .muted { color: var(--muted); font-size: 0.85rem; }
+        .row { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); align-items: end; }
+        .field { display: flex; gap: var(--s-2); }
+        .field input { flex: 1; min-width: 0; }
+        .ui input[type=number] { width: 6rem; }
         .hidden { display: none !important; }
-        .field { display: flex; gap: 0.4rem; }
-        .field input { flex: 1; }
-        .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; transition: border-color .15s, background .15s; }
-        .drop.over { border-color: var(--accent); background: rgba(99,102,241,0.08); }
-        .drop .big { font-size: 1rem; margin-bottom: 0.25rem; }
-        .drop .buttons { display: flex; gap: 0.6rem; justify-content: center; margin-top: 0.9rem; flex-wrap: wrap; }
-        .groups { margin-top: 0.9rem; font-size: 0.88rem; }
-        .groups div { display: flex; gap: 0.75rem; padding: 0.15rem 0; }
+        .ui button:disabled { opacity: 0.45; cursor: not-allowed; }
+        .muted { font-size: 13px; }
+
+        .drop {
+            padding: var(--s-6) var(--s-5);
+            text-align: center;
+            background: var(--surface-2);
+            border: 2px dashed var(--border-strong);
+            border-radius: var(--r-lg);
+            transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+        }
+        .drop.over { border-color: var(--accent-text); background: var(--accent-soft); }
+        .drop .big { margin-bottom: var(--s-1); font-size: 18px; font-weight: 600; }
+        .drop .big i { display: block; margin-bottom: var(--s-2); font-size: 32px; color: var(--accent-text); }
+        .drop .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); margin-top: var(--s-4); }
+
+        .groups { margin-top: var(--s-4); font-size: 14px; }
+        .groups div { display: flex; gap: var(--s-3); padding: 6px 0; border-bottom: 1px solid var(--border); }
         .groups .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .groups .meta { color: var(--muted); white-space: nowrap; }
-        .bar { height: 10px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
-        .bar > div { height: 100%; background: var(--run); width: 0; transition: width .2s; }
-        .bar.done > div { background: var(--ok); }
-        .stats { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0.6rem 0; font-size: 0.88rem; }
-        .stats b { font-weight: 600; }
-        .active { font-size: 0.82rem; font-family: ui-monospace, monospace; }
-        .active > div { display: flex; gap: 0.6rem; align-items: center; padding: 0.15rem 0; }
+        .groups .meta { color: var(--text-2); white-space: nowrap; }
+
+        .bar { height: 10px; overflow: hidden; background: var(--surface-3); border-radius: var(--r-pill); }
+        .bar > div { width: 0; height: 100%; background: var(--info); border-radius: inherit; transition: width 0.2s var(--ease); }
+        .bar.done > div { background: var(--success); }
+        .stats { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); margin: var(--s-3) 0; font-size: 14px; color: var(--text-2); }
+        .stats b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .active { font: 13px var(--mono); }
+        .active > div { display: flex; align-items: center; gap: var(--s-3); padding: 4px 0; }
         .active .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .active .mini { width: 90px; height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; flex: none; }
-        .active .mini > div { height: 100%; background: var(--run); }
-        .fails { max-height: 14rem; overflow: auto; font-size: 0.82rem; margin-top: 0.5rem; }
-        .fails div { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }
-        .fails .why { color: var(--bad); }
-        .msg { margin-top: 0.6rem; font-size: 0.9rem; }
-        .msg.error { color: var(--bad); } .msg.ok { color: var(--ok); }
+        .active .mini { width: 90px; height: 5px; flex: none; overflow: hidden; background: var(--surface-3); border-radius: var(--r-pill); }
+        .active .mini > div { height: 100%; background: var(--info); }
+        .fails { max-height: 14rem; margin-top: var(--s-3); overflow: auto; font-size: 13px; }
+        .fails > div { padding: 6px 0; border-bottom: 1px solid var(--border); }
+        .fails .why { color: var(--danger); }
+
+        .msg { min-height: 1.4em; margin-top: var(--s-3); font-size: 14px; }
+        .msg.error { color: var(--danger); }
+        .msg.ok { color: var(--success); }
     </style>
 </head>
-<body>
-<main>
-    <header>
-        <h1>Upload</h1>
-        <span><a href="/jobs">Jobs</a> &nbsp; <a href="/browse">Browse files</a> &nbsp; <a href="/page/">&larr; Back to gallery</a></span>
+<body class="ui">
+    <header class="appbar">
+        <a class="brand" href="/page/" title="Media Gallery home">
+            <i class="fas fa-photo-film" aria-hidden="true"></i>
+            <span class="brand-name">Media Gallery</span>
+        </a>
+        <nav class="appnav" aria-label="Primary">
+            <a href="/page/" title="Gallery"><i class="fas fa-table-cells-large" aria-hidden="true"></i><span class="label">Gallery</span></a>
+            <a href="/browse" title="Browse all files"><i class="fas fa-folder-tree" aria-hidden="true"></i><span class="label">Library</span></a>
+            <a href="/upload" aria-current="page" title="Upload files"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span class="label">Upload</span></a>
+            <a href="/jobs" title="Background jobs"><i class="fas fa-list-check" aria-hidden="true"></i><span class="label">Jobs</span></a>
+        </nav>
     </header>
 
+<main class="page narrow">
+    <div class="page-head">
+        <div>
+            <h1>Upload</h1>
+            <p class="page-sub">Add folders or files to the library.</p>
+        </div>
+        <a class="btn" id="backLink" href="/page/"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to gallery</a>
+    </div>
     <section class="panel">
-        <h2>Destination</h2>
+        <h2><i class="fas fa-folder-open" aria-hidden="true"></i> Destination</h2>
         <label>Folder (relative to the gallery root; created if it doesn't exist)
             <span class="field"><input type="text" id="dest" value="." spellcheck="false"><button type="button" id="pickDest">Browse&hellip;</button></span>
         </label>
@@ -73,7 +84,7 @@
     </section>
 
     <section class="panel">
-        <h2>Files</h2>
+        <h2><i class="fas fa-file-arrow-up" aria-hidden="true"></i> Files</h2>
         <div class="drop" id="drop">
             <div class="big"><i class="fas fa-cloud-arrow-up"></i> Drop folders or files here</div>
             <div class="muted">Folders are uploaded recursively and keep their structure. Empty folders are not created.</div>
@@ -91,7 +102,7 @@
     </section>
 
     <section class="panel">
-        <h2>Options</h2>
+        <h2><i class="fas fa-sliders" aria-hidden="true"></i> Options</h2>
         <div class="row">
             <label>Parallel uploads
                 <input type="number" id="parallel" min="1" max="8" value="3">
@@ -468,7 +479,10 @@ $('cancel').addEventListener('click', () => {
 window.addEventListener('beforeunload', (e) => { if (run?.running) { e.preventDefault(); e.returnValue = ''; } });
 
 const initial = new URLSearchParams(location.search).get('dest');
-if (initial) $('dest').value = initial;
+if (initial) {
+    $('dest').value = initial;
+    if (initial !== '.') $('backLink').href = `/page/${initial.split('/').map(encodeURIComponent).join('/')}`;
+}
 renderStaged();
 </script>
 </body>

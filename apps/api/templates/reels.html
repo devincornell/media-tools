@@ -8,8 +8,13 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --accent-primary: #6366f1;
-            --accent-secondary: #8b5cf6;
+            --accent-primary: #4f5bf0;
+            --accent-secondary: #a3acff;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--accent-secondary);
+            outline-offset: 2px;
         }
 
         * {
@@ -96,7 +101,8 @@
             top: 0;
             left: 0;
             right: 0;
-            padding: 1.25rem 1.25rem 2.5rem 1.25rem;
+            /* Leaves room for the fixed Gallery button in the top-left corner. */
+            padding: calc(1rem + 42px + 0.75rem) 1.25rem 2.5rem 1.25rem;
             background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
             display: flex;
             align-items: flex-start;
@@ -141,7 +147,7 @@
         .reel-info-popover {
             display: none;
             position: absolute;
-            top: 4rem;
+            top: calc(1rem + 42px + 0.75rem + 34px + 0.5rem);
             right: 1.25rem;
             background: rgba(20, 20, 20, 0.95);
             border: 1px solid rgba(255, 255, 255, 0.12);
@@ -284,7 +290,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            color: #a3a3a3;
+            color: #a7aebd;
         }
 
         .reel-empty i {

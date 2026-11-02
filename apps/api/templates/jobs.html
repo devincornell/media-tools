@@ -6,73 +6,83 @@
     <title>Jobs</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/ui.css" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0a0a0a; --panel: #161616; --panel-2: #202020; --border: rgba(255,255,255,0.1);
-            --text: #fff; --muted: #a3a3a3; --accent: #6366f1;
-            --queued: #6b7280; --running: #3b82f6; --succeeded: #22c55e; --failed: #ef4444; --canceled: #f59e0b;
-        }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); }
-        main { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
-        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        h1 { font-size: 1.5rem; margin: 0; }
-        h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
-        a { color: var(--accent); }
-        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
-        .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
-        label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
-        label.check { flex-direction: row; align-items: center; color: var(--text); font-size: 0.9rem; }
-        input, select, button, textarea { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; }
-        input[type=text] { min-width: 22rem; }
-        input[type=number] { width: 5rem; }
-        button { cursor: pointer; }
-        button.primary { background: var(--accent); border-color: var(--accent); }
-        button.small { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+        .row { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4); align-items: end; }
+        .row > label:has(.field) { flex: 1 1 22rem; }
+        .field { display: flex; gap: var(--s-2); }
+        .field input { flex: 1; min-width: 0; }
+        .ui input[type=number] { width: 6rem; }
         .hidden { display: none !important; }
-        .msg { margin-top: 0.75rem; font-size: 0.9rem; }
-        .msg.error { color: var(--failed); }
-        .msg.ok { color: var(--succeeded); }
-        .danger { color: var(--failed); font-size: 0.85rem; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
-        th { color: var(--muted); font-weight: 500; }
-        .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: #000; }
-        .badge.queued { background: var(--queued); color: #fff; } .badge.running { background: var(--running); color: #fff; }
-        .badge.succeeded { background: var(--succeeded); } .badge.failed { background: var(--failed); color: #fff; }
-        .badge.canceled { background: var(--canceled); }
-        .bar { width: 140px; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-bottom: 0.25rem; }
-        .bar > div { height: 100%; background: var(--running); }
-        .stage, .muted { color: var(--muted); font-size: 0.8rem; }
-        .warn { color: var(--canceled); }
-        .err { color: var(--failed); }
-        pre { white-space: pre-wrap; word-break: break-all; background: var(--panel-2); padding: 0.75rem; border-radius: 8px; max-height: 24rem; overflow: auto; margin: 0; font-size: 0.78rem; }
-        .details td { background: #111; }
-        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-        .details-grid .full { grid-column: 1 / -1; }
-        pre.log { max-height: 30rem; font-family: ui-monospace, monospace; }
-        .target { font-family: ui-monospace, monospace; font-size: 0.82rem; }
-        .field { display: flex; gap: 0.4rem; }
-        .field input { flex: 1; }
-        .montage { margin-top: 0.75rem; display: grid; gap: 0.75rem; }
-        .montage fieldset { border: 1px solid var(--border); border-radius: 10px; margin: 0; padding: 0.75rem; }
-        .montage legend { color: var(--muted); font-size: 0.8rem; font-weight: 600; padding: 0 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem 1rem; align-items: end; }
+
+        .msg { min-height: 1.4em; margin-top: var(--s-3); font-size: 14px; }
+        .msg.error, .danger { color: var(--danger); }
+        .msg.ok { color: var(--success); }
+        .danger { font-size: 13px; }
+
+        .montage { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
+        .montage fieldset { margin: 0; padding: var(--s-4); border: 1px solid var(--border); border-radius: var(--r-md); }
+        .montage legend { padding: 0 var(--s-2); font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+        .montage details > summary { margin-bottom: var(--s-3); font-size: 14px; color: var(--text-2); cursor: pointer; }
+        .montage details > summary:hover { color: var(--text); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--s-3) var(--s-4); align-items: end; }
         .grid .wide { grid-column: 1 / -1; }
         .montage input[type=text], .montage input[type=number], .montage input[type=datetime-local], .montage select, .montage textarea { width: 100%; min-width: 0; }
-        .montage details > summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
-        .checks { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+        .checks { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); }
+
+        .panel.scroll { overflow-x: auto; }
+        .history-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-4); }
+        .history-head h2 { margin: 0; }
+        table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: var(--s-3); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+        th { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+        tbody tr:not(.details):hover { background: var(--surface-2); }
+        .details td { background: var(--bg); }
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+        .details-grid .full { grid-column: 1 / -1; }
+        @media (max-width: 760px) { .details-grid { grid-template-columns: 1fr; } }
+
+        .badge.queued { color: var(--text-2); background: var(--surface-3); }
+        .badge.running { color: var(--info); background: var(--info-soft); }
+        .badge.succeeded { color: var(--success); background: var(--success-soft); }
+        .badge.failed { color: var(--danger); background: var(--danger-soft); }
+        .badge.canceled { color: var(--warning); background: var(--warning-soft); }
+
+        .bar { width: 140px; height: 6px; margin-bottom: 4px; overflow: hidden; background: var(--surface-3); border-radius: var(--r-pill); }
+        .bar > div { height: 100%; background: var(--info); border-radius: inherit; }
+        .stage { font-size: 13px; color: var(--text-2); }
+        .warn { color: var(--warning); font-size: 13px; }
+        .err { color: var(--danger); font-size: 13px; }
+        .target { font: 13px var(--mono); overflow-wrap: anywhere; }
+
+        pre { max-height: 24rem; margin: 0; padding: var(--s-3); overflow: auto; font: 12px/1.6 var(--mono); white-space: pre-wrap; word-break: break-all; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
+        pre.log { max-height: 30rem; }
     </style>
 </head>
-<body>
-<main>
-    <header>
-        <h1>Jobs</h1>
-        <span><a href="/upload">Upload files</a> &nbsp; <a href="/browse">Browse files</a> &nbsp; <a id="backLink" href="/page/">&larr; Back to gallery</a></span>
+<body class="ui">
+    <header class="appbar">
+        <a class="brand" href="/page/" title="Media Gallery home">
+            <i class="fas fa-photo-film" aria-hidden="true"></i>
+            <span class="brand-name">Media Gallery</span>
+        </a>
+        <nav class="appnav" aria-label="Primary">
+            <a href="/page/" title="Gallery"><i class="fas fa-table-cells-large" aria-hidden="true"></i><span class="label">Gallery</span></a>
+            <a href="/browse" title="Browse all files"><i class="fas fa-folder-tree" aria-hidden="true"></i><span class="label">Library</span></a>
+            <a href="/upload" title="Upload files"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span class="label">Upload</span></a>
+            <a href="/jobs" aria-current="page" title="Background jobs"><i class="fas fa-list-check" aria-hidden="true"></i><span class="label">Jobs</span></a>
+        </nav>
     </header>
 
+<main class="page wide">
+    <div class="page-head">
+        <div>
+            <h1>Jobs</h1>
+            <p class="page-sub">Rescans, thumbnails, cleanup, conversions, moves and montages run in the background.</p>
+        </div>
+        <a class="btn" id="backLink" href="/page/"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to gallery</a>
+    </div>
     <section class="panel">
-        <h2>New job</h2>
+        <h2><i class="fas fa-plus" aria-hidden="true"></i> New job</h2>
         <form id="jobForm">
             <div class="row">
                 <label>Task
@@ -177,9 +187,9 @@
         </form>
     </section>
 
-    <section class="panel">
-        <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem">
-            <h2 style="margin: 0">History</h2>
+    <section class="panel scroll">
+        <div class="history-head">
+            <h2 class="panel-title" style="margin: 0"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> History</h2>
             <div class="row">
                 <label>Status
                     <select id="filterStatus">
