@@ -782,6 +782,17 @@
         .jobs-panel-head strong { flex: 1; }
         .jobs-panel-head a { color: var(--accent-secondary); text-decoration: none; }
 
+        .jobs-close {
+            background: none;
+            border: none;
+            padding: 0.1rem 0.3rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+
+        .jobs-close:hover { color: var(--text-primary); }
+
         .jobs-list { overflow-y: auto; }
 
         .jobs-empty { padding: 1rem; color: var(--text-secondary); }
@@ -1839,6 +1850,9 @@
         <div class="jobs-panel-head">
             <strong>Jobs</strong>
             <a href="/jobs?path={{ page_path_rel | urlencode }}">All jobs</a>
+            <button type="button" class="jobs-close" onclick="setJobsPanel(false)" title="Close" aria-label="Close">
+                <i class="fas fa-xmark"></i>
+            </button>
         </div>
         <div class="jobs-list" id="jobsList"></div>
     </div>
@@ -2334,14 +2348,15 @@
                 const response = await fetch('/api/media-jobs?limit=15');
                 if (!response.ok) throw new Error(await apiError(response));
                 const items = (await response.json()).items;
-                const active = items.filter(i => JOB_ACTIVE.has(i.job.status)).length;
+                const activeItems = items.filter(i => JOB_ACTIVE.has(i.job.status));
+                const active = activeItems.length;
                 const badge = document.getElementById('jobsBadge');
                 badge.textContent = active;
                 badge.classList.toggle('jp-hidden', active === 0);
                 document.getElementById('jobsFab').classList.toggle('busy', active > 0);
                 applyFinishedMoves(items);
                 const list = document.getElementById('jobsList');
-                list.replaceChildren(...(items.length ? items.map(jobRow) : [jobEl('div', 'jobs-empty', 'No jobs yet.')]));
+                list.replaceChildren(...(active ? activeItems.map(jobRow) : [jobEl('div', 'jobs-empty', 'No active jobs.')]));
                 if (active) delay = 2000;
             } catch (err) {
                 document.getElementById('jobsList').replaceChildren(jobEl('div', 'jobs-empty', `Could not load jobs: ${err.message}`));
