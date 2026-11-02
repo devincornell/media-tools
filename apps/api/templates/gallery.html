@@ -720,6 +720,49 @@
             cursor: default;
         }
 
+        /* Multi-select */
+        .view-btn.select-on {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .select-mode .thumbnail { cursor: pointer; }
+        .select-mode .card-menu-btn { display: none; }
+
+        .thumbnail.selected {
+            outline: 3px solid var(--accent-primary);
+            outline-offset: -3px;
+        }
+
+        .select-bar {
+            position: fixed;
+            left: 50%;
+            bottom: 1rem;
+            transform: translateX(-50%);
+            z-index: 1400;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.5rem 0.8rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .select-bar button {
+            padding: 0.35rem 0.8rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .select-bar button:disabled { opacity: 0.4; cursor: default; }
+        .select-bar button.danger { color: #f87171; }
+
         /* Jobs viewer */
         .jp-hidden { display: none !important; }
 
@@ -1555,6 +1598,9 @@
                 <button class="view-btn" id="overlayToggleBtn" onclick="toggleCardOverlays()" title="Toggle file names, duration, and info button">
                     <i class="fas fa-eye"></i>
                 </button>
+                <button class="view-btn" id="selectToggleBtn" onclick="setSelectMode(!selectMode)" title="Select multiple items to move or delete">
+                    <i class="fas fa-square-check"></i>
+                </button>
                 <div class="global-autoplay-container" style="display: flex; align-items: center; padding: 0 0.5rem; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); margin: 0 0.25rem;">
                     <label class="autoplay-label" style="margin: 0;">
                         <input type="checkbox" id="globalAutoplayCheckbox" class="autoplay-checkbox">
@@ -1909,6 +1955,14 @@
                 <button type="button" class="primary" id="moveDialogConfirm">Move</button>
             </div>
         </div>
+    </div>
+
+    <!-- Multi-select action bar -->
+    <div class="select-bar jp-hidden" id="selectBar">
+        <span id="selectCount">0 selected</span>
+        <button type="button" id="selectMove" onclick="startBulkMove()" disabled><i class="fas fa-share"></i> Move to...</button>
+        <button type="button" id="selectDelete" class="danger" onclick="bulkDelete()" disabled><i class="fas fa-trash"></i> Delete...</button>
+        <button type="button" onclick="setSelectMode(false)">Done</button>
     </div>
 
     <script src="/static/picker.js"></script>
@@ -2361,6 +2415,7 @@
             } catch (err) {
                 document.getElementById('jobsList').replaceChildren(jobEl('div', 'jobs-empty', `Could not load jobs: ${err.message}`));
             }
+            clearTimeout(jobsTimer);
             jobsTimer = setTimeout(refreshJobs, delay);
         }
 
@@ -2373,6 +2428,103 @@
         document.getElementById('moveDialogBrowse').addEventListener('click', browseFromMoveDialog);
 
         refreshJobs();
+
+        // ------------------------------------------------------------ Multi-select move/delete
+        let selectMode = false;
+        const selectedCards = new Set();
+
+        function setSelectMode(on) {
+            selectMode = on;
+            document.body.classList.toggle('select-mode', on);
+            document.getElementById('selectToggleBtn').classList.toggle('select-on', on);
+            if (!on) clearSelection();
+            updateSelectBar();
+        }
+
+        function clearSelection() {
+            selectedCards.forEach(card => card.classList.remove('selected'));
+            selectedCards.clear();
+            updateSelectBar();
+        }
+
+        function toggleSelectCard(card) {
+            const on = !selectedCards.has(card);
+            if (on) selectedCards.add(card); else selectedCards.delete(card);
+            card.classList.toggle('selected', on);
+            updateSelectBar();
+        }
+
+        function updateSelectBar() {
+            for (const card of selectedCards) if (!card.isConnected) selectedCards.delete(card);
+            const count = selectedCards.size;
+            document.getElementById('selectCount').textContent = `${count} selected`;
+            document.getElementById('selectMove').disabled = count === 0;
+            document.getElementById('selectDelete').disabled = count === 0;
+            document.getElementById('selectBar').classList.toggle('jp-hidden', !selectMode);
+        }
+
+        // Capture phase so card links, players, and lightboxes do not open while selecting.
+        document.addEventListener('click', (e) => {
+            if (!selectMode) return;
+            const thumb = e.target.closest('.thumbnail');
+            if (!thumb) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (thumb.dataset.path && !thumb.classList.contains('busy-card')) toggleSelectCard(thumb);
+        }, true);
+
+        // Items inside a selected folder move or delete with it, so they are dropped from the batch.
+        function topLevelSelected() {
+            const cards = [...selectedCards].filter(c => c.isConnected);
+            return cards.filter(c => !cards.some(o => o !== c && c.dataset.path.startsWith(`${o.dataset.path}/`)));
+        }
+
+        function plural(count, word) {
+            return `${count} ${word}${count === 1 ? '' : 's'}`;
+        }
+
+        function startBulkMove() {
+            const cards = topLevelSelected();
+            if (!cards.length) return;
+            FolderPicker.open({
+                scope: 'gallery',
+                title: `Move ${plural(cards.length, 'item')} to...`,
+                startRel: document.getElementById('clipStreamBtn').dataset.folder,
+                note: (listing) => `will move into ${listing.rel || '.'}`,
+                onChoose: (listing) => bulkMove(cards, listing.rel || '.'),
+            });
+        }
+
+        function bulkMove(cards, dest) {
+            const movable = cards.filter(card => {
+                const path = card.dataset.path;
+                const parent = path.split('/').slice(0, -1).join('/') || '.';
+                return parent !== dest && dest !== path && !dest.startsWith(`${path}/`);
+            });
+            const skipped = cards.length - movable.length;
+            const note = skipped ? `${plural(skipped, 'item')} already in ${dest} or moving into itself, skipped.` : '';
+            return queueBulk(movable.map(card => ({ card, endpoint: 'move-item', body: { path: card.dataset.path, dest } })), note);
+        }
+
+        async function bulkDelete() {
+            const cards = topLevelSelected();
+            if (!cards.length) return;
+            const folders = cards.filter(c => c.dataset.type === 'folder').length;
+            const detail = folders ? ` (${plural(folders, 'folder')} with everything in them)` : '';
+            if (!confirm(`Permanently delete ${plural(cards.length, 'item')}${detail}? This can't be undone.`)) return;
+            await queueBulk(cards.map(card => ({ card, endpoint: 'delete-item', body: { path: card.dataset.path } })));
+        }
+
+        async function queueBulk(jobs, note = '') {
+            const errors = [];
+            for (const { card, endpoint, body } of jobs) {
+                const error = await queueCardJob(card, endpoint, body);
+                if (error) errors.push(`${card.dataset.path}: ${error}`);
+            }
+            setSelectMode(false);
+            const problems = [note, ...errors].filter(Boolean);
+            if (problems.length) alert(problems.join('\n'));
+        }
 
         // ------------------------------------------------------------ Random clip stream
         // Several <video> elements are stacked: one plays the current clip while the others load and seek
