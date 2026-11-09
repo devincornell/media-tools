@@ -383,7 +383,6 @@ body.hide-card-overlays .thumbnail-overlay-bottom { display: none !important; }
 .jp-hidden { display: none !important; }
 
 button.dialog-btn,
-.move-dialog-actions button,
 .select-bar button,
 .countdown-btn,
 .job-cancel {
@@ -401,13 +400,10 @@ button.dialog-btn,
     cursor: pointer;
     transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
-.move-dialog-actions button:hover,
 .select-bar button:hover,
 .job-cancel:hover { background: var(--surface-hover); border-color: var(--border-strong); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-.move-dialog-actions button.primary,
 .countdown-btn:not(.secondary) { color: #fff; background: var(--accent); border-color: transparent; }
-.move-dialog-actions button.primary:hover,
 .countdown-btn:not(.secondary):hover { background: var(--accent-hover); }
 
 .card-menu {
@@ -460,40 +456,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .card-menu-item.fav i { color: var(--favorite); }
 .card-menu-item.danger, .card-menu-item.danger i { color: var(--danger); }
 .card-menu-item.danger:hover { background: var(--danger-soft); }
-
-.move-dialog-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 2100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--overlay);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-}
-.move-dialog {
-    width: min(480px, 92vw);
-    padding: var(--s-5);
-    background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-lg);
-}
-.move-dialog h3 { margin-bottom: var(--s-4); font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
-.move-dialog-path {
-    width: 100%;
-    min-height: 38px;
-    padding: 0 var(--s-3);
-    font: 13px var(--mono);
-    color: var(--text);
-    background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-md);
-}
-.move-dialog-path:focus { outline: none; border-color: var(--accent-text); box-shadow: 0 0 0 3px var(--accent-soft); }
-.move-dialog-note { min-height: 1.25rem; margin-top: var(--s-2); font-size: 13px; color: var(--warning); }
-.move-dialog-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-4); }
 
 /* ---------------------------------------------------------------- Jobs viewer */
 

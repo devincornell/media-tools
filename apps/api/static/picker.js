@@ -7,6 +7,8 @@
  *     startRel: 'path/in/gallery',      // optional, relative to the gallery root (scope 'gallery')
  *     display: 'rel' | 'path',          // how the selection is shown (default: rel for gallery, path for source)
  *     note: (listing) => 'extra text',  // optional text appended to the selection line
+ *     allowNewFolder: true,             // show a "New folder" button (gallery scope); nothing is created here:
+ *                                       // onChoose gets a listing with virtual: true for a folder the caller must create
  *     onChoose: (listing) => {},        // receives the /api/fs/dirs listing of the chosen folder
  *   });
  */
@@ -66,6 +68,8 @@
             sel: el('span', { class: 'fp-sel' }),
             up: el('button', { type: 'button', onclick: () => state.listing?.parent && go(state.listing.parent) },
                 el('i', { class: 'fas fa-arrow-up' }), ' Up'),
+            newFolder: el('button', { type: 'button', title: 'Pick a new folder to create here', onclick: newFolder },
+                el('i', { class: 'fas fa-folder-plus' }), ' New folder'),
             choose: el('button', { type: 'button', class: 'fp-primary', onclick: choose }, 'Choose this folder'),
         };
         d.modal = el('div', { class: 'fp-modal fp-hidden', role: 'dialog', 'aria-modal': 'true', onclick: (e) => { if (e.target === d.modal) close(); } },
@@ -73,7 +77,7 @@
                 el('div', { class: 'fp-head' }, d.title, d.root,
                     el('button', { type: 'button', title: 'Close', onclick: close }, el('i', { class: 'fas fa-xmark' }))),
                 d.crumbs, d.list,
-                el('div', { class: 'fp-foot' }, d.sel, d.up, el('button', { type: 'button', onclick: close }, 'Cancel'), d.choose)));
+                el('div', { class: 'fp-foot' }, d.sel, d.newFolder, d.up, el('button', { type: 'button', onclick: close }, 'Cancel'), d.choose)));
         document.body.append(d.modal);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !d.modal.classList.contains('fp-hidden')) close(); });
         state.dom = d;
@@ -88,6 +92,33 @@
         const listing = state.listing;
         close();
         cb?.(listing);
+    }
+
+    // Descends into a folder that doesn't exist yet; it is created by whatever uses the choice.
+    function newFolder() {
+        const L = state.listing;
+        if (!L || L.rel == null) return;
+        const input = prompt(`New folder inside ${L.rel || '.'}:`);
+        if (input == null) return;
+        const parts = input.split('/').map(p => p.trim()).filter(Boolean);
+        if (!parts.length) return;
+        if (parts.some(p => p === '.' || p === '..')) { alert('Use a plain folder name without "." or "..".'); return; }
+        const existing = L.virtual ? null : L.dirs.find(x => x.name === parts[0]);
+        if (existing && parts.length === 1) {
+            if (existing.readable) go(existing.path);
+            return;
+        }
+        state.listing = {
+            ...L,
+            path: `${L.path.replace(/\/+$/, '')}/${parts.join('/')}`,
+            rel: [L.rel, ...parts].filter(Boolean).join('/'),
+            parent: L.virtual ? L.parent : L.path,
+            virtualDepth: (L.virtualDepth || 0) + parts.length,
+            virtual: true,
+            num_files: 0,
+            dirs: [],
+        };
+        render();
     }
 
     async function loadRoots() {
@@ -121,9 +152,10 @@
         d.root.value = L.root;
         const crumbs = [el('a', { onclick: () => go(L.root) }, L.root)];
         const rest = L.path.slice(L.root.length).split('/').filter(Boolean);
+        const realCount = rest.length - (L.virtualDepth || 0);
         rest.forEach((part, i) => {
             const target = L.root.replace(/\/$/, '') + '/' + rest.slice(0, i + 1).join('/');
-            crumbs.push(' / ', el('a', { onclick: () => go(target) }, part));
+            crumbs.push(' / ', i < realCount ? el('a', { onclick: () => go(target) }, part) : el('span', {}, `${part} (new)`));
         });
         d.crumbs.replaceChildren(...crumbs);
         const rows = L.dirs.map(x => el('div', {
@@ -134,10 +166,13 @@
            el('span', { class: 'fp-meta' }, dirMeta(x)),
            x.has_subdirs ? el('i', { class: 'fas fa-chevron-right fp-meta' }) : null));
         d.list.replaceChildren(...(rows.length ? rows
-            : [el('div', { class: 'fp-row fp-meta' }, `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`)]));
+            : [el('div', { class: 'fp-row fp-meta' }, L.virtual ? 'This new folder will be created when you choose it.'
+                : `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`)]));
         d.up.disabled = !L.parent;
+        d.newFolder.classList.toggle('fp-hidden', !(o.allowNewFolder && o.scope === 'gallery'));
+        d.newFolder.disabled = !L.writable;
         const showPath = (o.display || (o.scope === 'source' ? 'path' : 'rel')) === 'path';
-        let note = `Selected: ${showPath ? L.path : (L.rel || '.')}`;
+        let note = `Selected: ${showPath ? L.path : (L.rel || '.')}${L.virtual ? ' (new folder)' : ''}`;
         if (!L.writable) note += o.scope === 'source'
             ? ` \u00b7 \u26a0 the server can't delete files here (owner: ${L.owner}); the move would be refused`
             : ` \u00b7 \u26a0 read-only for the server (owner: ${L.owner})`;
