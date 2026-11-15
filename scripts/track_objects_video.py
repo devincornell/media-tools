@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import argparse
 import colorsys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import cv2
@@ -30,14 +30,24 @@ def color_for_track(track_id: TrackId) -> Color:
 
 
 COCO_PERSON_CLASS_ID = 0
+DEFAULT_TRACKER = Path(__file__).parent / "botsort_persistent.yaml"
 
 
-def extract_tracks(video: Path, max_frames: int | None, people_only: bool) -> list[TrackedFrame]:
+def extract_tracks(
+    video: Path,
+    max_frames: int | None,
+    people_only: bool,
+    model: str,
+    tracker_cfg: str,
+    conf: float,
+    imgsz: int,
+) -> list[TrackedFrame]:
     tracker = ObjectTracker(
-        model="yolo11n.pt",
-        tracker="bytetrack.yaml",
-        conf=0.25,
+        model=model,
+        tracker=tracker_cfg,
+        conf=conf,
         classes=[COCO_PERSON_CLASS_ID] if people_only else None,
+        imgsz=imgsz,
     )
     frames: list[TrackedFrame] = []
     for i, frame in enumerate(tracker.track_video(video)):
@@ -120,6 +130,14 @@ def main() -> None:
     parser.add_argument("--point-every", type=int, default=10, help="sample a trail point every N frames")
     parser.add_argument("--max-frames", type=int, default=None, help="only process the first M frames")
     parser.add_argument("--people-only", action="store_true", help="only track the 'person' class")
+    parser.add_argument("--model", default="yolo11n.pt", help="detector weights, e.g. yolo11s.pt, yolo11m.pt")
+    parser.add_argument(
+        "--tracker",
+        default=str(DEFAULT_TRACKER),
+        help="tracker yaml: bytetrack.yaml, botsort.yaml, or a custom path",
+    )
+    parser.add_argument("--conf", type=float, default=0.25, help="detection confidence threshold")
+    parser.add_argument("--imgsz", type=int, default=1280, help="detector input size; larger finds smaller people")
     args = parser.parse_args()
 
     if args.point_every < 1:
@@ -128,9 +146,13 @@ def main() -> None:
         parser.error(f"video not found: {args.video}")
     output = args.output or Path(f"{args.video.stem}_tracked.mp4")
 
-    frames = extract_tracks(args.video, args.max_frames, args.people_only)
+    frames = extract_tracks(
+        args.video, args.max_frames, args.people_only, args.model, args.tracker, args.conf, args.imgsz
+    )
+    track_lengths = Counter(o.track_id for f in frames for o in f)
+    mean_len = sum(track_lengths.values()) / max(len(track_lengths), 1)
     print(f"extracted detections for {len(frames)} frames, "
-          f"{len({o.track_id for f in frames for o in f})} unique tracks")
+          f"{len(track_lengths)} unique tracks, mean track length {mean_len:.1f} frames")
 
     trails = sample_trails(frames, args.point_every)
     render(args.video, output, frames, trails)

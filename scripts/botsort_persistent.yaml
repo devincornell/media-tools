@@ -1,0 +1,15 @@
+# BoT-SORT tuned for a moving camera and longer occlusions; pass as --tracker.
+tracker_type: botsort
+track_high_thresh: 0.3
+track_low_thresh: 0.1
+new_track_thresh: 0.4 # higher than track_high_thresh to avoid spawning IDs from weak detections
+track_buffer: 90 # keep lost tracks ~3s at 30fps so they can be re-matched after occlusion
+match_thresh: 0.85
+fuse_score: True
+
+gmc_method: sparseOptFlow # compensates camera motion (handheld/GoPro)
+
+proximity_thresh: 0.5
+appearance_thresh: 0.25 # lower than the default 0.8 so ReID can re-link lost tracks
+with_reid: True
+model: auto

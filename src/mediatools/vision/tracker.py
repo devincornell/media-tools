@@ -18,10 +18,12 @@ class ObjectTracker:
         tracker: str = "bytetrack.yaml",
         conf: float = 0.25,
         classes: Sequence[int] | None = None,
+        imgsz: int = 640,
     ) -> None:
         self._model = YOLO(model)
         self._tracker = tracker
         self._conf = conf
+        self._imgsz = imgsz
         self._classes = None if classes is None else list(classes)
 
     def track_video(self, video_path: str | Path) -> Iterator[TrackedFrame]:
@@ -36,6 +38,7 @@ class ObjectTracker:
             tracker=self._tracker,
             conf=self._conf,
             classes=self._classes,
+            imgsz=self._imgsz,
             verbose=False,
         )
         for result in results:
@@ -49,6 +52,7 @@ class ObjectTracker:
             tracker=self._tracker,
             conf=self._conf,
             classes=self._classes,
+            imgsz=self._imgsz,
             verbose=False,
         )[0]
         return TrackedFrame.from_ultralytics_result(result)
