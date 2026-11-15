@@ -1,15 +1,78 @@
 # MediaTools
-This package contains tools for working with video and image files.
 
-### Install
+Tools for working with video, audio, and image files: an ffmpeg wrapper, image processing, a scanned media-directory model, a MongoDB-backed media index with background jobs, a gallery web server, and optional AI components (transcription, object tracking).
+
+## Prerequisites
+
+- Python 3.11 or newer.
+- `ffmpeg` and `ffprobe` on `PATH` for the video features (for example `apt install ffmpeg`).
+- MongoDB, only for the media index, jobs, and gallery server.
+
+## Install
 
 ```bash
-pip install git+ssh://git@github.com:devincornell/media-tools.git@main
+pip install "git+ssh://git@github.com/devincornell/media-tools.git@main"
 ```
+
+From a local checkout, use `uv sync` (or `uv pip install -e .`).
 
 ```python
 import mediatools
 ```
+
+### Optional components
+
+Components with heavy dependencies are optional extras. They are not imported by `import mediatools`; importing one without its extra raises an `ImportError` that names the extra to install.
+
+| Extra | Installs | Enables |
+|---|---|---|
+| `transcribe` | `openai-whisper` | `mediatools.ai.transcribe_video_openai` |
+| `client` | `httpx` | `mediatools.client.GalleryClient` |
+| `vision` | `ultralytics`, `opencv-python-headless` | `mediatools.vision` (object tracking) |
+
+```bash
+# from git
+pip install "mediatools[vision] @ git+ssh://git@github.com/devincornell/media-tools.git@main"
+
+# from a checkout
+uv sync --extra vision
+uv sync --extra transcribe --extra client --extra vision   # several extras
+```
+
+Notes on `vision`:
+
+- It pulls in PyTorch, so the install is large. A CUDA GPU is used automatically when PyTorch can see one.
+- `ultralytics` itself depends on `opencv-python` (the GUI build), which needs the system library `libGL`. In this repo a `[tool.uv]` override replaces it with `opencv-python-headless`, so `uv sync` in a checkout needs no extra system packages. A plain `pip install` of the extra does not get that override: if `import cv2` fails with `libGL.so.1: cannot open shared object file`, either `apt install libgl1`, or run `pip uninstall opencv-python` followed by `pip install --force-reinstall opencv-python-headless`.
+
+The gallery server's dependencies are a dependency group, not an extra, and are available only from a checkout (`uv sync --group api`); see [Gallery server](#gallery-server).
+
+## Package overview
+
+| Module | Purpose | Needs |
+|---|---|---|
+| `mediatools` | `VideoFile`, `ImageFile`, `MediaDir`, `scan_directory`, and file helpers | |
+| `mediatools.ffmpeg` | ffmpeg/ffprobe wrapper: probe, compress, splice, crop, thumbnails, compilations | `ffmpeg` |
+| `mediatools.ai` | `transcribe_video_openai` (Whisper), `run_upscale` (video2x upscaling in Docker), and subprocess helpers | `transcribe` extra for transcription; Docker with the NVIDIA runtime for upscaling |
+| `mediatools.vision` | Typed object tracking on `ultralytics`: `ObjectTracker`, `TrackedFrame`, `TrackedObject`, `BoundingBox` | `vision` extra |
+| `mediatools.index_db` | MongoDB index of a media directory: directories, videos, favorites, job records | MongoDB |
+| `mediatools.jobs` | Generic job system: `JobManager`, `JobWorker`, repository, and log store | MongoDB |
+| `mediatools.application` | Services behind the gallery server: browsing, favorites, uploads, folder picker, media job handlers | MongoDB |
+| `mediatools.contracts` | Pydantic request and response models shared by the server and client | |
+| `mediatools.client` | Typed HTTP client for the gallery API (`GalleryClient`) | `client` extra |
+
+### Examples
+
+Notebooks in [examples/](examples/):
+
+| Notebook | Topic |
+|---|---|
+| [0-managing_media_files.ipynb](examples/0-managing_media_files.ipynb) | Working with media files and directories |
+| [1-image_processing.ipynb](examples/1-image_processing.ipynb) | Loading, transforming, and comparing images |
+| [3-ffmpeg_interface.ipynb](examples/3-ffmpeg_interface.ipynb) | Probing and processing video with ffmpeg |
+| [4_media_index_database.ipynb](examples/4_media_index_database.ipynb) | Indexing media into MongoDB |
+| [5-object_tracking.ipynb](examples/5-object_tracking.ipynb) | Object tracking with `mediatools.vision` (needs the `vision` extra) |
+
+Notebooks that download sample videos read the archive URL from the `TEST_ZIP_FILE_URL` environment variable (or a `.env` file).
 
 
 ## Gallery server
@@ -89,35 +152,23 @@ The server has no authentication. Anyone who can reach it can start jobs, includ
 Job tests need a disposable MongoDB (never a real one): `make test_mongo_up && make test_jobs && make test_mongo_down`.
 
 
-## API Overview
-
-Currently, the package provides tools for working with video and image files.
-
-+ **Video files**: process videos using [ffmpeg-python](https://github.com/kkroening/ffmpeg-python).
-    + Compress
-    + Splice
-    + Crop
-    + Create thumbnails
-
-+ **Image files**: interface for manipulating images using [skimage](https://scikit-image.org/).
-    + Convert between GS/RGB/RGBA
-    + Compute filter functions
-    + Execute distance metrics
-    + Crop
-    + Resize
+## Usage
 
 ### Working with Videos
 
 First create a `VideoFile` object from a file path.
 
 ```python
-vf = mediatools.VideoFile.from_path('my_video.mp4)
+import datetime
+import mediatools
+
+vf = mediatools.VideoFile.from_path('my_video.mp4')
 ```
 
 Compress the video using the `compress` method.
 
 ```python
-vf.ffmpeg.compress(td('totk_compressed.mp4'), crf=30, overwrite=True)
+vf.ffmpeg.compress('totk_compressed.mp4', crf=30, overwrite=True)
 ```
 
 
@@ -125,7 +176,7 @@ Splice the video using the `splice` method.
 
 ```python
 result = vf.ffmpeg.splice(
-    output_fname=td('totk_spliced.mp4'), 
+    output_fname='totk_spliced.mp4', 
     start_time=datetime.timedelta(seconds=0), 
     end_time=datetime.timedelta(seconds=5),
     overwrite=True
@@ -135,7 +186,7 @@ result = vf.ffmpeg.splice(
 Crop the video using the `crop` method.
 ```python
 result = vf.ffmpeg.crop(
-    output_fname=td('totk_cropped.mp4'), 
+    output_fname='totk_cropped.mp4', 
     topleft_point=(0,0),
     size=(vf.probe().video.width//2, vf.probe().video.height//2),
     overwrite=True
@@ -145,7 +196,7 @@ result = vf.ffmpeg.crop(
 Make a thumbnail using the `make_thumb` method.
 ```python
 result = vf.ffmpeg.make_thumb(
-    output_fname=td('totk_thumb.jpg'), 
+    output_fname='totk_thumb.jpg', 
     time_point=0.5,
     height=100,
     overwrite=True
@@ -163,10 +214,10 @@ imf = mediatools.ImageFile.from_path('my_image.jpg')
 You can read the image file using the `read` method. This will allow you to manipulate the data itself.
 
 ```python
-imf.read()
+im = imf.read()
 ```
 
-You can also use the `transform` attribute to manipulate the image file. For example, you can convert the image to RGB using the `to_rgb` method.
+You can also use the `transform` attribute on the loaded image to manipulate it. For example, you can convert the image to RGB using the `to_rgb` method.
 
 ```python
 im.transform.to_rgb()
@@ -191,5 +242,35 @@ im.dist.composit(im)
 im.dist.euclid(im)
 im.dist.sobel(im)
 ```
+
+### Object Tracking
+
+Requires the `vision` extra (see [Optional components](#optional-components)). `ObjectTracker` wraps a YOLO model and a tracker; results are immutable, typed objects rather than raw `ultralytics` output.
+
+```python
+from mediatools.vision import ObjectTracker
+
+tracker = ObjectTracker(
+    model="yolo11m.pt",        # weights are downloaded on first use
+    tracker="botsort.yaml",    # compensates for camera motion; "bytetrack.yaml" is the default
+    imgsz=1280,                # detector input size; larger finds smaller objects
+    classes=[0],               # optional filter; COCO class 0 is person
+)
+for frame in tracker.track_video("my_video.mp4"):   # one TrackedFrame per video frame
+    for obj in frame:
+        print(obj.track_id, obj.class_name, obj.confidence, obj.bounding_box)
+```
+
+`track_frame` tracks frames you read yourself. Create one `ObjectTracker` per video or stream, because track identities persist between calls. Tracking errors raise subclasses of `TrackingDomainError`. See [5-object_tracking.ipynb](examples/5-object_tracking.ipynb) for tuning tracks, custom tracker configurations, GPU use, and visualization.
+
+
+## Development
+
+```bash
+uv sync --extra client --extra vision --group api   # dev group is included by default
+make test                                           # video, image, media, and API tests (needs ffmpeg)
+```
+
+Job tests need a disposable MongoDB; see [Jobs](#jobs).
 
 
