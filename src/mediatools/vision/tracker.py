@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -17,10 +17,12 @@ class ObjectTracker:
         model: str = "yolo11n.pt",
         tracker: str = "bytetrack.yaml",
         conf: float = 0.25,
+        classes: Sequence[int] | None = None,
     ) -> None:
         self._model = YOLO(model)
         self._tracker = tracker
         self._conf = conf
+        self._classes = None if classes is None else list(classes)
 
     def track_video(self, video_path: str | Path) -> Iterator[TrackedFrame]:
         """Lazily yield one `TrackedFrame` per video frame, in order."""
@@ -33,6 +35,7 @@ class ObjectTracker:
             persist=True,
             tracker=self._tracker,
             conf=self._conf,
+            classes=self._classes,
             verbose=False,
         )
         for result in results:
@@ -45,6 +48,7 @@ class ObjectTracker:
             persist=True,
             tracker=self._tracker,
             conf=self._conf,
+            classes=self._classes,
             verbose=False,
         )[0]
         return TrackedFrame.from_ultralytics_result(result)
