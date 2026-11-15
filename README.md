@@ -27,7 +27,7 @@ Components with heavy dependencies are optional extras. They are not imported by
 | Extra | Installs | Enables |
 |---|---|---|
 | `transcribe` | `openai-whisper` | `mediatools.ai.transcribe_video_openai` |
-| `vision` | `ultralytics`, `opencv-python-headless` | `mediatools.vision` (object tracking) |
+| `vision` | `ultralytics`, `opencv-python-headless`, `torch`, `torchvision` | `mediatools.vision` (object tracking, optical flow) |
 
 ```bash
 # from git
@@ -52,7 +52,7 @@ The gallery server's dependencies are a dependency group, not an extra, and are 
 | `mediatools` | `VideoFile`, `ImageFile`, `MediaDir`, `scan_directory`, and file helpers | |
 | `mediatools.ffmpeg` | ffmpeg/ffprobe wrapper: probe, compress, splice, crop, thumbnails, compilations | `ffmpeg` |
 | `mediatools.ai` | `transcribe_video_openai` (Whisper), `run_upscale` (video2x upscaling in Docker), and subprocess helpers | `transcribe` extra for transcription; Docker with the NVIDIA runtime for upscaling |
-| `mediatools.vision` | Typed object tracking on `ultralytics`: `ObjectTracker`, `TrackedFrame`, `TrackedObject`, `BoundingBox` | `vision` extra |
+| `mediatools.vision` | Typed object tracking on `ultralytics` (`ObjectTracker`, `TrackedFrame`, `TrackedObject`, `BoundingBox`) and dense optical flow (`FarnebackFlow`, `DisFlow`, `RaftFlow`, `FlowField`) | `vision` extra |
 | `mediatools.index_db` | MongoDB index of a media directory: directories, videos, favorites, job records | MongoDB |
 | `mediatools.jobs` | Generic job system: `JobManager`, `JobWorker`, repository, and log store | MongoDB |
 | `mediatools.application` | Services behind the gallery server: browsing, favorites, uploads, folder picker, media job handlers | MongoDB |
@@ -262,6 +262,26 @@ for frame in tracker.track_video("my_video.mp4"):   # one TrackedFrame per video
 
 `track_frame` tracks frames you read yourself. Create one `ObjectTracker` per video or stream, because track identities persist between calls. Tracking errors raise subclasses of `TrackingDomainError`. See [5-object_tracking.ipynb](examples/5-object_tracking.ipynb) for tuning tracks, custom tracker configurations, GPU use, and visualization.
 
+### Optical Flow
+
+Requires the `vision` extra. Every algorithm implements the `OpticalFlowEstimator` strategy interface (`estimate(frame1, frame2) -> FlowField`), so they are interchangeable. Frames are BGR `uint8` arrays of identical shape, as returned by OpenCV.
+
+| Strategy | Kind | Notes |
+|---|---|---|
+| `FarnebackFlow` | OpenCV, classical | CPU, no downloads |
+| `DisFlow` | OpenCV, classical | CPU, much faster than Farneback; presets `ultrafast`, `fast`, `medium` |
+| `RaftFlow` | RAFT (torchvision), deep learning | GPU recommended; weights download on first use |
+
+```python
+from mediatools.vision import RaftFlow, estimate_video_flow
+
+estimator = RaftFlow(max_height=360)    # or FarnebackFlow() / DisFlow()
+for flow in estimate_video_flow("my_video.mp4", estimator):   # one FlowField per frame pair
+    dx, dy = flow.vectors                                      # (2, H, W) float32, in pixels
+    preview = flow.to_bgr()                                    # HSV color-wheel visualization
+```
+
+`FlowField.vectors` is read-only, with channel 0 the horizontal and channel 1 the vertical displacement from frame 1 to frame 2. `RaftFlow` is memory-safe for ~8GB GPUs: RAFT's memory use grows with the square of the pixel count (all-pairs correlation volume), so it downscales frames to at most `max_height` rows, runs in fp16 on CUDA, then upscales the flow to the input resolution and rescales the vectors to match. Raise `max_height` for more detail if memory allows, or use `variant="large"` for accuracy. Running out of memory raises `DeviceMemoryError`; other errors derive from `OpticalFlowError`.
 
 ## Development
 

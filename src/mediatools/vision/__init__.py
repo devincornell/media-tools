@@ -9,6 +9,18 @@ except ImportError as e:
     ) from e
 
 from .detect import Detection, detect_objects
+from .optical_flow import estimate_video_flow
+from .optical_flow_domain import (
+    DeviceMemoryError,
+    DeviceUnavailableError,
+    FlowField,
+    FlowShapeError,
+    FrameValidationError,
+    OpticalFlowError,
+    OpticalFlowEstimator,
+)
+from .optical_flow_opencv import DisFlow, FarnebackFlow
+from .optical_flow_raft import RaftFlow
 from .tracker import ObjectTracker
 from .tracking_domain import (
     BoundingBox,
@@ -33,12 +45,23 @@ __all__ = [
     "ConfidenceScore",
     "ConfidenceScoreBoundsError",
     "Detection",
+    "DeviceMemoryError",
+    "DeviceUnavailableError",
+    "DisFlow",
+    "FarnebackFlow",
+    "FlowField",
+    "FlowShapeError",
+    "FrameValidationError",
     "MissingTrackingIdError",
     "ObjectTracker",
+    "OpticalFlowError",
+    "OpticalFlowEstimator",
+    "RaftFlow",
     "TrackId",
     "TrackedFrame",
     "TrackedObject",
     "TrackingConfigurationError",
     "TrackingDomainError",
     "detect_objects",
+    "estimate_video_flow",
 ]
