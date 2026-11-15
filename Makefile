@@ -26,13 +26,13 @@ test:
 	uv run pytest tests/test_ffmpeg_interface.py
 	uv run pytest tests/test_image_processing.py
 	uv run pytest tests/test_media_management.py
-	uv run --group api --extra client pytest tests/test_api.py tests/test_fileops.py
+	uv run --group api pytest tests/test_api.py tests/test_fileops.py
 
 # Job tests need a disposable MongoDB (never point this at a real database).
 TEST_MONGODB_URL ?= mongodb://127.0.0.1:27099
 
 test_jobs:
-	TEST_MONGODB_URL=$(TEST_MONGODB_URL) uv run --group api --extra client pytest tests/test_jobs.py tests/test_media_jobs.py
+	TEST_MONGODB_URL=$(TEST_MONGODB_URL) uv run --group api pytest tests/test_jobs.py tests/test_media_jobs.py
 
 # mongo:8 refuses to start on Linux >= 6.19; apparmor=unconfined is needed on this host's Docker.
 test_mongo_up:

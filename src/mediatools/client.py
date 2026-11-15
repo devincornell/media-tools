@@ -4,13 +4,12 @@ import types
 import typing
 from urllib.parse import quote
 
-try:
-    import httpx
-except ImportError as e:  # pragma: no cover
-    raise ImportError("mediatools.client requires the 'client' extra: pip install 'mediatools[client]'") from e
+import httpx
 
-from ..application.errors import DirectoryNotIndexedError, GalleryError
-from ..contracts import DirectoryPage, ErrorResponse, PathList
+from .application.errors import DirectoryNotIndexedError, GalleryError
+from .contracts import DirectoryPage, ErrorResponse, PathList
+
+__all__ = ["GalleryClient", "GalleryClientError"]
 
 
 class GalleryClientError(GalleryError):

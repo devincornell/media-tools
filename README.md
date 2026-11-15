@@ -27,7 +27,6 @@ Components with heavy dependencies are optional extras. They are not imported by
 | Extra | Installs | Enables |
 |---|---|---|
 | `transcribe` | `openai-whisper` | `mediatools.ai.transcribe_video_openai` |
-| `client` | `httpx` | `mediatools.client.GalleryClient` |
 | `vision` | `ultralytics`, `opencv-python-headless` | `mediatools.vision` (object tracking) |
 
 ```bash
@@ -36,7 +35,7 @@ pip install "mediatools[vision] @ git+ssh://git@github.com/devincornell/media-to
 
 # from a checkout
 uv sync --extra vision
-uv sync --extra transcribe --extra client --extra vision   # several extras
+uv sync --extra transcribe --extra vision   # several extras
 ```
 
 Notes on `vision`:
@@ -58,7 +57,7 @@ The gallery server's dependencies are a dependency group, not an extra, and are 
 | `mediatools.jobs` | Generic job system: `JobManager`, `JobWorker`, repository, and log store | MongoDB |
 | `mediatools.application` | Services behind the gallery server: browsing, favorites, uploads, folder picker, media job handlers | MongoDB |
 | `mediatools.contracts` | Pydantic request and response models shared by the server and client | |
-| `mediatools.client` | Typed HTTP client for the gallery API (`GalleryClient`) | `client` extra |
+| `mediatools.client` | Typed HTTP client for the gallery API (`GalleryClient`) | |
 
 ### Examples
 
@@ -106,7 +105,7 @@ Run in Docker (reads `SITE_*` from `.env`; runs as UID/GID 1000 by default, set 
 docker compose up -d --build
 ```
 
-Browse `/page/`, `/reel/`, `/browse` (a Finder-style tree of every indexed folder and file, with each folder's recursive size and share of the library), or the JSON API under `/api` (docs at `/docs`). A typed client is available with the `client` extra:
+Browse `/page/`, `/reel/`, `/browse` (a Finder-style tree of every indexed folder and file, with each folder's recursive size and share of the library), or the JSON API under `/api` (docs at `/docs`). A typed client is included in the package:
 
 ```python
 from mediatools.client import GalleryClient
@@ -115,7 +114,7 @@ with GalleryClient("http://localhost:8000") as client:
     page = client.get_directory("some/subdir")
 ```
 
-Tests: `uv run --group api --extra client pytest tests/test_api.py tests/test_fileops.py`.
+Tests: `uv run --group api pytest tests/test_api.py tests/test_fileops.py`.
 
 ### Uploading
 
@@ -267,7 +266,7 @@ for frame in tracker.track_video("my_video.mp4"):   # one TrackedFrame per video
 ## Development
 
 ```bash
-uv sync --extra client --extra vision --group api   # dev group is included by default
+uv sync --extra vision --group api   # dev group is included by default
 make test                                           # video, image, media, and API tests (needs ffmpeg)
 ```
 

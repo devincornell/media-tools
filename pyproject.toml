@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "imageio[opencv,pyav]>=2.37.3",
     "jinja2>=3.1.6",
+    "httpx>=0.28.1",
     "librosa>=0.11.0",
     "matplotlib>=3.8.0",
     "pydantic>=2.13.3",
@@ -34,9 +35,6 @@ Homepage = "https://devinjcornell.com"
 [project.optional-dependencies]
 transcribe = [
     "openai-whisper>=20250625",
-]
-client = [
-    "httpx>=0.28.1",
 ]
 vision = [
     "ultralytics>=8.3.0",
@@ -77,7 +75,6 @@ dev = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.6",
     "nbconvert>=7.17.1",
-    "httpx>=0.28.1",
     "mypy>=1.13.0",
     "pydantic-settings>=2.14.0",
     "pytest>=9.0.3",
