@@ -1,7 +1,7 @@
 """Track objects in a video, then render an annotated copy with boxes and motion trails.
 
 Usage:
-    python scripts/track_objects_video.py [VIDEO] [-o OUTPUT] [--point-every N] [--max-frames M]
+    python scripts/track_objects_video.py VIDEO [-o OUTPUT] [--point-every N] [--max-frames M]
 """
 from __future__ import annotations
 
@@ -13,10 +13,6 @@ from pathlib import Path
 import cv2
 
 from mediatools.vision import ObjectTracker, TrackedFrame, TrackId
-
-DEFAULT_VIDEO = Path(
-    "/mnt/hdd-a/gopro/gopro_raw_organized/2025-11-29/2025-11-29_01-57-09-GX010049.MP4"
-)
 
 Color = tuple[int, int, int]
 Point = tuple[int, int]
@@ -125,7 +121,7 @@ def render(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("video", nargs="?", type=Path, default=DEFAULT_VIDEO)
+    parser.add_argument("video", type=Path)
     parser.add_argument("-o", "--output", type=Path, default=None)
     parser.add_argument("--point-every", type=int, default=10, help="sample a trail point every N frames")
     parser.add_argument("--max-frames", type=int, default=None, help="only process the first M frames")
