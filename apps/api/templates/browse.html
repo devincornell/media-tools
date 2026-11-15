@@ -19,6 +19,9 @@
         .browse-head h1 i { margin-right: var(--s-2); color: var(--folder); font-size: 18px; }
         .browse-head p { color: var(--text-3); font-size: 13px; }
 
+        .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin: 0 var(--s-5) var(--s-3); }
+        .toolbar #selCount { margin-right: var(--s-2); color: var(--text-3); font-size: 13px; }
+
         .scroller {
             flex: 1;
             min-height: 0;
@@ -46,6 +49,8 @@
         thead th .arrow { margin-left: 6px; font-size: 9px; }
         th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
+        tbody tr { user-select: none; }
+        tbody tr.busy { opacity: 0.45; pointer-events: none; }
         tbody tr:hover { background: var(--surface-2); }
         tbody tr.selected { background: var(--accent) !important; color: #fff; }
         tbody tr.selected td { color: #fff; }
@@ -87,7 +92,7 @@
 
         @media (max-width: 760px) {
             .browse-head { padding: var(--s-3) var(--s-4) var(--s-2); }
-            .scroller, .status { margin: 0 var(--s-3); }
+            .scroller, .status, .toolbar { margin-left: var(--s-3); margin-right: var(--s-3); }
             col:nth-child(2), col:nth-child(4), col:nth-child(5),
             th:nth-child(2), th:nth-child(4), th:nth-child(5),
             td:nth-child(2), td:nth-child(4), td:nth-child(5) { display: none; }
@@ -110,7 +115,13 @@
     </header>
     <div class="browse-head">
         <h1 id="title"><i class="fas fa-folder-tree" aria-hidden="true"></i> Library</h1>
-        <p>Every indexed folder with its size and share of the library. Use the arrow keys to move; Enter expands a folder or opens a file.</p>
+        <p>Every indexed folder with its size and share of the library. Use the arrow keys to move; Enter expands a folder or opens a file. Ctrl/Cmd-click or Shift-click selects several; F2 renames and Delete deletes.</p>
+    </div>
+    <div class="toolbar" id="toolbar">
+        <span id="selCount">Nothing selected</span>
+        <button type="button" id="moveBtn" disabled><i class="fas fa-share" aria-hidden="true"></i> Move to...</button>
+        <button type="button" id="renameBtn" disabled><i class="fas fa-pen" aria-hidden="true"></i> Rename...</button>
+        <button type="button" id="deleteBtn" class="btn-danger" disabled><i class="fas fa-trash" aria-hidden="true"></i> Delete...</button>
     </div>
     <div class="scroller" id="scroller" tabindex="0">
         <table>
@@ -127,8 +138,10 @@
             <tbody id="rows"></tbody>
         </table>
     </div>
-    <div class="status"><span id="statusLeft">Loading...</span><span id="statusRight"></span></div>
+    <div class="status"><span id="statusLeft">Loading...</span><span id="statusNote"></span><span id="statusRight"></span></div>
 
+<script src="/static/picker.js"></script>
+<script src="/static/itemops.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const STORE_KEY = 'browse.expanded';
@@ -140,7 +153,11 @@ const files = new Map();         // folder path -> [FileEntry] | 'loading' | 'er
 let expanded = new Set(JSON.parse(localStorage.getItem(STORE_KEY) || '[]'));
 let sort = { key: 'name', dir: 1 };
 let visible = [];                // rows currently displayed: { type, item, depth }
-let selected = null;             // key of the selected row
+let selection = new Set();       // keys of the selected rows
+let cursor = null;               // key of the row the arrow keys move from
+let anchor = null;               // key where a Shift-selected range starts
+const busy = new Set();          // keys of rows with a queued move/rename/delete
+const pending = new Map();       // job id -> keys of the rows it works on
 
 function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -189,6 +206,8 @@ async function loadTree() {
     const res = await fetch('/api/browse/tree');
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
     tree = await res.json();
+    folders.clear();
+    childFolders.clear();
     for (const f of tree.folders) {
         folders.set(f.path, f);
         if (f.parent !== null) {
@@ -274,6 +293,8 @@ function render() {
             if (expanded.has(f.path)) collect(f.path, 1, visible);
         }
     }
+    const shown = new Set(visible.map(keyOf));
+    selection = new Set([...selection].filter(k => shown.has(k)));
     const tbody = $('rows');
     tbody.replaceChildren(...visible.map((row) => {
         const { type, item } = row;
@@ -283,15 +304,17 @@ function render() {
                 ? el('tr', {}, nameCell(row), el('td', { class: 'dim' }, '--'), el('td', { class: 'num' }, fmtSize(item.size)), pctCell(item), el('td', { class: 'dim' }, folderKind(item)))
                 : el('tr', {}, nameCell(row), el('td', { class: 'dim' }, fmtDate(item.modified)), el('td', { class: 'num' }, fmtSize(item.size)), el('td'), el('td', { class: 'dim' }, fileKind(item)));
         tr.dataset.key = key;
-        if (key === selected) tr.classList.add('selected');
+        if (selection.has(key)) tr.classList.add('selected');
+        if (busy.has(key)) tr.classList.add('busy');
         if (type !== 'placeholder') {
-            tr.addEventListener('click', () => select(key));
+            tr.addEventListener('click', (e) => clickSelect(key, e));
             tr.addEventListener('dblclick', () => activate(row));
         }
         return tr;
     }));
     renderHeader();
     renderStatus();
+    renderToolbar();
 }
 
 function renderHeader() {
@@ -318,10 +341,138 @@ function toggle(path, open = !expanded.has(path)) {
     render();
 }
 
-function select(key, scroll = false) {
-    selected = key;
-    for (const tr of $('rows').children) tr.classList.toggle('selected', tr.dataset.key === key);
-    if (scroll) $('rows').querySelector(`tr[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
+const selectableKeys = () => visible.filter(r => r.type !== 'placeholder').map(keyOf);
+
+function setSelection(keys, scrollTo = null) {
+    selection = new Set(keys);
+    for (const tr of $('rows').children) tr.classList.toggle('selected', selection.has(tr.dataset.key));
+    if (scrollTo) $('rows').querySelector(`tr[data-key="${CSS.escape(scrollTo)}"]`)?.scrollIntoView({ block: 'nearest' });
+    renderToolbar();
+}
+
+// Plain click selects one row, Ctrl/Cmd toggles a row, Shift selects the range from the last plain click.
+function clickSelect(key, e) {
+    const keys = selectableKeys();
+    cursor = key;
+    if (e.shiftKey && keys.includes(anchor)) {
+        const [a, b] = [keys.indexOf(anchor), keys.indexOf(key)].sort((x, y) => x - y);
+        setSelection(keys.slice(a, b + 1));
+    } else if (e.ctrlKey || e.metaKey) {
+        anchor = key;
+        setSelection(selection.has(key) ? [...selection].filter(k => k !== key) : [...selection, key]);
+    } else {
+        anchor = key;
+        setSelection([key]);
+    }
+}
+
+// ---------------------------------------------------------------- move / rename / delete
+// Items inside a selected folder move or delete with it, so they are dropped from the batch.
+function actionRows() {
+    const rows = visible.filter(r => selection.has(keyOf(r)) && r.type !== 'placeholder' && r.item.path !== '.' && !busy.has(keyOf(r)));
+    return rows.filter(r => !rows.some(o => o !== r && o.type === 'folder' && r.item.path.startsWith(`${o.item.path}/`)));
+}
+
+function renderToolbar() {
+    const n = actionRows().length;
+    $('selCount').textContent = selection.size ? `${ItemOps.plural(selection.size, 'item')} selected` : 'Nothing selected';
+    for (const id of ['moveBtn', 'renameBtn', 'deleteBtn']) $(id).disabled = n === 0;
+}
+
+function setNote(text) { $('statusNote').textContent = text; }
+
+// Queues one job per entry of `jobs` ({ row, endpoint, body }); the tree reloads once they have finished.
+async function submitJobs(jobs, note = '') {
+    const errors = [];
+    for (const { row, endpoint, body } of jobs) {
+        const { jobId, error } = await ItemOps.postJob(endpoint, body);
+        if (error) { errors.push(`${row.item.path}: ${error}`); continue; }
+        busy.add(keyOf(row));
+        pending.set(jobId, keyOf(row));
+    }
+    const problems = [note, ...errors].filter(Boolean);
+    if (problems.length) alert(problems.join('\n'));
+    setNote(pending.size ? `${ItemOps.plural(pending.size, 'job')} running...` : '');
+    render();
+    if (pending.size) schedulePoll(1000);
+}
+
+let pollTimer = null;
+const schedulePoll = (delay) => { clearTimeout(pollTimer); pollTimer = setTimeout(pollJobs, delay); };
+
+async function pollJobs() {
+    let reloadNeeded = false, failed = 0;
+    await Promise.all([...pending].map(async ([id, key]) => {
+        try {
+            const res = await fetch(`/api/media-jobs/${encodeURIComponent(id)}`);
+            if (!res.ok) throw new Error();
+            const status = (await res.json()).job.status;
+            if (status === 'queued' || status === 'running') return;
+            reloadNeeded ||= status === 'succeeded';
+            failed += status === 'succeeded' ? 0 : 1;
+            pending.delete(id);
+            busy.delete(key);
+        } catch { /* try again on the next poll */ }
+    }));
+    if (reloadNeeded) {
+        try { await reload(); } catch (e) { setNote(`Could not refresh the index: ${e.message}`); }
+    }
+    setNote(failed ? `${ItemOps.plural(failed, 'job')} failed or was canceled; see the Jobs page.`
+        : pending.size ? `${ItemOps.plural(pending.size, 'job')} running...` : '');
+    render();
+    if (pending.size) schedulePoll(2000);
+}
+
+async function reload() {
+    await loadTree();
+    const open = ['.', ...expanded].filter(p => folders.has(p));
+    files.clear();
+    await Promise.all(open.map(loadFiles));
+}
+
+function moveSelected() {
+    const rows = actionRows();
+    if (!rows.length) return;
+    FolderPicker.open({
+        scope: 'gallery',
+        title: `Move ${rows.length === 1 ? `"${ItemOps.baseName(rows[0].item.path)}"` : ItemOps.plural(rows.length, 'item')} to...`,
+        startRel: ItemOps.parentOf(rows[0].item.path),
+        allowNewFolder: true,
+        note: (listing) => `will move into ${listing.rel || '.'}`,
+        onChoose: (listing) => {
+            const dest = listing.rel || '.';
+            const movable = rows.filter(({ item }) => (ItemOps.parentOf(item.path) || '.') !== dest && dest !== item.path && !dest.startsWith(`${item.path}/`));
+            const skipped = rows.length - movable.length;
+            submitJobs(movable.map(row => ({ row, endpoint: 'move-item', body: { path: row.item.path, dest } })),
+                skipped ? `${ItemOps.plural(skipped, 'item')} already in ${dest} or moving into itself, skipped.` : '');
+        },
+    });
+}
+
+function siblingNames(parent) {
+    const dir = parent || '.';
+    const names = (childFolders.get(dir) || []).map(f => f.name);
+    const fl = files.get(dir);
+    if (Array.isArray(fl)) names.push(...fl.map(f => f.name));
+    return new Set(names);
+}
+
+function renameSelected() {
+    const rows = actionRows();
+    const renames = ItemOps.askRenames(rows.map(r => ({ path: r.item.path, isFolder: r.type === 'folder' })), siblingNames);
+    if (!renames) return;
+    const byPath = new Map(rows.map(r => [r.item.path, r]));
+    submitJobs(renames.map(r => ({ row: byPath.get(r.path), endpoint: 'move-item', body: ItemOps.renameBody(r) })));
+}
+
+function deleteSelected() {
+    const rows = actionRows();
+    if (!rows.length) return;
+    const folders = rows.filter(r => r.type === 'folder').length;
+    const what = rows.length === 1 ? `${rows[0].type === 'folder' ? 'the folder ' : ''}"${ItemOps.baseName(rows[0].item.path)}"` : ItemOps.plural(rows.length, 'item');
+    const detail = folders && rows.length > 1 ? ` (${ItemOps.plural(folders, 'folder')} with everything in them)` : rows[0].type === 'folder' && rows.length === 1 ? ' and everything in it' : '';
+    if (!confirm(`Permanently delete ${what}${detail}? This can't be undone.`)) return;
+    submitJobs(rows.map(row => ({ row, endpoint: 'delete-item', body: { path: row.item.path } })));
 }
 
 function activate(row) {
@@ -332,11 +483,14 @@ function activate(row) {
 function onKey(e) {
     const rows = visible.filter(r => r.type !== 'placeholder');
     if (!rows.length) return;
-    let i = rows.findIndex(r => keyOf(r) === selected);
+    let i = rows.findIndex(r => keyOf(r) === cursor);
     const row = rows[i];
     switch (e.key) {
         case 'ArrowDown': i = Math.min(rows.length - 1, i + 1); break;
         case 'ArrowUp': i = Math.max(0, i - 1); break;
+        case 'F2': e.preventDefault(); renameSelected(); return;
+        case 'Delete': e.preventDefault(); deleteSelected(); return;
+        case 'Escape': setSelection([]); return;
         case 'ArrowRight':
             if (row?.type === 'folder' && !expanded.has(row.item.path)) toggle(row.item.path, true);
             else return;
@@ -352,7 +506,16 @@ function onKey(e) {
         default: return;
     }
     e.preventDefault();
-    select(keyOf(rows[i]), true);
+    const key = keyOf(rows[i]);
+    cursor = key;
+    if (e.shiftKey && anchor) {
+        const keys = rows.map(keyOf);
+        const [a, b] = [keys.indexOf(anchor), i].sort((x, y) => x - y);
+        setSelection(keys.slice(a, b + 1), key);
+    } else {
+        anchor = key;
+        setSelection([key], key);
+    }
 }
 
 function onSort(th) {
@@ -364,6 +527,9 @@ function onSort(th) {
 async function init() {
     for (const th of $('head').children) th.addEventListener('click', () => onSort(th));
     $('scroller').addEventListener('keydown', onKey);
+    for (const [id, action] of [['moveBtn', moveSelected], ['renameBtn', renameSelected], ['deleteBtn', deleteSelected]]) {
+        $(id).addEventListener('click', () => { action(); $('scroller').focus(); });
+    }
     try {
         await loadTree();
     } catch (e) {

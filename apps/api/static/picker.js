@@ -9,7 +9,7 @@
  *     note: (listing) => 'extra text',  // optional text appended to the selection line
  *     allowNewFolder: true,             // show a "New folder" button (gallery scope); nothing is created here:
  *                                       // onChoose gets a listing with virtual: true for a folder the caller must create
- *     onChoose: (listing) => {},        // receives the /api/fs/dirs listing of the chosen folder
+ *     onChoose: (listing) => {},        // receives the /api/fs/dirs listing of the chosen folder (Enter also chooses)
  *   });
  */
 (function () {
@@ -24,6 +24,9 @@
     .fp-head { border-bottom: 1px solid rgba(255,255,255,0.1); }
     .fp-foot { border-top: 1px solid rgba(255,255,255,0.1); }
     .fp-title { font-weight: 600; flex: 1; }
+    .fp-filter { padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .fp-filter input { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: #202020; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.4rem 0.7rem; }
+    .fp-filter input:focus { outline: none; border-color: #6366f1; }
     .fp-crumbs { padding: 0.5rem 1rem; font-size: 0.85rem; color: #a3a3a3; display: flex; flex-wrap: wrap; gap: 0.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
     .fp-crumbs a { color: #fff; text-decoration: none; cursor: pointer; }
     .fp-crumbs a:hover { text-decoration: underline; }
@@ -63,6 +66,10 @@
         const d = {
             title: el('span', { class: 'fp-title' }),
             root: el('select', { onchange: () => go(d.root.value) }),
+            filter: el('input', {
+                type: 'search', placeholder: 'Filter folders in this directory', 'aria-label': 'Filter folders',
+                autocomplete: 'off', spellcheck: 'false', oninput: () => state.listing && render(), onkeydown: filterKey,
+            }),
             crumbs: el('div', { class: 'fp-crumbs' }),
             list: el('div', { class: 'fp-list' }),
             sel: el('span', { class: 'fp-sel' }),
@@ -76,12 +83,32 @@
             el('div', { class: 'fp-box' },
                 el('div', { class: 'fp-head' }, d.title, d.root,
                     el('button', { type: 'button', title: 'Close', onclick: close }, el('i', { class: 'fas fa-xmark' }))),
-                d.crumbs, d.list,
+                el('div', { class: 'fp-filter' }, d.filter), d.crumbs, d.list,
                 el('div', { class: 'fp-foot' }, d.sel, d.newFolder, d.up, el('button', { type: 'button', onclick: close }, 'Cancel'), d.choose)));
         document.body.append(d.modal);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !d.modal.classList.contains('fp-hidden')) close(); });
+        document.addEventListener('keydown', (e) => {
+            if (d.modal.classList.contains('fp-hidden')) return;
+            if (e.key === 'Escape') close();
+            // Buttons and the root selector keep Enter for their own action.
+            else if (e.key === 'Enter' && !e.shiftKey && !e.repeat && !e.isComposing && !e.target.closest('button, select')) {
+                e.preventDefault();
+                choose();
+            }
+        });
         state.dom = d;
         return d;
+    }
+
+    function visibleDirs() {
+        const term = state.dom.filter.value.trim().toLowerCase();
+        return state.listing.dirs.filter(x => x.name.toLowerCase().includes(term));
+    }
+
+    // Shift+Enter opens the folder when the filter has narrowed the list to one (plain Enter chooses the current folder).
+    function filterKey(e) {
+        if (e.key !== 'Enter' || !e.shiftKey || !state.listing) return;
+        const matches = visibleDirs();
+        if (matches.length === 1 && matches[0].readable) go(matches[0].path);
     }
 
     function close() { state.dom?.modal.classList.add('fp-hidden'); }
@@ -108,6 +135,7 @@
             if (existing.readable) go(existing.path);
             return;
         }
+        state.dom.filter.value = '';
         state.listing = {
             ...L,
             path: `${L.path.replace(/\/+$/, '')}/${parts.join('/')}`,
@@ -136,6 +164,7 @@
             d.sel.textContent = errorText(data, `HTTP ${res.status}`);
             return false;
         }
+        d.filter.value = '';
         state.listing = data;
         render();
         return true;
@@ -158,7 +187,8 @@
             crumbs.push(' / ', i < realCount ? el('a', { onclick: () => go(target) }, part) : el('span', {}, `${part} (new)`));
         });
         d.crumbs.replaceChildren(...crumbs);
-        const rows = L.dirs.map(x => el('div', {
+        const shown = visibleDirs();
+        const rows = shown.map(x => el('div', {
             class: `fp-row${x.name.startsWith('.') ? ' fp-dot' : ''}${x.writable ? '' : ' fp-locked'}`,
             title: x.path, onclick: () => x.readable && go(x.path),
         }, el('i', { class: `fas ${x.is_symlink ? 'fa-link' : x.writable ? 'fa-folder' : 'fa-folder-closed'} fp-ico` }),
@@ -167,6 +197,7 @@
            x.has_subdirs ? el('i', { class: 'fas fa-chevron-right fp-meta' }) : null));
         d.list.replaceChildren(...(rows.length ? rows
             : [el('div', { class: 'fp-row fp-meta' }, L.virtual ? 'This new folder will be created when you choose it.'
+                : L.dirs.length ? 'No folders match the filter.'
                 : `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`)]));
         d.up.disabled = !L.parent;
         d.newFolder.classList.toggle('fp-hidden', !(o.allowNewFolder && o.scope === 'gallery'));
@@ -190,12 +221,14 @@
         d.root.replaceChildren(...roots.map(r => el('option', { value: r }, r)));
         d.root.classList.toggle('fp-hidden', roots.length < 2);
         d.modal.classList.remove('fp-hidden');
+        d.filter.value = '';
         let start = state.opts.start || null;
         if (!start && state.opts.startRel !== undefined && state.opts.scope === 'gallery') {
             const rel = (state.opts.startRel || '').replace(/^\.?\/+/, '');
             start = rel && rel !== '.' ? `${roots[0]}/${rel}` : roots[0];
         }
         if (!(await go(start))) await go(roots[0]);
+        d.filter.focus();
     }
 
     window.FolderPicker = { open, close };

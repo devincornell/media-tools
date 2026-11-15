@@ -467,11 +467,13 @@
     <div class="select-bar jp-hidden" id="selectBar">
         <span id="selectCount">0 selected</span>
         <button type="button" id="selectMove" onclick="startBulkMove()" disabled><i class="fas fa-share"></i> Move to...</button>
+        <button type="button" id="selectRename" onclick="startBulkRename()" disabled><i class="fas fa-pen"></i> Rename...</button>
         <button type="button" id="selectDelete" class="danger" onclick="bulkDelete()" disabled><i class="fas fa-trash"></i> Delete...</button>
         <button type="button" onclick="setSelectMode(false)">Done</button>
     </div>
 
     <script src="/static/picker.js"></script>
+    <script src="/static/itemops.js"></script>
     <script>
         // Subfolder thumbnails data
         const subfolderThumbs = {
@@ -669,6 +671,7 @@
                 info,
                 item(isFavorite ? 'fas fa-star' : 'far fa-star', isFavorite ? 'Remove favorite' : 'Add to favorites', 'fav', run(toggleFavorite)),
                 item('fas fa-share', 'Move to...', '', run(startMove)),
+                item('fas fa-pen', 'Rename...', '', run(startRename)),
                 item('fas fa-circle-info', 'Info', '', () => { info.hidden = !info.hidden; placeCardMenu(menu, button); }),
                 item('fas fa-trash', isFolder ? 'Delete folder...' : 'Delete...', 'danger', run(startDelete)),
             );
@@ -691,6 +694,34 @@
                     if (error) alert(`Could not start the move: ${error}`);
                 },
             });
+        }
+
+        function siblingNames(parent) {
+            return new Set([...document.querySelectorAll('.thumbnail[data-path]')]
+                .filter(c => ItemOps.parentOf(c.dataset.path) === parent).map(c => ItemOps.baseName(c.dataset.path)));
+        }
+
+        const renameItem = (card) => ({ path: card.dataset.path, isFolder: card.dataset.type === 'folder' });
+
+        // Resolves to true once the rename is queued.
+        async function startRename(card) {
+            const renames = ItemOps.askRenames([renameItem(card)], siblingNames);
+            if (!renames) return false;
+            const error = await queueCardJob(card, 'move-item', ItemOps.renameBody(renames[0]));
+            if (error) alert(`Could not start the rename: ${error}`);
+            return !error;
+        }
+
+        async function startBulkRename() {
+            const cards = topLevelSelected().sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+            if (cards.length === 1) {
+                if (await startRename(cards[0])) setSelectMode(false);
+                return;
+            }
+            const renames = ItemOps.askRenames(cards.map(renameItem), siblingNames);
+            if (!renames) return;
+            const byPath = new Map(cards.map(card => [card.dataset.path, card]));
+            await queueBulk(renames.map(r => ({ card: byPath.get(r.path), endpoint: 'move-item', body: ItemOps.renameBody(r) })));
         }
 
         async function startDelete(card) {
@@ -866,6 +897,7 @@
             const count = selectedCards.size;
             document.getElementById('selectCount').textContent = `${count} selected`;
             document.getElementById('selectMove').disabled = count === 0;
+            document.getElementById('selectRename').disabled = count === 0;
             document.getElementById('selectDelete').disabled = count === 0;
             document.getElementById('selectBar').classList.toggle('jp-hidden', !selectMode);
         }
