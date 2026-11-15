@@ -1,5 +1,5 @@
 *.env*
-
+*.pt
 scripts/Makefile_hidden
 scripts/test_media
 

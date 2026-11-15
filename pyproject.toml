@@ -40,8 +40,12 @@ client = [
 ]
 vision = [
     "ultralytics>=8.3.0",
-    "opencv-python>=4.9.0",
+    "opencv-python-headless>=4.9.0",
 ]
+
+[tool.uv]
+# ultralytics requires opencv-python; the headless build replaces it (no libGL needed).
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
 
 [tool.pytest.ini_options]
 env_files = [".env"]
