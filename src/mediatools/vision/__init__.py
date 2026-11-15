@@ -9,5 +9,36 @@ except ImportError as e:
     ) from e
 
 from .detect import Detection, detect_objects
+from .tracker import ObjectTracker
+from .tracking_domain import (
+    BoundingBox,
+    BoundingBoxDimensionError,
+    ClassId,
+    ClassName,
+    ConfidenceScore,
+    ConfidenceScoreBoundsError,
+    MissingTrackingIdError,
+    TrackedFrame,
+    TrackedObject,
+    TrackId,
+    TrackingConfigurationError,
+    TrackingDomainError,
+)
 
-__all__ = ["Detection", "detect_objects"]
+__all__ = [
+    "BoundingBox",
+    "BoundingBoxDimensionError",
+    "ClassId",
+    "ClassName",
+    "ConfidenceScore",
+    "ConfidenceScoreBoundsError",
+    "Detection",
+    "MissingTrackingIdError",
+    "ObjectTracker",
+    "TrackId",
+    "TrackedFrame",
+    "TrackedObject",
+    "TrackingConfigurationError",
+    "TrackingDomainError",
+    "detect_objects",
+]
