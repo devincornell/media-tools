@@ -1,7 +1,17 @@
-"""Estimate dense optical flow for a video and render it as an overlay for visual checking.
+"""Estimate dense optical flow for a video, cache it, and optionally render it two ways.
 
-Each output frame is the source frame with the flow drawn on top: a color-wheel layer
-(hue = direction, brightness = speed) blended in, plus a sparse grid of motion arrows.
+By default this only fills the flow cache. Each output is enabled by giving it a filename:
+
+  --overlay-output FILE    the source frame with the flow drawn on top: a color-wheel
+                           layer (hue = direction, brightness = speed) blended in, plus a
+                           sparse grid of motion arrows.
+  --particles-output FILE  particles on a black background that drift with the flow. A
+                           particle's velocity is the flow at its exact sub-pixel position
+                           (bilinear interpolation). Each frame's flow is integrated in
+                           --particle-substeps smaller steps, re-sampling the velocity each
+                           time so paths curve with the field. Particles that leave the
+                           frame or reach --particle-lifetime frames respawn at random.
+                           Trails come from fading the previous frame by --particle-fade.
 
 Computed flow is cached on disk, one file per frame pair, keyed by the video (path, size,
 modification time), the algorithm and its parameters, `--step`, and `--cache-height`. Any
@@ -9,11 +19,14 @@ run, whatever its `--max-frames`, only computes the frame pairs that are not cac
 extending 500 frames to 1000 computes just the new 500 and shrinking back to 500 computes
 nothing. Flow is stored downscaled to `--cache-height` rows (float16) to keep the cache
 small, and upscaled when rendering; both fresh and cached runs go through that same
-round trip, so their output is identical.
+round trip, so their output is identical. With no `--max-frames`, the whole video is
+processed.
 
 Usage:
-    python scripts/optical_flow_video.py VIDEO [-o OUTPUT] [--algorithm raft|dis|farneback]
-        [--step N] [--max-frames M] [--side-by-side] [--cache-dir DIR] [--recompute]
+    python scripts/optical_flow_video.py VIDEO [--algorithm raft|dis|farneback] [--step N]
+        [--max-frames M] [--cache-dir DIR] [--recompute]
+        [--overlay-output FILE [--side-by-side] [--alpha A] [--arrow-every PX]]
+        [--particles-output FILE [--particle-count N] [--particle-fade F]]
 """
 from __future__ import annotations
 
@@ -25,6 +38,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import numpy.typing as npt
 
 from mediatools.vision import (
     DisFlow,
@@ -36,6 +50,7 @@ from mediatools.vision import (
 from video_writer import H264Writer
 
 BgrFrame = np.ndarray
+Positions = npt.NDArray[np.float32]  # (N, 2) x, y in source-video pixels
 
 DEFAULT_CACHE_DIR = Path("~/.cache/mediatools/optical_flow").expanduser()
 
@@ -214,13 +229,88 @@ def compose(
     return np.hstack([frame, out]) if side_by_side else out  # type: ignore[no-any-return]
 
 
-def render(video: Path, output: Path, args: argparse.Namespace) -> int:
+def sample_bilinear(vectors: npt.NDArray[np.float32], positions: Positions) -> Positions:
+    """Flow at arbitrary sub-pixel positions, bilinearly interpolated from the (2, H, W) field."""
+    _, height, width = vectors.shape
+    x = np.clip(positions[:, 0], 0, width - 1)
+    y = np.clip(positions[:, 1], 0, height - 1)
+    x0 = np.minimum(x.astype(np.int64), width - 2)
+    y0 = np.minimum(y.astype(np.int64), height - 2)
+    fx, fy = (x - x0)[:, None], (y - y0)[:, None]
+    hwc = np.moveaxis(vectors, 0, 2)  # view, (H, W, 2)
+    top = hwc[y0, x0] * (1 - fx) + hwc[y0, x0 + 1] * fx
+    bottom = hwc[y0 + 1, x0] * (1 - fx) + hwc[y0 + 1, x0 + 1] * fx
+    return (top * (1 - fy) + bottom * fy).astype(np.float32)
+
+
+class ParticleSystem:
+    def __init__(self, count: int, width: int, height: int, lifetime: int, rng: np.random.Generator) -> None:
+        self._size = np.array([width, height], dtype=np.float32)
+        self._lifetime = lifetime
+        self._rng = rng
+        self.positions = self._random_positions(count)
+        # Stagger ages so particles do not all respawn on the same frame.
+        self._age = rng.integers(0, lifetime, count)
+
+    def _random_positions(self, count: int) -> Positions:
+        return (self._rng.random((count, 2), dtype=np.float32) * self._size).astype(np.float32)
+
+    def advance(self, vectors: npt.NDArray[np.float32], substeps: int) -> tuple[Positions, npt.NDArray[np.bool_]]:
+        """Move every particle through one frame of flow.
+
+        Returns the positions before the move and a mask of particles that survived it
+        (respawned particles should not be drawn with a trail from their old spot).
+        """
+        previous = self.positions.copy()
+        for _ in range(substeps):
+            self.positions += sample_bilinear(vectors, self.positions) / substeps
+        self._age += 1
+        inside = np.all((self.positions >= 0) & (self.positions < self._size), axis=1)
+        alive = inside & (self._age < self._lifetime)
+        dead = ~alive
+        self.positions[dead] = self._random_positions(int(dead.sum()))
+        self._age[dead] = 0
+        return previous, alive
+
+
+def direction_colors(delta: Positions) -> npt.NDArray[np.uint8]:
+    """BGR color per displacement, matching FlowField.to_bgr's hue convention at full brightness."""
+    hue = ((np.arctan2(delta[:, 1], delta[:, 0]) + np.pi) * (180.0 / (2 * np.pi))).astype(np.uint8)
+    hsv = np.stack([hue, np.full_like(hue, 255), np.full_like(hue, 255)], axis=-1)
+    return cv2.cvtColor(hsv[np.newaxis], cv2.COLOR_HSV2BGR)[0]  # type: ignore[return-value]
+
+
+def draw_particles(
+    canvas: npt.NDArray[np.uint8],
+    start: Positions,
+    end: Positions,
+    scale: float,
+    white: bool,
+    thickness: int,
+) -> None:
+    colors = np.full((len(start), 3), 255, dtype=np.uint8) if white else direction_colors(end - start)
+    a = np.rint(start * scale).astype(np.int32)
+    b = np.rint(end * scale).astype(np.int32)
+    for (x0, y0), (x1, y1), color in zip(a, b, colors):
+        cv2.line(canvas, (int(x0), int(y0)), (int(x1), int(y1)), tuple(int(c) for c in color), thickness, cv2.LINE_AA)
+
+
+def particle_output_size(width: int, height: int, max_height: int) -> tuple[int, int]:
+    if max_height and height > max_height:
+        # Keep the aspect ratio; codecs want even dimensions.
+        return round(width * max_height / height / 2) * 2, max_height // 2 * 2
+    return width, height
+
+
+def render(video: Path, args: argparse.Namespace) -> None:
     cap = cv2.VideoCapture(str(video))
     if not cap.isOpened():
         raise RuntimeError(f"Failed to open video: {video}")
     fps = cap.get(cv2.CAP_PROP_FPS)
     width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if args.overlay_output is None:
+        cap.release()  # only the overlay needs the source frames after this
 
     cache = FlowCache(args.cache_dir, video, args, width, height)
     total = (frame_count - 1) // args.step
@@ -229,58 +319,109 @@ def render(video: Path, output: Path, args: argparse.Namespace) -> int:
     print(f"{len(wanted) - len(missing)}/{len(wanted)} flows cached in {cache.directory}")
     if missing:
         compute_missing(video, missing, cache, args)
+    if args.overlay_output is None and args.particles_output is None:
+        print("no outputs requested; pass --overlay-output and/or --particles-output to render")
+        return
 
-    out_size = (width * 2 if args.side_by_side else width, height)
-    # Flow is only computed every `step` frames, so the output plays at a proportionally lower rate.
-    writer = H264Writer(output, fps / args.step, out_size)
-
-    max_flow = args.max_flow or 0.02 * width * args.step
-    written = 0
+    # Flow is only computed every `step` frames, so outputs play at a proportionally lower rate.
+    out_fps = fps / args.step
+    overlay_writer = particle_writer = None
+    particles = None
+    canvas = None
     try:
+        if args.overlay_output is not None:
+            overlay_writer = H264Writer(
+                args.overlay_output, out_fps, (width * 2 if args.side_by_side else width, height)
+            )
+            max_flow = args.max_flow or 0.02 * width * args.step
+        if args.particles_output is not None:
+            particle_size = particle_output_size(width, height, args.particle_height)
+            particle_scale = particle_size[0] / width  # simulate in source pixels, draw at output size
+            particle_thickness = max(1, particle_size[0] // 1280)
+            particles = ParticleSystem(
+                args.particle_count, width, height, args.particle_lifetime, np.random.default_rng(args.particle_seed)
+            )
+            canvas = np.zeros((particle_size[1], particle_size[0], 3), dtype=np.uint8)
+            particle_writer = H264Writer(args.particles_output, out_fps, particle_size)
+
+        written = 0
         for k in wanted:
             if not cache.has(k):
                 break  # the video ended before this pair
-            success, frame = cap.read()
-            if not success:
-                raise RuntimeError(f"Video ended after {written} frames")
-            for _ in range(args.step - 1):
-                cap.grab()
             flow = cache.load(k)
-            writer.write(compose(frame, flow, max_flow, args.alpha, args.arrow_every, args.arrow_scale, args.side_by_side))
+            if overlay_writer is not None:
+                success, frame = cap.read()
+                if not success:
+                    raise RuntimeError(f"Video ended after {written} frames")
+                for _ in range(args.step - 1):
+                    cap.grab()
+                overlay_writer.write(
+                    compose(frame, flow, max_flow, args.alpha, args.arrow_every, args.arrow_scale, args.side_by_side)
+                )
+            if particle_writer is not None:
+                previous, alive = particles.advance(flow.vectors, args.particle_substeps)
+                canvas = (canvas * np.float32(args.particle_fade)).astype(np.uint8)
+                draw_particles(
+                    canvas, previous[alive], particles.positions[alive], particle_scale, args.particle_white,
+                    particle_thickness,
+                )
+                particle_writer.write(canvas)
             written += 1
             if written % 50 == 0:
                 print(f"rendered {written} frames")
     finally:
         cap.release()
-        writer.close()
-    return written
+        for writer in (overlay_writer, particle_writer):
+            if writer is not None:
+                writer.close()
+    for label, path in (("overlay", args.overlay_output), ("particles", args.particles_output)):
+        if path is not None:
+            print(f"wrote {written} {label} frames to {path}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("video", type=Path)
-    parser.add_argument("-o", "--output", type=Path, default=None)
     add_flow_args(parser)
-    parser.add_argument("--max-frames", type=int, default=None, help="only render the first M output frames")
-    parser.add_argument("--side-by-side", action="store_true", help="show the original frame next to the overlay")
-    parser.add_argument("--alpha", type=float, default=0.5, help="opacity of the color-wheel layer (0-1)")
-    parser.add_argument("--max-flow", type=float, default=None,
-                        help="flow (pixels) that maps to full brightness; default 2%% of width per step")  # fmt: skip
-    parser.add_argument("--arrow-every", type=int, default=48, help="arrow grid spacing in pixels; 0 disables arrows")
-    parser.add_argument("--arrow-scale", type=float, default=3.0, help="arrow length multiplier")
+    parser.add_argument("--max-frames", type=int, default=None, help="only process the first M frame pairs")
     parser.add_argument("--device", default=None, help="torch device for RAFT, e.g. cuda or cpu")
     parser.add_argument("--recompute", action="store_true", help="ignore cached flow and overwrite it")
+
+    overlay = parser.add_argument_group("overlay video")
+    overlay.add_argument("--overlay-output", type=Path, default=None, help="write the flow overlay video here")
+    overlay.add_argument("--side-by-side", action="store_true", help="show the original frame next to the overlay")
+    overlay.add_argument("--alpha", type=float, default=0.5, help="opacity of the color-wheel layer (0-1)")
+    overlay.add_argument("--max-flow", type=float, default=None,
+                         help="flow (pixels) that maps to full brightness; default 2%% of width per step")  # fmt: skip
+    overlay.add_argument("--arrow-every", type=int, default=48, help="arrow grid spacing in pixels; 0 disables arrows")
+    overlay.add_argument("--arrow-scale", type=float, default=3.0, help="arrow length multiplier")
+
+    particles = parser.add_argument_group("particle video")
+    particles.add_argument("--particles-output", type=Path, default=None, help="write the particle video here")
+    particles.add_argument("--particle-count", type=int, default=4000, help="number of particles")
+    particles.add_argument("--particle-lifetime", type=int, default=90, help="frames before a particle respawns")
+    particles.add_argument("--particle-fade", type=float, default=0.85,
+                           help="fraction of the previous frame kept each frame; higher = longer trails (0-1)")  # fmt: skip
+    particles.add_argument("--particle-substeps", type=int, default=4, help="integration steps per frame of flow")
+    particles.add_argument("--particle-seed", type=int, default=0, help="random seed for particle placement")
+    particles.add_argument("--particle-white", action="store_true", help="draw particles white, not colored by direction")
+    particles.add_argument("--particle-height", type=int, default=720,
+                           help="particle video height, keeping aspect (0 = source size)")  # fmt: skip
     args = parser.parse_args()
 
     validate_flow_args(parser, args)
     if not 0.0 <= args.alpha <= 1.0:
         parser.error("--alpha must be between 0 and 1")
+    if args.particle_height < 0:
+        parser.error("--particle-height must be >= 0")
+    if args.particle_count < 1 or args.particle_lifetime < 1 or args.particle_substeps < 1:
+        parser.error("--particle-count, --particle-lifetime and --particle-substeps must be >= 1")
+    if not 0.0 <= args.particle_fade < 1.0:
+        parser.error("--particle-fade must be in [0, 1)")
     if not args.video.is_file():
         parser.error(f"video not found: {args.video}")
-    output = args.output or Path(f"{args.video.stem}_flow_{args.algorithm}.mp4")
 
-    written = render(args.video, output, args)
-    print(f"wrote {written} frames to {output}")
+    render(args.video, args)
 
 
 if __name__ == "__main__":
