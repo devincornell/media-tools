@@ -142,10 +142,17 @@ class _Flat:
 
 
 Endpoint = tuple[str, str]
+_AnyNode = InputNode | FilterNode | GraphNode | OutputNode
 
 
-def compile_graph(doc: FilterGraphDoc, catalog: FilterCatalog, refs: Mapping[str, GraphRef] | None = None) -> CompiledGraph:
-    return _Compiler(catalog, refs or {}).run(doc)
+def compile_graph(
+    doc: FilterGraphDoc,
+    catalog: FilterCatalog,
+    refs: Mapping[str, GraphRef] | None = None,
+    values: Mapping[str, str] | None = None,
+) -> CompiledGraph:
+    '''Compile `doc`; `values` replaces the defaults of its parameters.'''
+    return _Compiler(catalog, refs or {}).run(doc, values or {})
 
 
 def referenced_graph_ids(doc: FilterGraphDoc) -> set[str]:
@@ -162,14 +169,25 @@ class _Compiler:
         self.ports: dict[str, dict[str, dict[str, Endpoint]]] = {}
         self.top_pads: dict[str, NodePads] = {}
         self.top_edges: list[tuple[Endpoint, Endpoint]] = []
+        self.top_nodes: dict[str, _AnyNode] = {}
 
     def issue(self, level: str, message: str, node: str | None = None, pad: str | None = None, side: str | None = None) -> None:
         self.issues.append(Issue(level=level, message=message, node=node, pad=pad, side=side))  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------ driver
 
-    def run(self, doc: FilterGraphDoc) -> CompiledGraph:
-        self._flatten(doc, prefix="", stack=(), origin=None, context="")
+    def run(self, doc: FilterGraphDoc, values: Mapping[str, str]) -> CompiledGraph:
+        names = {p.name for p in doc.params}
+        for key in values:
+            if key not in names:
+                self.issue("error", f"The graph has no parameter '{key}'.")
+        used = {p for n in doc.nodes for p in n.params.values()}
+        for p in doc.params:
+            if p.name not in used:
+                self.issue("warning", f"Parameter '{p.name}' isn't used by any option.")
+        self._flatten(doc, prefix="", stack=(), origin=None, context="", values=doc.param_values(values))
+        # From here on, top-level nodes carry their parameter values as plain options.
+        doc = doc.model_copy(update={"nodes": [self.top_nodes.get(n.id, n) for n in doc.nodes]})
         if not any(isinstance(n, OutputNode) for n in doc.nodes):
             self.issue("error", "Add an output node: it decides which streams are written to the output file.")
         empty = CompiledGraph(ok=False, filter_complex="", filter_complex_pretty="", inputs=[], outputs=[],
@@ -183,23 +201,27 @@ class _Compiler:
 
     # ------------------------------------------------------------------ flattening
 
-    def _flatten(self, doc: FilterGraphDoc, prefix: str, stack: tuple[str, ...], origin: str | None, context: str) -> None:
+    def _flatten(self, doc: FilterGraphDoc, prefix: str, stack: tuple[str, ...], origin: str | None, context: str,
+                 values: Mapping[str, str]) -> None:
         top = origin is None
         level_pads: dict[str, NodePads] = {}
         for node in doc.nodes:
             fid = prefix + node.id
             where = origin or node.id
+            node = self._bind(node, values, where, context)
+            if top:
+                self.top_nodes[node.id] = node
             if isinstance(node, InputNode):
                 pads = input_pads(node)
                 kind = "input" if top else "relay"
                 if top:
-                    self._check_io(node.options, INPUT_BY_NAME, where, context)
+                    self._check_io(node, INPUT_BY_NAME, where, context)
                 self.nodes[fid] = _Flat(fid, kind, where, not top, NodePads(inputs=pads.outputs, outputs=pads.outputs) if not top else pads, node)
             elif isinstance(node, OutputNode):
                 pads = output_pads(node)
                 kind = "output" if top else "relay"
                 if top:
-                    self._check_io(node.options, OUTPUT_BY_NAME, where, context)
+                    self._check_io(node, OUTPUT_BY_NAME, where, context)
                 self.nodes[fid] = _Flat(fid, kind, where, not top, pads if top else NodePads(inputs=pads.inputs, outputs=pads.inputs), node)
             elif isinstance(node, FilterNode):
                 spec = self._filter_spec(node, where, context)
@@ -225,6 +247,20 @@ class _Compiler:
             return self.ports[fid][side].get(pad)
         return (fid, pad) if fid in self.nodes else None
 
+    def _bind(self, node: _AnyNode, values: Mapping[str, str], where: str, context: str) -> _AnyNode:
+        '''The node with its parameter-bound options replaced by the parameters' values.'''
+        if not node.params:
+            return node
+        options = dict(node.options)
+        for key, name in node.params.items():
+            if name not in values:
+                self.issue("error", f"{context}Option '{key}' uses parameter '{name}', which doesn't exist.", where)
+                continue
+            options.pop(key, None)
+            if values[name] != "":
+                options[key] = values[name]
+        return node.model_copy(update={"options": options})
+
     def _expand_graph(self, node: GraphNode, fid: str, stack: tuple[str, ...], where: str, context: str) -> NodePads:
         ref = self.refs.get(node.graph_id)
         if ref is None:
@@ -236,7 +272,11 @@ class _Compiler:
         if len(stack) >= MAX_DEPTH:
             self.issue("error", f"{context}Saved graphs are nested more than {MAX_DEPTH} levels deep.", where)
             return NodePads()
-        self._flatten(ref.doc, prefix=f"{fid}/", stack=(*stack, node.graph_id), origin=where, context=f"{context}In '{ref.name}': ")
+        names = {p.name for p in ref.doc.params}
+        for key in sorted({*node.options, *node.params} - names):
+            self.issue("error", f"{context}'{ref.name}' has no parameter '{key}'.", where)
+        self._flatten(ref.doc, prefix=f"{fid}/", stack=(*stack, node.graph_id), origin=where, context=f"{context}In '{ref.name}': ",
+                      values=ref.doc.param_values(node.options))
         ports: dict[str, dict[str, Endpoint]] = {"in": {}, "out": {}}
         for inner in ref.doc.nodes:
             if isinstance(inner, InputNode):
@@ -274,15 +314,21 @@ class _Compiler:
             if opt.name in seen:
                 self.issue("error", f"{context}{node.filter}: '{key}' is set twice (also as {seen[opt.name]}).", where)
             seen[opt.name] = key
+        for key in node.params:
+            if key not in node.options and spec.option(key) is None:
+                self.issue("error", f"{context}{node.filter} has no option '{key}'.", where)
         for value in [*node.args, *node.options.values()]:
             if _CONTROL.search(value):
                 self.issue("error", f"{context}{node.filter}: option values can't contain line breaks or control characters.", where)
                 break
         return spec
 
-    def _check_io(self, options: Mapping[str, str], specs: Mapping[str, typing.Any], where: str, context: str) -> None:
-        for problem in validate_io_options(options, specs):
+    def _check_io(self, node: InputNode | OutputNode, specs: Mapping[str, typing.Any], where: str, context: str) -> None:
+        for problem in validate_io_options(node.options, specs):
             self.issue("error", context + problem, where)
+        for key in node.params:
+            if key not in node.options and key not in specs:
+                self.issue("error", f"{context}-{key} is not supported here", where)
 
     def _check_edges(self, doc: FilterGraphDoc, pads: Mapping[str, NodePads], origin: str | None, context: str) -> list:
         '''Report wiring problems on one level of the document and return its usable edges.'''

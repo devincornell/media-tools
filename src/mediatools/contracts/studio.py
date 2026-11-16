@@ -9,6 +9,7 @@ from ..video.ffmpeg.filtergraph import (
     CompiledGraph,
     FilterGraphDoc,
     FilterSummary,
+    GraphParam,
     IoOptionSpec,
     Issue,
     NodePads,
@@ -21,6 +22,10 @@ class _Contract(BaseModel):
 
 
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
+ParamValues = Annotated[
+    dict[Annotated[str, StringConstraints(max_length=32)], Annotated[str, StringConstraints(max_length=4000)]],
+    Field(max_length=64, description="Parameter name -> value, replacing the parameter's default."),
+]
 
 
 class FilterCatalogView(_Contract):
@@ -52,6 +57,7 @@ class GraphSummary(_Contract):
     updated_at: datetime.datetime
     revision: Annotated[int, Field(description="Increases with every save.")]
     interface: Annotated[NodePads, Field(description="Pads the graph shows when used as a node in another graph.")]
+    params: Annotated[list[GraphParam], Field(description="Parameters that can be set when running or embedding it.")]
     filters: Annotated[list[str], Field(description="Filters used, in order of appearance.")]
     uses: Annotated[list[str], Field(description="IDs of saved graphs this one embeds.")]
 
@@ -66,6 +72,7 @@ class GraphList(_Contract):
 
 class CompileRequest(_Contract):
     graph: FilterGraphDoc
+    params: ParamValues = {}
 
 
 class CompileView(CompiledGraph):
@@ -116,6 +123,7 @@ class StudioRunRequest(_Contract):
     graph_id: Annotated[str | None, Field(description="Saved graph the run came from, if any.")] = None
     graph_name: Annotated[str, Field(max_length=120)] = "Untitled graph"
     items: Annotated[list[StudioRunItem], Field(min_length=1, max_length=200)]
+    params: ParamValues = {}
     overwrite: Annotated[bool, Field(description="Replace output files that already exist.")] = False
 
 

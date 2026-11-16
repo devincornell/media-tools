@@ -145,6 +145,10 @@
                 <div id="runInputs" class="run-rows"></div>
                 <h3>Outputs</h3>
                 <div id="runOutputs" class="run-rows"></div>
+                <div id="runParamsBox">
+                    <h3>Parameters</h3>
+                    <div id="runParams" class="run-rows"></div>
+                </div>
                 <p class="hint">File names can use <code>{stem}</code> (input name without extension), <code>{name}</code>, <code>{ext}</code>,
                     <code>{output}</code>, <code>{graph}</code>, <code>{n}</code> (run number) and <code>{date}</code>.</p>
                 <label class="check"><input type="checkbox" id="runOverwrite"> Overwrite files that already exist</label>
@@ -234,6 +238,7 @@
                         <tr><td>Link (wire)</td><td>a link label like <code>[scale1]</code>. A straight run of one-in/one-out filters is written as a chain with commas: <code>scale=...,hflip</code>.</td></tr>
                         <tr><td><span class="chip output">Output</span> node</td><td>one output file: each connected pad is a <code>-map</code>, its options are output options (<code>-c:v libx264 -crf 20</code>).</td></tr>
                         <tr><td><span class="chip graph">Saved graph</span> node</td><td>another graph from your library, copied in when the graph runs. Change the saved graph and every graph using it changes too.</td></tr>
+                        <tr><td><i class="fas fa-sliders"></i> Parameter</td><td>an option value lifted to the whole graph, e.g. the <code>w</code> of a <code>scale</code> as <code>width</code>. Its default is used unless you change it in the Run dialog, or on the node when the graph is used inside another graph. One parameter can drive several options.</td></tr>
                     </tbody>
                 </table>
                 <h3>Making a graph</h3>
@@ -241,7 +246,8 @@
                     <li><b>Start</b> from an example (left, <i>Examples</i>), import an ffmpeg command, or press <b>New</b>: you get an input wired straight to an output.</li>
                     <li><b>Add filters</b>: drag one from the left, press <kbd>Tab</kbd>, or select a wire and use <i>Insert filter</i> to put one in between.</li>
                     <li><b>Connect</b> by dragging from a dot to a dot of the same color. Dragging from a connected input dot picks the wire up again.</li>
-                    <li><b>Configure</b>: select a node; the panel on the right lists its options and shows what each pad is connected to and under which label.</li>
+                    <li><b>Configure</b>: select a node; the panel on the right lists its options and shows what each pad is connected to and under which label.
+                        Click <i class="fas fa-sliders"></i> next to an option to make it a <b>graph parameter</b>; with nothing selected, the panel lists the graph's parameters.</li>
                     <li><b>Check</b> the <i>Problems</i> tab: unconnected pads, wrong types, unknown options. The <i>Run</i> button works once there are none.</li>
                     <li><b>Save</b> it to the library with a name and description. Saved graphs can be opened, run, or added as a single node to other graphs.</li>
                     <li><b>Run</b>: pick a file per input (or many files for one input to process a batch) and where outputs go. Progress and logs appear under <i>Runs</i>.</li>

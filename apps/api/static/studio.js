@@ -81,7 +81,7 @@ function quoteArgs(a) {
 }
 function formatFilter(node) {
     const parts = node.args.map(a => escapeValue(a, true))
-        .concat(Object.entries(node.options).map(([k, v]) => `${k}=${escapeValue(v)}`));
+        .concat(Object.entries(effectiveOptions(node)).map(([k, v]) => `${k}=${escapeValue(v)}`));
     const joined = quoteArgs(parts.join(':'));
     return joined ? `${node.filter}=${joined}` : node.filter;
 }
@@ -110,6 +110,7 @@ const S = {
     lastPointer: null,
     optFilter: '',
     optOnlySet: false,
+    bindMenu: null,
 };
 
 // ------------------------------------------------------------------ pads (mirrors filtergraph/model.py)
@@ -174,7 +175,7 @@ function padsOf(node) {
         return g ? g.interface : (S.compiled?.pads?.[node.id] || { inputs: [], outputs: [] });
     }
     const spec = S.specs.get(node.filter);
-    if (spec) return filterPads(spec, node);
+    if (spec) return filterPads(spec, { ...node, options: effectiveOptions(node) });
     return S.compiled?.pads?.[node.id] || { inputs: [], outputs: [] };
 }
 
@@ -217,22 +218,143 @@ function uniqueName(kind, base) {
 }
 
 function makeNode(kind, extra = {}) {
-    if (kind === 'input') return { kind, id: newId('in'), name: uniqueName('input', 'in'), options: {}, sample_path: null, note: '', position: null };
+    if (kind === 'input') return { kind, id: newId('in'), name: uniqueName('input', 'in'), options: {}, params: {}, sample_path: null, note: '', position: null };
     if (kind === 'output') {
         return { kind, id: newId('out'), name: uniqueName('output', 'out'), pads: [{ name: 'v', type: 'video' }, { name: 'a', type: 'audio' }],
-                 options: {}, filename: '{stem}-{output}.mp4', note: '', position: null };
+                 options: {}, params: {}, filename: '{stem}-{output}.mp4', note: '', position: null };
     }
-    if (kind === 'graph') return { kind, id: newId('graph'), graph_id: extra.graph_id, note: '', position: null };
-    return { kind: 'filter', id: newId(extra.filter), filter: extra.filter, args: [], options: {}, extra_inputs: null, extra_outputs: null, note: '', position: null };
+    if (kind === 'graph') return { kind, id: newId('graph'), graph_id: extra.graph_id, options: {}, params: {}, note: '', position: null };
+    return { kind: 'filter', id: newId(extra.filter), filter: extra.filter, args: [], options: {}, params: {}, extra_inputs: null, extra_outputs: null, note: '', position: null };
+}
+
+// Older drafts and documents may lack the parameter fields.
+function normalizeDoc(doc) {
+    doc.params = doc.params || [];
+    for (const n of doc.nodes) {
+        n.params = n.params || {};
+        n.options = n.options || {};
+    }
+    return doc;
+}
+
+// ------------------------------------------------------------------ graph parameters
+
+const paramOf = (name) => S.doc.params.find(p => p.name === name);
+
+// Options as the compiler sees them with every parameter at its default.
+function effectiveOptions(node) {
+    const out = { ...(node.options || {}) };
+    for (const [key, name] of Object.entries(node.params || {})) {
+        delete out[key];
+        const v = paramOf(name)?.default ?? '';
+        if (v !== '') out[key] = v;
+    }
+    return out;
+}
+
+const boundKey = (node, keys) => keys.find(k => k in (node.params || {})) ?? null;
+const paramUses = (name) => S.doc.nodes.flatMap(n => Object.entries(n.params || {}).filter(([, p]) => p === name).map(([key]) => ({ node: n, key })));
+
+function uniqueParamName(base) {
+    base = String(base).replace(/[^A-Za-z0-9_-]/g, '_').replace(/^[^A-Za-z]+/, '').slice(0, 28) || 'param';
+    const names = new Set(S.doc.params.map(p => p.name));
+    if (!names.has(base)) return base;
+    let i = 2;
+    while (names.has(`${base}${i}`)) i++;
+    return `${base}${i}`;
+}
+
+// Bind an option to parameter `name`, or to a new parameter that starts from the option's current value.
+function bindParam(node, key, name, { aliases = [], base = key, description = '' } = {}) {
+    S.bindMenu = null;
+    mutate(() => {
+        const n = nodeById(node.id);
+        const keys = [key, ...aliases];
+        if (!name) {
+            name = uniqueParamName(base);
+            const current = keys.map(k => n.options[k]).find(v => v !== undefined) ?? '';
+            S.doc.params.push({ name, description, default: current });
+        }
+        for (const k of keys) { delete n.options[k]; delete n.params[k]; }
+        n.params[key] = name;
+    });
+}
+
+// Back to a fixed value: the parameter's current default.
+function unbindParam(node, key) {
+    mutate(() => {
+        const n = nodeById(node.id);
+        const v = paramOf(n.params[key])?.default ?? '';
+        delete n.params[key];
+        if (v !== '') n.options[key] = v;
+    });
+}
+
+function renameParam(oldName, newName) {
+    mutate(() => {
+        paramOf(oldName).name = newName;
+        for (const { node, key } of paramUses(oldName)) node.params[key] = newName;
+    });
+}
+
+function removeParam(name) {
+    mutate(() => {
+        const v = paramOf(name)?.default ?? '';
+        for (const { node, key } of paramUses(name)) {
+            delete node.params[key];
+            if (v !== '') node.options[key] = v;
+        }
+        S.doc.params = S.doc.params.filter(p => p.name !== name);
+    });
+}
+
+// Shown instead of the value field when the option is bound to a parameter.
+function boundWidget(node, keys) {
+    const key = boundKey(node, keys);
+    if (!key) return null;
+    const name = node.params[key];
+    const p = paramOf(name);
+    return el('div', { class: 'param-bound' },
+        icon('fa-sliders'),
+        el('select', { 'data-key': `bind:${node.id}:${key}`, title: 'Graph parameter this option takes its value from',
+            onchange: (ev) => bindParam(node, key, ev.target.value) },
+            S.doc.params.map(q => el('option', { value: q.name, selected: q.name === name }, q.name)),
+            p ? null : el('option', { value: name, selected: true }, `${name} (missing)`)),
+        el('span', { class: 'hint', title: 'The parameter\'s default; runs and graphs embedding this one can change it' },
+            p ? (p.default === '' ? 'default: unset' : `default: ${p.default}`) : ''),
+        el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Use a fixed value again', onclick: () => unbindParam(node, key) }, icon('fa-link-slash')));
+}
+
+// The sliders button that turns an option into a graph parameter.
+function paramButton(node, keys, opts) {
+    if (boundKey(node, keys)) return null;
+    const key = keys[0];
+    const menuKey = `${node.id}:${key}`;
+    if (S.bindMenu === menuKey) {
+        return el('select', { class: 'param-menu', 'data-key': `bindmenu:${menuKey}`, onchange: (ev) => {
+            if (ev.target.value === '__cancel__') { S.bindMenu = null; renderInspector(); return; }
+            bindParam(node, key, ev.target.value === '__new__' ? null : ev.target.value, { aliases: keys.slice(1), ...opts });
+        } },
+            el('option', { value: '__cancel__' }, 'Make a graph parameter…'),
+            el('option', { value: '__new__' }, `New parameter "${uniqueParamName(opts.base || key)}"`),
+            S.doc.params.map(p => el('option', { value: p.name }, `Use "${p.name}"`)));
+    }
+    return el('button', { type: 'button', class: 'small btn-ghost param-btn', title: 'Make this a graph parameter (set when running, or by graphs that use this one)',
+        onclick: () => {
+            if (!S.doc.params.length) { bindParam(node, key, null, { aliases: keys.slice(1), ...opts }); return; }
+            S.bindMenu = menuKey;
+            renderInspector();
+        } }, icon('fa-sliders'));
 }
 
 function starterDoc() {
     return {
         version: 1,
+        params: [],
         nodes: [
-            { kind: 'input', id: 'in1', name: 'in', options: {}, sample_path: null, note: '', position: { x: 40, y: 80 } },
+            { kind: 'input', id: 'in1', name: 'in', options: {}, params: {}, sample_path: null, note: '', position: { x: 40, y: 80 } },
             { kind: 'output', id: 'out1', name: 'out', pads: [{ name: 'v', type: 'video' }, { name: 'a', type: 'audio' }],
-              options: {}, filename: '{stem}-{output}.mp4', note: '', position: { x: 520, y: 80 } },
+              options: {}, params: {}, filename: '{stem}-{output}.mp4', note: '', position: { x: 520, y: 80 } },
         ],
         edges: [
             { source: 'in1', source_pad: 'v', target: 'out1', target_pad: 'v' },
@@ -331,7 +453,7 @@ async function ensureSpecs(names) {
 
 async function loadDoc(doc, meta, { dirty = false } = {}) {
     await ensureSpecs(doc.nodes.filter(n => n.kind === 'filter').map(n => n.filter));
-    S.doc = doc;
+    S.doc = normalizeDoc(doc);
     S.meta = { id: null, name: 'Untitled graph', description: '', tags: [], revision: null, ...meta };
     S.sel = { nodes: new Set(), edge: null };
     S.history = { undo: [], redo: [] };
@@ -369,19 +491,22 @@ function issuesByNode() {
 }
 
 function summaryText(node) {
+    const bound = (fmt) => Object.entries(node.params || {}).map(([k, p]) => fmt(k, `$${p}`));
     if (node.kind === 'filter') {
-        const parts = node.args.map((a, i) => `#${i + 1}=${a}`).concat(Object.entries(node.options).map(([k, v]) => `${k}=${v}`));
+        const parts = node.args.map((a, i) => `#${i + 1}=${a}`).concat(Object.entries(node.options).map(([k, v]) => `${k}=${v}`), bound((k, v) => `${k}=${v}`));
         return parts.join('  ');
     }
     if (node.kind === 'input') {
-        const parts = Object.entries(node.options).map(([k, v]) => `-${k} ${v}`);
+        const parts = Object.entries(node.options).map(([k, v]) => `-${k} ${v}`).concat(bound((k, v) => `-${k} ${v}`));
         if (node.sample_path) parts.unshift(node.sample_path.split('/').pop());
         return parts.join('  ') || 'file chosen at run time';
     }
     if (node.kind === 'output') {
-        return [node.filename, ...Object.entries(node.options).map(([k, v]) => `-${k} ${v}`)].join('  ');
+        return [node.filename, ...Object.entries(node.options).map(([k, v]) => `-${k} ${v}`), ...bound((k, v) => `-${k} ${v}`)].join('  ');
     }
     const g = S.libById.get(node.graph_id);
+    const values = Object.entries(node.options || {}).map(([k, v]) => `${k}=${v}`).concat(bound((k, v) => `${k}=${v}`));
+    if (values.length) return values.join('  ');
     return g ? (g.filters.join(', ') || 'no filters') : 'not in library';
 }
 
@@ -648,6 +773,7 @@ function clearHighlights() {
 
 canvas.addEventListener('pointerdown', (ev) => {
     if (ev.button !== 0 && ev.button !== 1) return;
+    ev.preventDefault(); // suppresses the browser's native text/element drag
     hideQuickAdd();
     canvas.focus({ preventScroll: true });
     const portEl = ev.target.closest('.dot')?.closest('.port');
@@ -774,6 +900,9 @@ canvas.addEventListener('dblclick', (ev) => {
     if (ev.target.closest('.node')) return;
     showQuickAdd(ev.clientX, ev.clientY, {});
 });
+
+canvas.addEventListener('dragstart', (ev) => ev.preventDefault());
+canvas.addEventListener('selectstart', (ev) => ev.preventDefault());
 
 canvas.addEventListener('dragover', (ev) => {
     if (ev.dataTransfer.types.includes('application/x-studio-node')) ev.preventDefault();
@@ -1141,8 +1270,11 @@ function optionRow(node, opt) {
     const key = optionKey(node, opt);
     const value = key ? node.options[key] : '';
     const dataKey = `opt:${node.id}:${opt.name}`;
+    const bound = opt.blocked ? null : boundWidget(node, [opt.name, ...opt.aliases]);
     let widget;
-    if (opt.blocked) {
+    if (bound) {
+        widget = bound;
+    } else if (opt.blocked) {
         widget = el('input', { type: 'text', disabled: true, value: '', placeholder: 'not allowed: reads or writes server files' });
     } else if (opt.type === 'boolean') {
         widget = el('select', { 'data-key': dataKey, onchange: (ev) => setOption(node, opt, ev.target.value) },
@@ -1170,28 +1302,28 @@ function optionRow(node, opt) {
         if (listId) widget = [widget, el('datalist', { id: listId }, opt.constants.map(c => el('option', { value: c.name }, c.help)))];
     }
     const extras = [];
-    if (opt.type === 'color' && !opt.blocked) {
+    if (opt.type === 'color' && !opt.blocked && !bound) {
         const hex = /^#?[0-9a-f]{6}$/i.test(value) ? (value.startsWith('#') ? value : `#${value}`) : /^0x[0-9a-f]{6}$/i.test(value) ? `#${value.slice(2)}` : '#000000';
         extras.push(el('input', { type: 'color', value: hex, title: 'Pick a color', onchange: (ev) => setOption(node, opt, ev.target.value) }));
     }
-    if (value !== '' && !opt.blocked) {
+    if (value !== '' && !opt.blocked && !bound) {
         extras.push(el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Reset to default', onclick: () => setOption(node, opt, '') }, icon('fa-xmark')));
     }
     let warn = null;
-    if (value !== '' && NUMERIC.has(opt.type) && opt.type !== 'boolean' && /^-?\d+(\.\d+)?$/.test(value)) {
+    if (value !== '' && !bound && NUMERIC.has(opt.type) && opt.type !== 'boolean' && /^-?\d+(\.\d+)?$/.test(value)) {
         const v = parseFloat(value), lo = parseFloat(opt.min), hi = parseFloat(opt.max);
         if ((!isNaN(lo) && v < lo) || (!isNaN(hi) && v > hi)) warn = `Outside the allowed range ${opt.min} … ${opt.max}`;
     }
     const range = opt.min != null && opt.max != null ? ` Range ${opt.min} … ${opt.max}.` : '';
     const consts = opt.type === 'flags' && opt.constants.length
         ? el('div', { class: 'consts' }, 'Flags (combine with +): ', opt.constants.map((c, i) => [i ? ', ' : '', el('b', { title: c.help }, c.name)])) : null;
-    return el('div', { class: `opt${value !== '' ? ' set' : ''}${opt.blocked ? ' blocked' : ''}` },
+    return el('div', { class: `opt${value !== '' || bound ? ' set' : ''}${opt.blocked ? ' blocked' : ''}` },
         el('div', { class: 'opt-top' },
             el('span', { class: 'opt-name' }, opt.name),
             opt.aliases.length ? el('span', { class: 'opt-alias' }, `(${opt.aliases.join(', ')})`) : null,
             el('span', { class: 'opt-type' }, opt.type),
             opt.runtime ? el('span', { class: 'opt-rt', title: 'Can change while running (sendcmd/zmq)' }, 'runtime') : null,
-            opt.blocked ? icon('fa-lock') : null),
+            opt.blocked ? icon('fa-lock') : paramButton(node, [opt.name, ...opt.aliases], { base: `${node.filter}_${opt.name}`, description: opt.help })),
         (opt.help || range) ? el('div', { class: 'opt-help' }, `${opt.help}${opt.help && !/[.!?]$/.test(opt.help) ? '.' : ''}${range}`) : null,
         el('div', { class: 'opt-row' }, widget, extras),
         consts,
@@ -1249,9 +1381,10 @@ function inspectFilter(node) {
     }
 
     if (spec) {
-        const setCount = spec.options.filter(o => optionKey(node, o) !== null).length;
+        const isSet = (o) => optionKey(node, o) !== null || boundKey(node, [o.name, ...o.aliases]) !== null;
+        const setCount = spec.options.filter(isSet).length;
         const q = S.optFilter.toLowerCase();
-        const shown = spec.options.filter(o => (!S.optOnlySet || optionKey(node, o) !== null)
+        const shown = spec.options.filter(o => (!S.optOnlySet || isSet(o))
             && (!q || o.name.includes(q) || o.aliases.some(a => a.includes(q)) || o.help.toLowerCase().includes(q)));
         out.push(section([`Options `, el('span', { class: 'hint' }, `${setCount} set of ${spec.options.length}`)],
             el('div', { class: 'opt-tools' },
@@ -1277,7 +1410,10 @@ function ioOptionRow(node, spec) {
         if (v === '' || v === false) delete n.options[spec.name]; else n.options[spec.name] = v === true ? 'true' : v;
     });
     let widget;
-    if (spec.kind === 'flag') {
+    const bound = boundWidget(node, [spec.name]);
+    if (bound) {
+        widget = bound;
+    } else if (spec.kind === 'flag') {
         widget = el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: ['true', '1', 'yes', ''].includes(value) && spec.name in node.options, 'data-key': dataKey,
             onchange: (ev) => set(ev.target.checked) }), `-${spec.name}`);
     } else if (spec.kind === 'choice') {
@@ -1289,11 +1425,12 @@ function ioOptionRow(node, spec) {
             onchange: (ev) => set(ev.target.value.trim()) }),
             listId ? el('datalist', { id: listId }, spec.suggestions.map(s => el('option', { value: s }))) : null];
     }
-    return el('div', { class: `opt${value !== '' ? ' set' : ''}` },
-        el('div', { class: 'opt-top' }, el('span', { class: 'opt-name' }, `-${spec.name}`), el('span', { class: 'opt-type' }, spec.kind)),
+    return el('div', { class: `opt${value !== '' || bound ? ' set' : ''}` },
+        el('div', { class: 'opt-top' }, el('span', { class: 'opt-name' }, `-${spec.name}`), el('span', { class: 'opt-type' }, spec.kind),
+            paramButton(node, [spec.name], { base: `${node.name}_${spec.name}`, description: spec.help })),
         el('div', { class: 'opt-help' }, spec.help),
         el('div', { class: 'opt-row' }, widget,
-            value !== '' && spec.kind !== 'flag' ? el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Clear', onclick: () => set('') }, icon('fa-xmark')) : null));
+            value !== '' && !bound && spec.kind !== 'flag' ? el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Clear', onclick: () => set('') }, icon('fa-xmark')) : null));
 }
 
 function ioOptionSections(node, specs) {
@@ -1303,9 +1440,9 @@ function ioOptionSections(node, specs) {
         groups.get(s.group).push(s);
     }
     return [...groups].map(([g, list]) => {
-        const anySet = list.some(s => s.name in node.options);
+        const anySet = list.some(s => s.name in node.options || s.name in node.params);
         return el('details', { class: 'insp-section', open: anySet || g === 'Trim' || g === 'Video encoding' },
-            el('summary', { class: 'hint' }, g, anySet ? el('span', { class: 'chip', style: 'margin-left:6px' }, `${list.filter(s => s.name in node.options).length} set`) : null),
+            el('summary', { class: 'hint' }, g, anySet ? el('span', { class: 'chip', style: 'margin-left:6px' }, `${list.filter(s => s.name in node.options || s.name in node.params).length} set`) : null),
             list.map(s => ioOptionRow(node, s)));
     });
 }
@@ -1399,6 +1536,27 @@ function inspectOutput(node) {
     ];
 }
 
+function graphNodeParams(node, g) {
+    if (!g.params.length) return section('Parameters', el('p', { class: 'hint' }, `${g.name} has no parameters.`));
+    const set = (key, v) => mutate(() => {
+        const n = nodeById(node.id);
+        if (v === '') delete n.options[key]; else n.options[key] = v;
+    }, { coalesce: `gopt:${node.id}:${key}` });
+    return section('Parameters', el('p', { class: 'hint' }, 'Values for this use of the saved graph. Empty fields use its defaults.'),
+        g.params.map(p => {
+            const value = node.options[p.name] ?? '';
+            const bound = boundWidget(node, [p.name]);
+            return el('div', { class: `opt${value !== '' || bound ? ' set' : ''}` },
+                el('div', { class: 'opt-top' }, el('span', { class: 'opt-name' }, p.name),
+                    paramButton(node, [p.name], { base: p.name, description: p.description })),
+                p.description ? el('div', { class: 'opt-help' }, p.description) : null,
+                el('div', { class: 'opt-row' }, bound || [
+                    el('input', { type: 'text', value, 'data-key': `gopt:${node.id}:${p.name}`, spellcheck: 'false',
+                        placeholder: p.default === '' ? 'default: unset' : `default: ${p.default}`, onchange: (ev) => set(p.name, ev.target.value) }),
+                    value !== '' ? el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Use the default', onclick: () => set(p.name, '') }, icon('fa-xmark')) : null]));
+        }));
+}
+
 function inspectGraphNode(node) {
     const g = S.libById.get(node.graph_id);
     return [
@@ -1407,6 +1565,7 @@ function inspectGraphNode(node) {
             g ? el('div', { class: 'links' }, el('span', { class: 'chip' }, `rev ${g.revision}`), g.filters.slice(0, 8).map(f => el('span', { class: 'chip mono' }, f))) : null),
         nodeIssues(node),
         el('p', { class: 'hint' }, "When the graph runs, this node is replaced by the saved graph's filters. Its pads are the saved graph's used input streams (left) and output pads (right)."),
+        g ? graphNodeParams(node, g) : null,
         section('Pads', padsTable(node)),
         g ? el('div', { class: 'insp-actions' }, el('button', { type: 'button', class: 'small', onclick: () => openSaved(g.id) }, icon('fa-pen'), ' Open to edit')) : null,
         section('Node', noteField(node)),
@@ -1445,6 +1604,37 @@ function inspectEdge(index) {
 
 // ---- whole graph
 
+function graphParamsSection() {
+    const go = (id) => { S.sel = { nodes: new Set([id]), edge: null }; renderAll(); centerOn(id); };
+    const edit = (name, field, v) => mutate(() => { paramOf(name)[field] = v; }, { coalesce: `param:${name}:${field}` });
+    const cards = S.doc.params.map(p => {
+        const uses = paramUses(p.name);
+        return el('div', { class: 'param-card' },
+            el('div', { class: 'opt-row' },
+                icon('fa-sliders'),
+                el('input', { type: 'text', value: p.name, class: 'mono', 'data-key': `pname:${p.name}`, spellcheck: 'false', title: 'Parameter name', onchange: (ev) => {
+                    const v = ev.target.value.trim();
+                    if (v === p.name) return;
+                    if (!NAME_RE.test(v)) { toast('Parameter names start with a letter; use letters, digits, - and _ (max 32).', true); renderInspector(); return; }
+                    if (paramOf(v)) { toast(`There is already a parameter called ${v}.`, true); renderInspector(); return; }
+                    renameParam(p.name, v);
+                } }),
+                el('button', { type: 'button', class: 'small btn-ghost reset', title: 'Remove the parameter (options keep its default as a fixed value)',
+                    onclick: () => removeParam(p.name) }, icon('fa-trash'))),
+            el('label', {}, 'Default', el('input', { type: 'text', value: p.default, 'data-key': `pdef:${p.name}`, spellcheck: 'false', placeholder: 'empty: leave the options unset',
+                onchange: (ev) => edit(p.name, 'default', ev.target.value) })),
+            el('label', {}, 'Description', el('input', { type: 'text', value: p.description, 'data-key': `pdesc:${p.name}`, maxlength: 1000,
+                onchange: (ev) => edit(p.name, 'description', ev.target.value) })),
+            el('div', { class: 'links' }, uses.length ? ['Sets ', uses.map(u => el('a', { class: 'chip mono', onclick: () => go(u.node.id) },
+                `${u.node.kind === 'filter' ? u.node.id : nodeLabel(u.node)} › ${u.key}`))]
+                : el('span', { class: 'bad' }, 'Not used by any option')));
+    });
+    return section(['Parameters ', el('span', { class: 'hint' }, `${S.doc.params.length}`)],
+        el('p', { class: 'hint' }, 'Values of the graph that can be changed when running it, or on its node when it is used inside another graph. ',
+            'To add one, click ', icon('fa-sliders'), ' next to an option of a node.'),
+        cards);
+}
+
 function inspectGraph() {
     const c = S.compiled;
     const filters = S.doc.nodes.filter(n => n.kind === 'filter').length;
@@ -1465,6 +1655,7 @@ function inspectGraph() {
         section('Interface', el('p', { class: 'hint' }, 'What this graph looks like when added to another graph as a node.'),
             el('div', { class: 'links' }, 'In: ', pads.inputs.length ? iface(pads.inputs) : el('span', { class: 'hint' }, 'none')),
             el('div', { class: 'links', style: 'margin-top: 4px' }, 'Out: ', pads.outputs.length ? iface(pads.outputs) : el('span', { class: 'hint' }, 'none'))),
+        graphParamsSection(),
         section('Summary', el('p', { class: 'hint' }, `${filters} filter(s), ${S.doc.edges.length} link(s). `,
             c ? (c.ok ? 'Ready to run.' : `${c.issues.filter(i => i.level === 'error').length} problem(s) to fix.`) : '')),
         el('p', { class: 'hint', style: 'margin-top: 16px' }, 'Select a node to edit it, or a wire to see how it is written in the filtergraph. Press Tab to add a filter.'),
@@ -1606,6 +1797,7 @@ function renderLibrary() {
         g.description ? el('p', {}, g.description) : null,
         el('div', { class: 'meta' }, g.tags.map(t => el('span', { class: 'chip' }, t)), g.filters.slice(0, 6).map(f => el('span', { class: 'chip mono' }, f))),
         el('div', { class: 'meta' }, el('span', { class: 'hint' }, `in ${g.interface.inputs.map(p => p.name).join(', ') || '—'} · out ${g.interface.outputs.map(p => p.name).join(', ') || '—'} · ${new Date(g.updated_at).toLocaleDateString()}`)),
+        g.params.length ? el('div', { class: 'meta' }, el('span', { class: 'hint' }, icon('fa-sliders'), ` ${g.params.map(p => p.name).join(', ')}`)) : null,
         el('div', { class: 'actions' },
             el('button', { type: 'button', class: 'small', onclick: () => openSaved(g.id) }, icon('fa-folder-open'), ' Open'),
             el('button', { type: 'button', class: 'small', title: 'Use it as one node in the current graph', disabled: g.id === S.meta.id, onclick: () => addNode('graph', { graph_id: g.id }) }, icon('fa-plus'), ' Add as node'),
@@ -1827,7 +2019,7 @@ $('fileAllVideos').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ run dialog
 
-const RUN = { inputs: {}, outputs: {} };
+const RUN = { inputs: {}, outputs: {}, params: {} };
 
 function slug(s) {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'graph';
@@ -1855,6 +2047,7 @@ function openRun() {
         if (!r.touched) r.name = node.filename;
     }
     $('runGraphName').textContent = `"${S.meta.name}"`;
+    for (const name of Object.keys(RUN.params)) if (!paramOf(name)) delete RUN.params[name];
     $('runMsg').textContent = '';
     renderRunDialog();
     $('runDialog').showModal();
@@ -1937,6 +2130,19 @@ function renderRunDialog() {
                 el('div', { class: 'line' }, el('input', { type: 'text', value: r.name, title: 'File name template', spellcheck: 'false',
                     onchange: (ev) => { r.name = ev.target.value.trim(); r.touched = true; renderRunDialog(); } }))));
     }));
+    $('runParamsBox').hidden = !S.doc.params.length;
+    $('runParams').replaceChildren(...S.doc.params.map(p => {
+        const changed = p.name in RUN.params;
+        return el('div', { class: 'run-row' }, el('div', { class: 'slot' }, icon('fa-sliders'), ' ', p.name),
+            el('div', { class: 'fields' },
+                el('div', { class: 'line' },
+                    el('input', { type: 'text', value: changed ? RUN.params[p.name] : p.default, spellcheck: 'false',
+                        placeholder: 'empty: leave the options unset', title: p.description || p.name,
+                        onchange: (ev) => { if (ev.target.value === p.default) delete RUN.params[p.name]; else RUN.params[p.name] = ev.target.value; renderRunDialog(); } }),
+                    changed ? el('button', { type: 'button', class: 'small btn-ghost', title: `Back to the default (${p.default || 'unset'})`,
+                        onclick: () => { delete RUN.params[p.name]; renderRunDialog(); } }, 'Default') : null),
+                p.description ? el('div', { class: 'hint' }, p.description) : null));
+    }));
     const { items, error } = runItems();
     $('runPreview').replaceChildren(...(items || []).slice(0, 200).map((it, i) => el('tr', {},
         el('td', {}, `${i + 1}`),
@@ -1958,7 +2164,7 @@ $('runForm').addEventListener('submit', async (ev) => {
     $('runSubmit').disabled = true;
     try {
         const r = await api(`${API}/run`, { method: 'POST', body: {
-            graph: S.doc, graph_id: S.meta.id, graph_name: S.meta.name, items, overwrite: $('runOverwrite').checked,
+            graph: S.doc, graph_id: S.meta.id, graph_name: S.meta.name, items, params: RUN.params, overwrite: $('runOverwrite').checked,
         } });
         $('runDialog').close();
         toast(`Queued ${r.jobs.length} job(s)`);

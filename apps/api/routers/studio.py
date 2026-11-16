@@ -65,7 +65,7 @@ async def examples(studio: StudioDep) -> ExampleList:
 @router.post(f"{api}/compile")
 async def compile_graph(request: CompileRequest, studio: StudioDep) -> CompileView:
     '''Check a graph and show the filtergraph and command it produces. Problems are returned, not raised.'''
-    return await studio.compile(request.graph)
+    return await studio.compile(request.graph, request.params)
 
 
 @router.post(f"{api}/import")

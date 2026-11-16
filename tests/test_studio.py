@@ -27,6 +27,7 @@ from mediatools.video.ffmpeg.filtergraph import (
     FilterGraphDoc,
     FilterNode,
     GraphNode,
+    GraphParam,
     GraphRef,
     InputNode,
     OutputNode,
@@ -210,6 +211,67 @@ def test_graph_nodes_are_inlined(catalog: FilterCatalog):
 
     loop = {"g1": GraphRef(name="Loop", doc=_doc([GraphNode(id="x", graph_id="g1")], []))}
     assert any("uses itself" in i.message for i in compile_graph(_doc(_io(GraphNode(id="g", graph_id="g1")), []), catalog, loop).errors)
+
+
+def _param_doc(**params) -> FilterGraphDoc:
+    doc = _doc(
+        [InputNode(id="in", params={"ss": "start"}),
+         FilterNode(id="s", filter="scale", options={"h": "-2"}, params={"w": "width"}),
+         OutputNode(id="out", params={"crf": "quality"})],
+        [("in", "v", "s", "0"), ("s", "0", "out", "v")])
+    return doc.model_copy(update={"params": [GraphParam(name="width", default="640"), GraphParam(name="start"),
+                                             GraphParam(name="quality", default="23"), *params.values()]})
+
+
+def test_parameters_take_defaults_and_values(catalog: FilterCatalog):
+    c = compile_graph(_param_doc(), catalog)
+    assert c.ok, c.issues
+    assert c.filter_complex == "[0:v]scale=h=-2:w=640[scale1]"
+    assert c.inputs[0].args == [] and c.outputs[0].args == [("crf", "23")]
+
+    c = compile_graph(_param_doc(), catalog, values={"width": "320", "start": "5"})
+    assert c.ok and c.filter_complex == "[0:v]scale=h=-2:w=320[scale1]" and c.inputs[0].args == [("ss", "5")]
+
+
+@pytest.mark.parametrize("values, message", [
+    ({"nope": "1"}, "no parameter 'nope'"),
+    ({"quality": "-f"}, "-crf: invalid value"),
+    ({"width": "1\n2"}, "line breaks"),
+])
+def test_parameter_values_are_checked(catalog: FilterCatalog, values: dict, message: str):
+    c = compile_graph(_param_doc(), catalog, values=values)
+    assert any(message in i.message for i in c.errors), [i.message for i in c.issues]
+
+
+def test_parameter_bindings_are_checked(catalog: FilterCatalog):
+    doc = _param_doc(extra=GraphParam(name="unused"))
+    doc.nodes[1].params["bogus"] = "width"
+    doc.nodes[2].params["t"] = "missing"
+    c = compile_graph(doc, catalog)
+    messages = [i.message for i in c.issues]
+    assert "scale has no option 'bogus'." in messages
+    assert "Option 't' uses parameter 'missing', which doesn't exist." in messages
+    assert "Parameter 'unused' isn't used by any option." in messages
+
+
+def test_graph_nodes_pass_parameters(catalog: FilterCatalog):
+    blur = _doc([InputNode(id="i", name="src"), FilterNode(id="b", filter="gblur", params={"sigma": "amount"}),
+                 OutputNode(id="o", name="res", pads=[{"name": "v", "type": "video"}])],
+                [("i", "v", "b", "0"), ("b", "0", "o", "v")])
+    blur = blur.model_copy(update={"params": [GraphParam(name="amount", default="5")]})
+    refs = {"g1": GraphRef(name="Blur", doc=blur)}
+
+    def outer(node: GraphNode, params: tuple[GraphParam, ...] = ()) -> FilterGraphDoc:
+        doc = _doc(_io(node), [("in", "v", "g", "src:v"), ("g", "res:v", "out", "v")])
+        return doc.model_copy(update={"params": list(params)})
+
+    assert compile_graph(outer(GraphNode(id="g", graph_id="g1")), catalog, refs).filter_complex == "[0:v]gblur=sigma=5[gblur1]"
+    fixed = outer(GraphNode(id="g", graph_id="g1", options={"amount": "9"}))
+    assert compile_graph(fixed, catalog, refs).filter_complex == "[0:v]gblur=sigma=9[gblur1]"
+    lifted = outer(GraphNode(id="g", graph_id="g1", params={"amount": "blur"}), (GraphParam(name="blur", default="2"),))
+    assert compile_graph(lifted, catalog, refs, {"blur": "7"}).filter_complex == "[0:v]gblur=sigma=7[gblur1]"
+    wrong = outer(GraphNode(id="g", graph_id="g1", options={"radius": "1"}))
+    assert any("'Blur' has no parameter 'radius'" in i.message for i in compile_graph(wrong, catalog, refs).errors)
 
 
 def test_import_command(catalog: FilterCatalog):
@@ -441,6 +503,23 @@ def test_run_validates_and_queues(client: TestClient, studio: StudioService):
     page = client.get("/api/studio/jobs").json()
     assert page["total"] == 1 and page["items"][0]["kind"] == "studio" and "graph" not in page["items"][0]["params"]
     assert client.get(f"/api/studio/jobs/{job_id}/graph").json()["nodes"][1]["filter"] == "scale"
+
+
+def test_run_with_parameters(client: TestClient, studio: StudioService):
+    graph = {**SIMPLE, "params": [{"name": "width", "default": "iw/2"}],
+             "nodes": [SIMPLE["nodes"][0], {**SIMPLE["nodes"][1], "options": {"h": "-2"}, "params": {"w": "width"}}, SIMPLE["nodes"][2]]}
+    saved = client.post("/api/studio/graphs", json={"name": "Sized", "graph": graph}).json()
+    assert saved["params"] == [{"name": "width", "description": "", "default": "iw/2"}]
+
+    def run(params: dict):
+        return client.post("/api/studio/run", json={"graph": graph, "params": params,
+                                                    "items": [{"inputs": {"in": "clips/a.mp4"}, "outputs": {"out": "out/p.mp4"}}]})
+
+    assert "no parameter" in run({"nope": "1"}).json()["detail"]
+    job_id = run({"width": "320"}).json()["jobs"][0]["job_id"]
+    record = asyncio.run(studio.records.get(job_id))
+    assert record.params["filter_complex"] == "[0:v]scale=h=-2:w=320[scale1]" and record.params["param_values"] == {"width": "320"}
+    assert client.get(f"/api/studio/jobs/{job_id}/graph").json()["params"][0]["default"] == "320"
 
 
 # ---------------------------------------------------------------------------

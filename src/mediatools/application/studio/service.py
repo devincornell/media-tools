@@ -89,6 +89,7 @@ def _summary(record: FilterGraphRecord, doc: FilterGraphDoc) -> dict[str, typing
         "id": record.id, "name": record.name, "description": record.description, "tags": record.tags,
         "created_at": record.created_at, "updated_at": record.updated_at, "revision": record.revision,
         "interface": graph_interface(doc),
+        "params": doc.params,
         "filters": list(dict.fromkeys(n.filter for n in doc.nodes if isinstance(n, FilterNode))),
         "uses": sorted(referenced_graph_ids(doc)),
     }
@@ -138,17 +139,17 @@ class StudioService:
 
     # ------------------------------------------------------------------ compile / import
 
-    async def compile(self, doc: FilterGraphDoc) -> CompileView:
-        compiled = await self._compile(doc)
+    async def compile(self, doc: FilterGraphDoc, values: typing.Mapping[str, str] | None = None) -> CompileView:
+        compiled = await self._compile(doc, values)
         return CompileView(**compiled.model_dump(), command=compiled.preview())
 
     async def import_text(self, text: str) -> ImportResult:
         doc, issues = await asyncio.to_thread(import_command, text, self.catalog)
         return ImportResult(graph=doc, issues=issues)
 
-    async def _compile(self, doc: FilterGraphDoc) -> CompiledGraph:
+    async def _compile(self, doc: FilterGraphDoc, values: typing.Mapping[str, str] | None = None) -> CompiledGraph:
         refs = await self._load_refs(doc)
-        return await asyncio.to_thread(compile_graph, doc, self.catalog, refs)
+        return await asyncio.to_thread(compile_graph, doc, self.catalog, refs, values)
 
     async def _load_refs(self, doc: FilterGraphDoc, override: tuple[str, FilterGraphDoc] | None = None) -> dict[str, GraphRef]:
         '''All saved graphs reachable from `doc` (optionally with one graph replaced by an unsaved version).'''
@@ -244,7 +245,7 @@ class StudioService:
     # ------------------------------------------------------------------ running
 
     async def run(self, req: StudioRunRequest) -> StudioRunAccepted:
-        compiled = await self._compile(req.graph)
+        compiled = await self._compile(req.graph, req.params)
         if not compiled.ok:
             raise InvalidJobRequestError("Fix the graph first: " + "; ".join(i.message for i in compiled.errors[:3]))
         plans = [self._plan(compiled, item, req.overwrite) for item in req.items]
@@ -268,6 +269,7 @@ class StudioService:
                 "graph_id": req.graph_id, "graph_name": req.graph_name, "batch_id": batch_id,
                 "item": i + 1, "items": len(req.items),
                 "inputs": dict(item.inputs), "outputs": out_rel, "overwrite": req.overwrite,
+                "param_values": req.graph.param_values(req.params),
                 "filter_complex": compiled.filter_complex,
                 "command": " ".join(shlex.quote(a) for a in command.build_command()),
                 "input_paths": {n: str(p) for n, p in inputs.items()},
@@ -329,7 +331,12 @@ class StudioService:
         record = await self.records.get(job_id)
         if record is None or record.job_type != STUDIO_RENDER or "graph" not in record.params:
             raise GraphNotFoundError(f"No studio graph for job {job_id}")
-        return FilterGraphDoc.model_validate(record.params["graph"])
+        doc = FilterGraphDoc.model_validate(record.params["graph"])
+        # The values the run used become the defaults, so the opened graph reproduces it.
+        used = record.params.get("param_values")
+        if not isinstance(used, dict):
+            return doc
+        return doc.model_copy(update={"params": [p.model_copy(update={"default": str(used.get(p.name, p.default))}) for p in doc.params]})
 
     # ------------------------------------------------------------------ files
 

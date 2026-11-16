@@ -7,6 +7,10 @@ A document maps onto an ffmpeg command:
 * a `graph` node embeds another saved graph: its pads are that graph's input streams and output pads;
 * an `output` node is one output file: each connected pad becomes a `-map`, and its options are output options;
 * an edge is a link between two pads, i.e. a `[label]` in the filtergraph.
+
+A document can declare parameters. A node option bound to a parameter (`node.params[option] = name`)
+takes the parameter's value, which is the parameter's default unless the run, or the graph node
+embedding this document, gives another one. An empty value leaves the option unset.
 '''
 from __future__ import annotations
 
@@ -22,6 +26,8 @@ PadKey = Annotated[str, pydantic.StringConstraints(pattern=r"^[A-Za-z0-9_.:-]{1,
 SlotName = Annotated[str, pydantic.StringConstraints(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
 OptionName = Annotated[str, pydantic.StringConstraints(pattern=r"^[A-Za-z0-9_:-]{1,64}$")]
 OptionValue = Annotated[str, pydantic.StringConstraints(max_length=4000)]
+ParamName = SlotName
+Bindings = Annotated[dict[OptionName, ParamName], pydantic.Field(description="Option -> graph parameter it takes its value from.")]
 
 MAX_PADS = 64
 INPUT_STREAMS: tuple[tuple[str, MediaType], ...] = (("v", "video"), ("a", "audio"))
@@ -36,10 +42,19 @@ class Position(_Model):
     y: float
 
 
+class GraphParam(_Model):
+    '''A value of the graph that can be set when running it or when using it inside another graph.'''
+
+    name: ParamName
+    description: Annotated[str, pydantic.Field(max_length=1000)] = ""
+    default: Annotated[OptionValue, pydantic.Field(description="Used when no value is given; empty leaves bound options unset.")] = ""
+
+
 class _Node(_Model):
     id: NodeId
     position: Position | None = None
     note: Annotated[str, pydantic.Field(max_length=2000)] = ""
+    params: Bindings = {}
 
 
 class InputNode(_Node):
@@ -67,6 +82,7 @@ class GraphNode(_Node):
 
     kind: typing.Literal["graph"] = "graph"
     graph_id: Annotated[str, pydantic.StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+    options: Annotated[dict[ParamName, OptionValue], pydantic.Field(description="Values for the saved graph's parameters.")] = {}
 
 
 class OutputPadDef(_Model):
@@ -104,12 +120,15 @@ class FilterGraphDoc(_Model):
     version: typing.Literal[1] = 1
     nodes: Annotated[list[Node], pydantic.Field(max_length=500)] = []
     edges: Annotated[list[Edge], pydantic.Field(max_length=2000)] = []
+    params: Annotated[list[GraphParam], pydantic.Field(max_length=64)] = []
 
     @pydantic.model_validator(mode="after")
     def _unique(self) -> FilterGraphDoc:
         ids = [n.id for n in self.nodes]
         if len(ids) != len(set(ids)):
             raise ValueError("Node ids must be unique.")
+        if len({p.name for p in self.params}) != len(self.params):
+            raise ValueError("Each parameter needs a unique name.")
         for kind in ("input", "output"):
             names = [n.name for n in self.nodes if n.kind == kind]  # type: ignore[union-attr]
             if len(names) != len(set(names)):
@@ -121,6 +140,12 @@ class FilterGraphDoc(_Model):
 
     def node(self, node_id: str) -> Node | None:
         return next((n for n in self.nodes if n.id == node_id), None)
+
+    def param_values(self, values: typing.Mapping[str, str] | None = None) -> dict[str, str]:
+        '''Every parameter's value: its default, replaced by `values` where given.'''
+        out = {p.name: p.default for p in self.params}
+        out.update({k: v for k, v in (values or {}).items() if k in out})
+        return out
 
 
 class Pad(pydantic.BaseModel):
