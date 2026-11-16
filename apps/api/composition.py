@@ -16,9 +16,16 @@ from mediatools.application.media_jobs import (
     MediaJobService,
     build_handlers,
 )
+from mediatools.application.studio import StudioService, build_studio_handlers
 from mediatools.application.uploads import UploadService
-from mediatools.index_db import FavoriteCollection, MediaIndexDB, MediaJobCollection
+from mediatools.index_db import (
+    FavoriteCollection,
+    FilterGraphCollection,
+    MediaIndexDB,
+    MediaJobCollection,
+)
 from mediatools.jobs import JobManager, JobWorker, MongoJobLogStore, MongoJobRepository
+from mediatools.video.ffmpeg.filtergraph import FilterCatalog
 
 from .settings import ServerConfig
 
@@ -33,6 +40,7 @@ class Services:
     uploads: UploadService
     job_manager: JobManager
     media_jobs: MediaJobService
+    studio: StudioService
     worker: JobWorker
 
 
@@ -46,6 +54,8 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
     records = MediaJobCollection.from_database(database)
     favorites = FavoriteCollection.from_database(database)
     favorite_folders = FavoriteCollection.from_database(database, collection_name="favorite_folders")
+    graphs = FilterGraphCollection.from_database(database)
+    await graphs.create_indexes()
     # Jobs are scoped to the gallery root they operate on.
     manager = JobManager(repo, scope_id=str(config.root_path), log_store=log_store)
     deps = MediaJobDeps(
@@ -55,6 +65,12 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
         index=index,
         records=records,
         favorite_folders=favorite_folders,
+    )
+    media_jobs = MediaJobService(
+        root_path=config.root_path,
+        copy_source_roots=config.copy_source_roots,
+        jobs=manager,
+        records=records,
     )
     return Services(
         gallery=GalleryService(
@@ -72,15 +88,19 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
         picker=FolderPicker(gallery_root=config.root_path, source_roots=config.copy_source_roots),
         uploads=UploadService(root_path=config.root_path),
         job_manager=manager,
-        media_jobs=MediaJobService(
+        media_jobs=media_jobs,
+        studio=StudioService(
             root_path=config.root_path,
-            copy_source_roots=config.copy_source_roots,
+            source_roots=config.copy_source_roots,
+            catalog=FilterCatalog(),
+            store=graphs,
             jobs=manager,
             records=records,
+            media_jobs=media_jobs,
         ),
         worker=JobWorker(
             repo,
-            build_handlers(deps),
+            {**build_handlers(deps), **build_studio_handlers(deps)},
             scope_id=manager.scope_id,
             logs=log_store,
             lease_seconds=config.job_lease_seconds,

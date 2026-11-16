@@ -4,6 +4,7 @@ from .mediadir_index_collection import DirectorySizeRow, MediaDirIndexCollection
 from .video_index_collection import VideoIndexCollection, VideoIndexDoc, VideoFileNotFoundError
 from .favorite_collection import FavoriteCollection
 from .media_job_collection import MediaJobCollection, MediaJobRecord
+from .filtergraph_collection import FilterGraphCollection, FilterGraphRecord, GraphNameTakenError
 from .util import index_hash_func, path_prefix_regex
 
 from .util import index_hash_func

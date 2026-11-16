@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/ui.css" rel="stylesheet">
+    <link href="/static/studio.css" rel="stylesheet">
+</head>
+<body class="ui studio">
+    <header class="appbar">
+        <a class="brand" href="/page/" title="Media Gallery home">
+            <i class="fas fa-photo-film" aria-hidden="true"></i>
+            <span class="brand-name">Media Gallery</span>
+        </a>
+        <nav class="appnav" aria-label="Primary">
+            <a href="/page/" title="Gallery"><i class="fas fa-table-cells-large" aria-hidden="true"></i><span class="label">Gallery</span></a>
+            <a href="/browse" title="Browse all files"><i class="fas fa-folder-tree" aria-hidden="true"></i><span class="label">Library</span></a>
+            <a href="/upload" title="Upload files"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span class="label">Upload</span></a>
+            <a href="/jobs" title="Background jobs"><i class="fas fa-list-check" aria-hidden="true"></i><span class="label">Jobs</span></a>
+            <a href="/studio" aria-current="page" title="Build and run ffmpeg filtergraphs"><i class="fas fa-diagram-project" aria-hidden="true"></i><span class="label">Studio</span></a>
+        </nav>
+    </header>
+
+    <div class="toolbar" role="toolbar" aria-label="Graph">
+        <div class="tb-name">
+            <input id="graphName" type="text" aria-label="Graph name" spellcheck="false" maxlength="120">
+            <span id="saveState" class="save-state"></span>
+        </div>
+        <div class="tb-group">
+            <button type="button" class="small" id="btnNew" title="New graph"><i class="fas fa-file"></i><span>New</span></button>
+            <button type="button" class="small" id="btnSave" title="Save to the library (Ctrl+S)"><i class="fas fa-floppy-disk"></i><span>Save</span></button>
+            <button type="button" class="small" id="btnSaveAs" title="Save a copy under a new name"><i class="fas fa-copy"></i><span>Save as</span></button>
+            <button type="button" class="small" id="btnImport" title="Build a graph from an ffmpeg command or filtergraph text"><i class="fas fa-terminal"></i><span>Import ffmpeg</span></button>
+        </div>
+        <div class="tb-group">
+            <button type="button" class="small btn-icon" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo"><i class="fas fa-rotate-left"></i></button>
+            <button type="button" class="small btn-icon" id="btnRedo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i class="fas fa-rotate-right"></i></button>
+            <button type="button" class="small" id="btnAdd" title="Add a filter (Tab)"><i class="fas fa-plus"></i><span>Add</span></button>
+            <button type="button" class="small" id="btnLayout" title="Arrange nodes left to right"><i class="fas fa-sitemap fa-rotate-270"></i><span>Arrange</span></button>
+            <button type="button" class="small btn-icon" id="btnFit" title="Fit graph in view (F)" aria-label="Fit"><i class="fas fa-expand"></i></button>
+            <label class="check tb-check" title="Show the filtergraph label of every link"><input type="checkbox" id="showLabels" checked> Link labels</label>
+        </div>
+        <div class="tb-spacer"></div>
+        <button type="button" class="small" id="btnGuide" title="How the studio maps to ffmpeg"><i class="fas fa-circle-question"></i><span>Guide</span></button>
+        <button type="button" class="primary" id="btnRun" title="Run this graph on files"><i class="fas fa-play"></i> Run&hellip;</button>
+    </div>
+
+    <div class="studio-main">
+        <aside class="sidebar" aria-label="Add, library and examples">
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" data-tab="palette" aria-selected="true"><i class="fas fa-shapes"></i> Add</button>
+                <button type="button" role="tab" data-tab="library"><i class="fas fa-book"></i> Library</button>
+                <button type="button" role="tab" data-tab="examples"><i class="fas fa-lightbulb"></i> Examples</button>
+            </div>
+            <div class="tab-panel" data-panel="palette">
+                <input type="search" id="paletteSearch" placeholder="Search filters (e.g. blur, scale, crop)" aria-label="Search filters">
+                <div id="palette" class="palette"></div>
+            </div>
+            <div class="tab-panel" data-panel="library" hidden>
+                <input type="search" id="librarySearch" placeholder="Search saved graphs" aria-label="Search saved graphs">
+                <div id="library" class="cards"></div>
+            </div>
+            <div class="tab-panel" data-panel="examples" hidden>
+                <p class="hint pad">Ready-made graphs for common jobs. Open one, then change it or run it as is.</p>
+                <div id="examples" class="cards"></div>
+            </div>
+        </aside>
+
+        <section class="center">
+            <div id="canvas" class="canvas" tabindex="0" aria-label="Graph editor">
+                <div id="world" class="world">
+                    <svg id="edges" class="edges" aria-hidden="true"></svg>
+                    <div id="nodes"></div>
+                </div>
+                <div id="emptyHint" class="empty-hint" hidden>
+                    <i class="fas fa-diagram-project"></i>
+                    <h2>Build a filtergraph</h2>
+                    <p>Open an <a href="#" data-open-tab="examples">example</a>, <a href="#" id="emptyImport">import an ffmpeg command</a>,
+                        or add filters from the left and connect their dots.</p>
+                </div>
+                <div class="canvas-legend" aria-hidden="true">
+                    <span><i class="dot video"></i> video</span><span><i class="dot audio"></i> audio</span>
+                    <span class="hint">Drag dots to connect &middot; Tab to add &middot; Del to remove</span>
+                </div>
+                <div id="zoomLabel" class="zoom-label"></div>
+            </div>
+
+            <div class="bottom" id="bottom">
+                <div class="tabs" role="tablist">
+                    <button type="button" role="tab" data-btab="ffmpeg" aria-selected="true"><i class="fas fa-terminal"></i> ffmpeg</button>
+                    <button type="button" role="tab" data-btab="problems"><i class="fas fa-triangle-exclamation"></i> Problems <span id="problemCount" class="count"></span></button>
+                    <button type="button" role="tab" data-btab="runs"><i class="fas fa-play"></i> Runs <span id="runCount" class="count"></span></button>
+                    <span class="tb-spacer"></span>
+                    <button type="button" class="small btn-ghost btn-icon" id="btnBottomToggle" title="Collapse / expand" aria-label="Collapse panel"><i class="fas fa-chevron-down"></i></button>
+                </div>
+                <div class="btab-panel" data-bpanel="ffmpeg">
+                    <div class="code-head"><span class="muted">-filter_complex</span>
+                        <button type="button" class="small btn-ghost" data-copy="fcText"><i class="fas fa-copy"></i> Copy</button></div>
+                    <pre id="fcText" class="code"></pre>
+                    <div class="code-head"><span class="muted">Command (placeholder file names)</span>
+                        <button type="button" class="small btn-ghost" data-copy="cmdText"><i class="fas fa-copy"></i> Copy</button></div>
+                    <pre id="cmdText" class="code"></pre>
+                </div>
+                <div class="btab-panel" data-bpanel="problems" hidden>
+                    <ul id="problems" class="problems"></ul>
+                </div>
+                <div class="btab-panel" data-bpanel="runs" hidden>
+                    <div class="runs-head">
+                        <label>Status
+                            <select id="runFilter"><option value="">All</option><option>queued</option><option>running</option>
+                                <option>succeeded</option><option>failed</option><option>canceled</option></select>
+                        </label>
+                        <span id="workerNote" class="hint"></span>
+                        <a class="hint" href="/jobs">All background jobs &rarr;</a>
+                    </div>
+                    <table class="table runs">
+                        <thead><tr><th>Graph</th><th>Input &rarr; output</th><th>Status</th><th>Progress</th><th>Started</th><th></th></tr></thead>
+                        <tbody id="runRows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <aside class="inspector" id="inspector" aria-label="Inspector"></aside>
+    </div>
+
+    <!-- Quick add -->
+    <div id="quickAdd" class="quick-add" hidden>
+        <input type="search" id="quickSearch" placeholder="Filter name or task (blur, resize, text...)" aria-label="Add node" autocomplete="off">
+        <div id="quickList" class="quick-list" role="listbox"></div>
+    </div>
+
+    <!-- Run -->
+    <dialog id="runDialog" class="dlg wide">
+        <form method="dialog" id="runForm">
+            <header><h2><i class="fas fa-play"></i> Run <span id="runGraphName"></span></h2>
+                <button type="button" class="btn-ghost btn-icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></header>
+            <div class="dlg-body">
+                <p class="hint">Each input node reads one file. Pick <b>several files for one input</b> to run the graph once per file (a batch).
+                    Each run becomes a background job; outputs are written next to each other and appear in the gallery.</p>
+                <h3>Inputs</h3>
+                <div id="runInputs" class="run-rows"></div>
+                <h3>Outputs</h3>
+                <div id="runOutputs" class="run-rows"></div>
+                <p class="hint">File names can use <code>{stem}</code> (input name without extension), <code>{name}</code>, <code>{ext}</code>,
+                    <code>{output}</code>, <code>{graph}</code>, <code>{n}</code> (run number) and <code>{date}</code>.</p>
+                <label class="check"><input type="checkbox" id="runOverwrite"> Overwrite files that already exist</label>
+                <h3>Runs <span id="runSummary" class="hint"></span></h3>
+                <div class="run-preview"><table class="table"><tbody id="runPreview"></tbody></table></div>
+                <div id="runMsg" class="msg"></div>
+            </div>
+            <footer>
+                <button type="button" data-close>Cancel</button>
+                <button type="submit" class="primary" id="runSubmit"><i class="fas fa-play"></i> Queue</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- File browser -->
+    <dialog id="fileDialog" class="dlg">
+        <form method="dialog">
+            <header><h2 id="fileTitle">Choose files</h2>
+                <button type="button" class="btn-ghost btn-icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></header>
+            <div class="dlg-body">
+                <div id="fileCrumbs" class="crumbs"></div>
+                <input type="search" id="fileFilter" placeholder="Filter this folder" aria-label="Filter files">
+                <div id="fileList" class="file-list"></div>
+            </div>
+            <footer>
+                <span id="fileCount" class="hint"></span>
+                <button type="button" class="small" id="fileAllVideos">Select all videos</button>
+                <button type="button" class="small" id="fileNewFolder">New folder&hellip;</button>
+                <button type="button" data-close>Cancel</button>
+                <button type="button" class="primary" id="fileChoose">Choose</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Import -->
+    <dialog id="importDialog" class="dlg wide">
+        <form method="dialog" id="importForm">
+            <header><h2><i class="fas fa-terminal"></i> Import from ffmpeg</h2>
+                <button type="button" class="btn-ghost btn-icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></header>
+            <div class="dlg-body">
+                <p class="hint">Paste a whole command (<code>ffmpeg -i in.mp4 -vf "scale=640:-2" out.mp4</code>) or just filtergraph text
+                    (<code>[0:v]split[a][b];[a]hflip[l];[l][b]hstack</code>). Inputs, <code>-filter_complex</code>, <code>-vf</code>/<code>-af</code>,
+                    <code>-map</code> and common encoding options are understood.</p>
+                <textarea id="importText" rows="8" spellcheck="false" aria-label="ffmpeg command"></textarea>
+                <ul id="importIssues" class="problems"></ul>
+            </div>
+            <footer>
+                <button type="button" data-close>Cancel</button>
+                <button type="submit" class="primary">Open as new graph</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Save as -->
+    <dialog id="saveDialog" class="dlg">
+        <form method="dialog" id="saveForm">
+            <header><h2><i class="fas fa-floppy-disk"></i> <span id="saveTitle">Save to library</span></h2>
+                <button type="button" class="btn-ghost btn-icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></header>
+            <div class="dlg-body form-grid">
+                <label>Name <input type="text" id="saveName" required maxlength="120"></label>
+                <label>Description <textarea id="saveDesc" rows="3" maxlength="4000" placeholder="What does it do? When should it be used?"></textarea></label>
+                <label>Tags <input type="text" id="saveTags" placeholder="comma separated, e.g. resize, social"></label>
+                <div id="saveMsg" class="msg"></div>
+            </div>
+            <footer>
+                <button type="button" data-close>Cancel</button>
+                <button type="submit" class="primary">Save</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Guide -->
+    <dialog id="guideDialog" class="dlg wide guide">
+        <form method="dialog">
+            <header><h2><i class="fas fa-circle-question"></i> Studio guide</h2>
+                <button type="button" class="btn-ghost btn-icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></header>
+            <div class="dlg-body">
+                <p>The studio edits <b>ffmpeg filtergraphs</b> as boxes and wires. Everything you see maps one-to-one onto an ffmpeg command,
+                    shown live in the <b>ffmpeg</b> tab at the bottom, so you can learn ffmpeg here or paste what you already know.</p>
+                <h3>How the pieces map to ffmpeg</h3>
+                <table class="table">
+                    <thead><tr><th>In the studio</th><th>In ffmpeg</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="chip input">Input</span> node</td><td>one <code>-i FILE</code>. Its pads <code>v</code> and <code>a</code> are the streams <code>[0:v]</code> and <code>[0:a]</code>. The file is chosen when you run the graph; options like <code>-ss</code>/<code>-t</code> trim it.</td></tr>
+                        <tr><td><span class="chip filter">Filter</span> node</td><td>one filter with its options, e.g. <code>scale=w=iw/2:h=-2</code>. Every option ffmpeg has is listed, with its default and range.</td></tr>
+                        <tr><td>Pads (dots)</td><td>a filter's inputs (left) and outputs (right). <code>overlay</code> has two inputs (<code>main</code>, <code>overlay</code>); <code>split</code> has as many outputs as its <code>outputs</code> option. <span class="dot video"></span> video, <span class="dot audio"></span> audio.</td></tr>
+                        <tr><td>Link (wire)</td><td>a link label like <code>[scale1]</code>. A straight run of one-in/one-out filters is written as a chain with commas: <code>scale=...,hflip</code>.</td></tr>
+                        <tr><td><span class="chip output">Output</span> node</td><td>one output file: each connected pad is a <code>-map</code>, its options are output options (<code>-c:v libx264 -crf 20</code>).</td></tr>
+                        <tr><td><span class="chip graph">Saved graph</span> node</td><td>another graph from your library, copied in when the graph runs. Change the saved graph and every graph using it changes too.</td></tr>
+                    </tbody>
+                </table>
+                <h3>Making a graph</h3>
+                <ol>
+                    <li><b>Start</b> from an example (left, <i>Examples</i>), import an ffmpeg command, or press <b>New</b>: you get an input wired straight to an output.</li>
+                    <li><b>Add filters</b>: drag one from the left, press <kbd>Tab</kbd>, or select a wire and use <i>Insert filter</i> to put one in between.</li>
+                    <li><b>Connect</b> by dragging from a dot to a dot of the same color. Dragging from a connected input dot picks the wire up again.</li>
+                    <li><b>Configure</b>: select a node; the panel on the right lists its options and shows what each pad is connected to and under which label.</li>
+                    <li><b>Check</b> the <i>Problems</i> tab: unconnected pads, wrong types, unknown options. The <i>Run</i> button works once there are none.</li>
+                    <li><b>Save</b> it to the library with a name and description. Saved graphs can be opened, run, or added as a single node to other graphs.</li>
+                    <li><b>Run</b>: pick a file per input (or many files for one input to process a batch) and where outputs go. Progress and logs appear under <i>Runs</i>.</li>
+                </ol>
+                <h3>ffmpeg rules worth knowing</h3>
+                <ul>
+                    <li>A filter output can only feed one place. If you wire one output to several inputs, the studio adds a <code>split</code> (or <code>asplit</code>) for you.</li>
+                    <li>Filters that combine pictures (<code>overlay</code>, <code>hstack</code>, <code>blend</code>) usually need inputs of compatible size: <code>scale</code> them first.</li>
+                    <li>Expressions use ffmpeg variables: <code>iw</code>/<code>ih</code> input size, <code>ow</code>/<code>oh</code> output size, <code>t</code> time in seconds, <code>n</code> frame number. Commas and colons inside values are escaped for you.</li>
+                    <li>Filters with a <span class="badge tiny">timeline</span> badge accept <code>enable</code>, e.g. <code>between(t,2,5)</code> to apply them only from 2 s to 5 s.</li>
+                    <li>Filters and options that read or write files on the server (e.g. <code>movie</code>, <code>drawtext textfile</code>) are disabled.</li>
+                </ul>
+                <h3>Keyboard</h3>
+                <p><kbd>Tab</kbd> add node &middot; <kbd>Del</kbd> remove selection &middot; <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate &middot;
+                    <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> undo/redo &middot; <kbd>Ctrl</kbd>+<kbd>S</kbd> save &middot;
+                    <kbd>F</kbd> fit view &middot; drag the background to pan, scroll to zoom, <kbd>Shift</kbd>+click to select several nodes.</p>
+                <p class="hint">Full reference: <a href="https://ffmpeg.org/ffmpeg-filters.html" target="_blank" rel="noopener">ffmpeg filters documentation</a>.
+                    Each filter's panel links straight to its section.</p>
+            </div>
+            <footer><button type="button" class="primary" data-close>Got it</button></footer>
+        </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="/static/studio.js"></script>
+</body>
+</html>

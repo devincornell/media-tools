@@ -18,6 +18,14 @@ class InvalidJobRequestError(GalleryError):
     '''A job submission was rejected (bad path, disabled feature, ...).'''
 
 
+class GraphNotFoundError(GalleryError):
+    '''No saved filtergraph with this ID.'''
+
+
+class GraphConflictError(GalleryError):
+    '''A save or delete clashes with another graph (name taken, changed meanwhile, still in use).'''
+
+
 class UploadError(GalleryError):
     '''Base class for upload failures; `status_code` is the HTTP status the API reports.'''
 

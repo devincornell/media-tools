@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 
 from mediatools.application import (
     DirectoryNotIndexedError,
+    GraphConflictError,
+    GraphNotFoundError,
     InvalidJobRequestError,
     MediaFileNotFoundError,
     PathOutsideRootError,
@@ -12,6 +14,10 @@ from mediatools.application import (
 )
 from mediatools.contracts import ErrorResponse
 from mediatools.jobs import JobNotFoundError
+from mediatools.video.ffmpeg.filtergraph import (
+    FFmpegUnavailableError,
+    UnknownFilterError,
+)
 
 
 def _error(status_code: int, detail: str) -> JSONResponse:
@@ -36,6 +42,14 @@ async def _upload_error(request: Request, exc: Exception) -> JSONResponse:
     return _error(exc.status_code, str(exc))
 
 
+async def _conflict(request: Request, exc: Exception) -> JSONResponse:
+    return _error(409, str(exc))
+
+
+async def _unavailable(request: Request, exc: Exception) -> JSONResponse:
+    return _error(503, str(exc))
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DirectoryNotIndexedError, _not_found)
     app.add_exception_handler(MediaFileNotFoundError, _not_found)
@@ -43,3 +57,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(JobNotFoundError, _not_found)
     app.add_exception_handler(InvalidJobRequestError, _invalid_request)
     app.add_exception_handler(UploadError, _upload_error)
+    app.add_exception_handler(GraphNotFoundError, _not_found)
+    app.add_exception_handler(UnknownFilterError, _not_found)
+    app.add_exception_handler(GraphConflictError, _conflict)
+    app.add_exception_handler(FFmpegUnavailableError, _unavailable)

@@ -70,6 +70,7 @@
             <a href="/browse" title="Browse all files"><i class="fas fa-folder-tree" aria-hidden="true"></i><span class="label">Library</span></a>
             <a href="/upload" title="Upload files"><i class="fas fa-cloud-arrow-up" aria-hidden="true"></i><span class="label">Upload</span></a>
             <a href="/jobs" aria-current="page" title="Background jobs"><i class="fas fa-list-check" aria-hidden="true"></i><span class="label">Jobs</span></a>
+            <a href="/studio" title="Build and run ffmpeg filtergraphs"><i class="fas fa-diagram-project" aria-hidden="true"></i><span class="label">Studio</span></a>
         </nav>
     </header>
 
@@ -203,7 +204,7 @@
                         <option value="">All</option>
                         <option value="reindex">Rescan</option><option value="thumbnails">Thumbnails</option>
                         <option value="cleanup">Cleanup</option><option value="convert_mp4">Convert</option>
-                        <option value="move">Move</option><option value="move_item">Move item</option><option value="delete_item">Delete item</option><option value="montage">Montage</option>
+                        <option value="move">Move</option><option value="move_item">Move item</option><option value="delete_item">Delete item</option><option value="montage">Montage</option><option value="studio">Studio render</option>
                     </select>
                 </label>
             </div>
@@ -220,7 +221,7 @@
 
 <script src="/static/picker.js"></script>
 <script>
-const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan', move_item: 'Move', delete_item: 'Delete', montage: 'Montage' };
+const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan', move_item: 'Move', delete_item: 'Delete', montage: 'Montage', studio: 'Studio render' };
 const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move', montage: 'montage' };
 const ACTIVE = new Set(['queued', 'running']);
 const expanded = new Set();
@@ -391,6 +392,9 @@ function summary(item) {
             }
             case 'delete_item':
                 parts.push(`${r.deleted} file(s) deleted`);
+                break;
+            case 'studio':
+                parts.push(`${item.params.graph_name}: ${(r.outputs || []).join(', ')}`);
                 break;
             case 'move_item':
                 parts.push(r.outcome ? `${r.outcome}: ${r.dest}` : `${r.moved ?? 0} moved, ${r.deduplicated ?? 0} already present, ${(r.renamed || []).length} renamed`);

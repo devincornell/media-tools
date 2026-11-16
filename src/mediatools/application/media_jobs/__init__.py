@@ -9,6 +9,7 @@ from .types import (
     MOVE,
     MOVE_ITEM,
     REINDEX,
+    STUDIO_RENDER,
     THUMBNAILS,
 )
 
@@ -21,6 +22,7 @@ __all__ = [
     "MOVE",
     "MOVE_ITEM",
     "REINDEX",
+    "STUDIO_RENDER",
     "THUMBNAILS",
     "MediaJobDeps",
     "MediaJobRequest",

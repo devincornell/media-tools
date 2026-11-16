@@ -2,6 +2,8 @@ from .browser import BrowserService, FolderIndexReader
 from .errors import (
     DirectoryNotIndexedError,
     GalleryError,
+    GraphConflictError,
+    GraphNotFoundError,
     InvalidJobRequestError,
     InvalidUploadError,
     MediaFileNotFoundError,
@@ -26,6 +28,8 @@ __all__ = [
     "FolderIndexReader",
     "GalleryError",
     "GalleryService",
+    "GraphConflictError",
+    "GraphNotFoundError",
     "InvalidJobRequestError",
     "InvalidUploadError",
     "MediaFileNotFoundError",

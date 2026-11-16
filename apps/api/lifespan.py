@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.uploads = services.uploads
         app.state.job_manager = services.job_manager
         app.state.media_jobs = services.media_jobs
+        app.state.studio = services.studio
         app.state.job_config = JobConfigView(
             copy_source_roots=[str(p) for p in config.copy_source_roots],
             worker_enabled=config.run_worker,

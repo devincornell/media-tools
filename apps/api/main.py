@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .errors import register_exception_handlers
 from .lifespan import lifespan
-from .routers import favorites, fs, jobs, listings, media, media_jobs, pages, uploads
+from .routers import favorites, fs, jobs, listings, media, media_jobs, pages, studio, uploads
 from .settings import STATIC_DIR, Settings
 
 
@@ -23,6 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(media_jobs.router)
     app.include_router(fs.router)
     app.include_router(uploads.router)
+    app.include_router(studio.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
 
