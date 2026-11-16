@@ -13,6 +13,7 @@ from pathlib import Path
 import cv2
 
 from mediatools.vision import ObjectTracker, TrackedFrame, TrackId
+from video_writer import H264Writer
 
 Color = tuple[int, int, int]
 Point = tuple[int, int]
@@ -79,9 +80,7 @@ def render(
         raise RuntimeError(f"Failed to open video: {video}")
     fps = cap.get(cv2.CAP_PROP_FPS)
     size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    writer = cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*"mp4v"), fps, size)
-    if not writer.isOpened():
-        raise RuntimeError(f"Failed to open writer for: {output}")
+    writer = H264Writer(output, fps, size)
 
     thickness = max(2, size[0] // 640)
     try:
@@ -116,7 +115,7 @@ def render(
             writer.write(image)
     finally:
         cap.release()
-        writer.release()
+        writer.close()
 
 
 def main() -> None:
