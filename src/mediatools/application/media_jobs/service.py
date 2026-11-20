@@ -15,6 +15,7 @@ from ...contracts import (
     MontageRequest,
     MoveItemRequest,
     MoveRequest,
+    OpticalFlowRequest,
     ReindexRequest,
     ThumbnailsRequest,
 )
@@ -31,6 +32,7 @@ from .types import (
     MONTAGE,
     MOVE,
     MOVE_ITEM,
+    OPTICAL_FLOW,
     REINDEX,
     THUMBNAILS,
     TYPE_BY_KIND,
@@ -45,6 +47,7 @@ MediaJobRequest = (
     | MoveItemRequest
     | DeleteItemRequest
     | MontageRequest
+    | OpticalFlowRequest
 )
 
 _TYPE_BY_REQUEST: dict[type, str] = {
@@ -56,6 +59,7 @@ _TYPE_BY_REQUEST: dict[type, str] = {
     MoveItemRequest: MOVE_ITEM,
     DeleteItemRequest: DELETE_ITEM,
     MontageRequest: MONTAGE,
+    OpticalFlowRequest: OPTICAL_FLOW,
 }
 
 
@@ -132,10 +136,26 @@ class MediaJobService:
             return self._validate_delete_item(request)
         if isinstance(request, MontageRequest):
             return self._validate_montage(request)
+        if isinstance(request, OpticalFlowRequest):
+            return self._validate_optical_flow(request)
         target = self._under_root(request.path)
         if not target.is_dir():
             raise InvalidJobRequestError(f"Directory not found: {request.path}")
         return target
+
+    def _validate_optical_flow(self, request: OpticalFlowRequest) -> Path:
+        try:
+            video = resolve_allowed_source(request.video, (self.root_path, *self.copy_source_roots))
+        except PathOutsideRootError as e:
+            raise InvalidJobRequestError(str(e)) from e
+        if not video.is_file():
+            raise InvalidJobRequestError(f"Video not found: {request.video}")
+        outputs = [self._under_root(o) for o in (request.overlay_output, request.particles_output) if o is not None]
+        for output in outputs:
+            if output.exists() and not request.overwrite:
+                raise InvalidJobRequestError(f"Output already exists: {output.relative_to(self.root_path)}")
+        # The job is listed under its first output's folder; with no output it only fills the flow cache.
+        return outputs[0].parent if outputs else self.root_path
 
     def _validate_montage(self, request: MontageRequest) -> Path:
         for source in request.sources:

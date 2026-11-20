@@ -23,6 +23,7 @@ from mediatools.contracts import (
     DeleteItemRequest,
     MoveItemRequest,
     MoveRequest,
+    OpticalFlowRequest,
     ReindexRequest,
     ThumbnailsRequest,
 )
@@ -80,7 +81,10 @@ def tree(tmp_path: Path, video_cache: dict[str, Path]) -> dict[str, Path]:
     cp("v7", root / "trip" / "batch" / "dupe.mp4")
     cp("v8", batch / "conflict.mp4")
     (root / "trip" / "batch" / "conflict.mp4").write_bytes(b"different")
-    return {"root": root, "thumbs": thumbs, "incoming": incoming, "batch": batch}
+    return {
+        "root": root, "thumbs": thumbs, "incoming": incoming, "batch": batch,
+        "flow_cache": tmp_path / "flow_cache",
+    }
 
 
 def settings_for(tree: dict[str, Path], db_name: str, **extra: object) -> Settings:
@@ -627,6 +631,88 @@ def test_submission_validation(tree: dict[str, Path], tmp_path: Path):
 def test_cleanup_requires_a_selection():
     with pytest.raises(ValueError):
         CleanupRequest(path=".")
+
+
+def test_optical_flow_job_caches_and_resumes(tree: dict[str, Path]):
+    video = str(tree["root"] / "trip" / "x.mp4")  # 12 frames, so 11 frame pairs
+    flow = {"video": video, "algorithm": "dis", "dis_preset": "ultrafast"}
+
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        # Cache only: no outputs, so nothing is rendered and nothing is rescanned.
+        status, out = await submit_and_run(s, OpticalFlowRequest(**flow, max_frames=5))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert out["result"] == {
+            "video": video, "algorithm": "dis", "pairs": 5, "flows_cached": 0, "flows_computed": 5,
+            "frames_written": 0, "overlay_output": None, "particles_output": None,
+        }
+        assert out["view"].kind == "optical_flow" and out["view"].target == "."
+        assert len(list(tree["flow_cache"].glob("x-*/*.npy"))) == 5
+
+        # A longer request reuses the 5 cached pairs and renders both videos from the cache.
+        status, out = await submit_and_run(s, OpticalFlowRequest(
+            **flow, overlay_output="flow/overlay.mp4", particles_output="flow/particles.mp4",
+            particle_count=200, particle_height=32,
+        ))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        r = out["result"]
+        assert (r["pairs"], r["flows_cached"], r["flows_computed"], r["frames_written"]) == (11, 5, 6, 11)
+        assert r["reindex"]["videos_new"] == 2 and r["reindex"]["directories"] >= 1
+        assert out["view"].target == "flow"
+        for name in ("overlay.mp4", "particles.mp4"):
+            assert (tree["root"] / "flow" / name).stat().st_size > 0
+        assert not list((tree["root"] / "flow").glob(".*"))  # no temporary files left behind
+        assert "flow" in await s.gallery.list_directories()
+        log = [ln.message for ln in await s.job_manager.logs(out["view"].job.id, limit=1000)]
+        assert any("5 cached, 6 to compute" in m for m in log) and log[-1] == "Finished"
+
+        # Everything is cached now; an existing output is only replaced when asked.
+        with pytest.raises(InvalidJobRequestError, match="already exists"):
+            await s.media_jobs.submit(OpticalFlowRequest(**flow, overlay_output="flow/overlay.mp4"))
+        status, out = await submit_and_run(s, OpticalFlowRequest(**flow, overlay_output="flow/overlay.mp4", overwrite=True))
+        assert status is JobStatus.SUCCEEDED, out["view"].job.error_message
+        assert out["result"]["flows_computed"] == 0 and out["result"]["flows_cached"] == 11
+
+        # A different setting is a different cache; --recompute redoes the cached pairs.
+        status, out = await submit_and_run(s, OpticalFlowRequest(**{**flow, "dis_preset": "fast"}, max_frames=2))
+        assert out["result"]["flows_computed"] == 2
+        status, out = await submit_and_run(s, OpticalFlowRequest(**flow, max_frames=3, recompute=True))
+        assert out["result"]["flows_computed"] == 3 and out["result"]["flows_cached"] == 0
+
+    run_services(tree, body, site_flow_cache_path=tree["flow_cache"])
+
+
+def test_optical_flow_submission_validation(tree: dict[str, Path]):
+    async def body(s: Services, client: pymongo.AsyncMongoClient, db: str) -> None:
+        inside = str(tree["root"] / "trip" / "x.mp4")
+        for req in (
+            OpticalFlowRequest(video="/etc/passwd"),
+            OpticalFlowRequest(video="trip/x.mp4"),  # must be absolute
+            OpticalFlowRequest(video=str(tree["root"] / "trip" / "missing.mp4")),
+            OpticalFlowRequest(video=str(tree["root"] / "trip")),  # a folder
+            OpticalFlowRequest(video=inside, overlay_output="../escape.mp4"),
+            OpticalFlowRequest(video=inside, particles_output="a/clip1.mp4"),  # exists, no overwrite
+        ):
+            with pytest.raises(InvalidJobRequestError):
+                await s.media_jobs.submit(req)
+        assert (await s.media_jobs.list()).total == 0
+        # Videos in a copy source root are fine to read.
+        await s.media_jobs.submit(OpticalFlowRequest(video=str(tree["batch"] / "new1.mp4")))
+
+    run_services(tree, body, site_flow_cache_path=tree["flow_cache"])
+
+
+def test_optical_flow_request_rules():
+    OpticalFlowRequest(video="/v.mp4", overlay_output="a.mp4", particles_output="b.mp4")
+    for bad in (
+        {"overlay_output": "clip.mkv"},
+        {"overlay_output": "same.mp4", "particles_output": "./same.mp4"},
+        {"particle_fade": 1.0},
+        {"step": 0},
+        {"raft_flow_updates": 0},
+        {"unknown_option": True},
+    ):
+        with pytest.raises(ValueError):
+            OpticalFlowRequest(video="/v.mp4", **bad)
 
 
 def test_api_end_to_end(tree: dict[str, Path]):

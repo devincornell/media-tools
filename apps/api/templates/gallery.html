@@ -669,15 +669,18 @@
             };
             const run = (fn) => () => { closeCardMenu(); fn(card); };
 
-            menu.append(
+            menu.append(...[
                 jobEl('div', 'card-menu-title', card.dataset.path.split('/').pop()),
                 info,
                 item(isFavorite ? 'fas fa-star' : 'far fa-star', isFavorite ? 'Remove favorite' : 'Add to favorites', 'fav', run(toggleFavorite)),
                 item('fas fa-share', 'Move to...', '', run(startMove)),
                 item('fas fa-pen', 'Rename...', '', run(startRename)),
                 item('fas fa-circle-info', 'Info', '', () => { info.hidden = !info.hidden; placeCardMenu(menu, button); }),
+                card.dataset.type === 'video'
+                    ? item('fas fa-wind', 'Optical flow...', '', run(c => { location.href = `/jobs?kind=optical_flow&video_rel=${encodeURIComponent(c.dataset.path)}`; }))
+                    : null,
                 item('fas fa-trash', isFolder ? 'Delete folder...' : 'Delete...', 'danger', run(startDelete)),
-            );
+            ].filter(Boolean));
             document.body.append(menu);
             placeCardMenu(menu, button);
             openMenu = menu;

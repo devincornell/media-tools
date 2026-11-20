@@ -65,6 +65,7 @@ async def build_services(config: ServerConfig, database: AsyncDatabase) -> Servi
         index=index,
         records=records,
         favorite_folders=favorite_folders,
+        flow_cache_path=config.flow_cache_path,
     )
     media_jobs = MediaJobService(
         root_path=config.root_path,

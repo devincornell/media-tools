@@ -27,6 +27,7 @@ from .jobs import (
     MontageRequest,
     MoveItemRequest,
     MoveRequest,
+    OpticalFlowRequest,
     ReindexRequest,
     ThumbnailsRequest,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "MontageRequest",
     "MoveItemRequest",
     "MoveRequest",
+    "OpticalFlowRequest",
     "PathList",
     "ReindexRequest",
     "StreamSource",

@@ -32,6 +32,15 @@ class PickerDir(_Contract):
     has_subdirs: Annotated[bool, Field(description="Whether it contains subfolders.")]
 
 
+class PickerFile(_Contract):
+    '''A video file shown when the picker chooses a video.'''
+
+    name: Annotated[str, Field(description="File name.")]
+    path: Annotated[str, Field(description="Absolute path.")]
+    rel: Annotated[str | None, Field(description="Path relative to the gallery root, or null if outside it.")]
+    size: Annotated[int, Field(description="Size in bytes.")]
+
+
 class PickerListing(_Contract):
     '''One folder's subfolders, read live from disk.'''
 
@@ -44,3 +53,4 @@ class PickerListing(_Contract):
     owner: Annotated[str, Field(description="Owning user of `path`.")]
     num_files: Annotated[int, Field(description="Files directly inside `path` (capped).")]
     dirs: Annotated[list[PickerDir], Field(description="Subfolders sorted by name.")]
+    videos: Annotated[list[PickerFile], Field(description="Video files in `path` sorted by name; only filled when requested.")] = []

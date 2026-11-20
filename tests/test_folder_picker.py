@@ -84,3 +84,13 @@ def test_unwritable_dirs_and_message(layout: dict[str, Path]):
     assert blocked == [incoming / "locked"]
     msg = fileops.permission_message(incoming, blocked)
     assert "can't delete files in 1 source folder" in msg and f"sudo chown -R {fileops.user_name(os.getuid())} '{incoming}'" in msg
+
+
+def test_lists_videos_only_when_requested(layout: dict[str, Path]):
+    (layout["gallery"] / "trips" / "B.MOV").write_bytes(b"yy")
+    (layout["gallery"] / "trips" / "notes.txt").write_bytes(b"z")
+    picker = FolderPicker(layout["gallery"], ())
+    trips = str(layout["gallery"] / "trips")
+    assert listing(picker, "gallery", trips).videos == []
+    videos = asyncio.run(picker.list("gallery", trips, videos=True)).videos
+    assert [(v.name, v.rel, v.size) for v in videos] == [("a.mp4", "trips/a.mp4", 1), ("B.MOV", "trips/B.MOV", 2)]

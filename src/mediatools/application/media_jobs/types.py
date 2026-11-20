@@ -6,6 +6,7 @@ MOVE = "media.move_rescan.v1"
 MOVE_ITEM = "media.move_item.v1"
 DELETE_ITEM = "media.delete_item.v1"
 MONTAGE = "media.montage.v1"
+OPTICAL_FLOW = "media.optical_flow.v1"
 STUDIO_RENDER = "studio.render.v1"
 
 KIND_BY_TYPE = {
@@ -17,6 +18,7 @@ KIND_BY_TYPE = {
     MOVE_ITEM: "move_item",
     DELETE_ITEM: "delete_item",
     MONTAGE: "montage",
+    OPTICAL_FLOW: "optical_flow",
     STUDIO_RENDER: "studio",
 }
 TYPE_BY_KIND = {kind: job_type for job_type, kind in KIND_BY_TYPE.items()}

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import datetime
-from typing import Annotated
+import os
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -195,13 +196,60 @@ class MontageRequest(_Contract):
         return self
 
 
+class OpticalFlowRequest(_Contract):
+    '''Estimate dense optical flow for one video, and optionally render it as an overlay video and/or a particle video.
+
+    Flow is cached per frame pair, keyed by the video and the flow settings, so a repeated or extended request only
+    computes the pairs that are missing, and a job that is interrupted resumes where it stopped. With no output
+    given, the job only fills the cache.
+    '''
+
+    video: Annotated[str, Field(description="Absolute path of the video; must be inside the gallery root or a configured copy source root.")]
+    max_frames: Annotated[int | None, Field(ge=1, description="Only process the first this many frame pairs. Omit for the whole video.")] = None
+    algorithm: Annotated[Literal["raft", "dis", "farneback"], Field(description="`raft` is the most accurate (deep learning, GPU recommended), `dis` is fast on CPU, `farneback` is classical.")] = "dis"
+    step: Annotated[int, Field(ge=1, le=600, description="Estimate flow between frames this many apart.")] = 1
+    cache_height: Annotated[int, Field(ge=0, le=4320, description="Store flow downscaled to this many rows to keep the cache small; 0 stores full resolution. Part of the cache key.")] = 360
+    dis_preset: Annotated[Literal["ultrafast", "fast", "medium"], Field(description="Speed/quality preset of `dis`.")] = "medium"
+    raft_max_height: Annotated[int, Field(ge=16, le=2160, description="`raft` runs on frames downscaled to at most this height; GPU memory grows with the square of it.")] = 360
+    raft_variant: Annotated[Literal["small", "large"], Field(description="`large` is more accurate and needs more memory.")] = "small"
+    raft_flow_updates: Annotated[int | None, Field(ge=1, le=64, description="`raft` refinement iterations; the model default if omitted. More is slower, not larger in memory.")] = None
+    recompute: Annotated[bool, Field(description="Ignore cached flow for the selected pairs and overwrite it.")] = False
+
+    overlay_output: Annotated[str | None, Field(description="Write the overlay video (flow drawn over the source) to this `.mp4` path relative to the gallery root.")] = None
+    side_by_side: Annotated[bool, Field(description="Overlay video: show the original frame next to the overlay.")] = False
+    alpha: Annotated[float, Field(ge=0, le=1, description="Overlay video: opacity of the flow color layer.")] = 0.5
+    max_flow: Annotated[float | None, Field(gt=0, description="Overlay video: flow in pixels that maps to full brightness. Default 2% of the width per step.")] = None
+    arrow_every: Annotated[int, Field(ge=0, le=512, description="Overlay video: arrow grid spacing in pixels; 0 disables arrows.")] = 48
+    arrow_scale: Annotated[float, Field(gt=0, le=50, description="Overlay video: arrow length multiplier.")] = 3.0
+
+    particles_output: Annotated[str | None, Field(description="Write the particle video (particles drifting with the flow on black) to this `.mp4` path relative to the gallery root.")] = None
+    particle_count: Annotated[int, Field(ge=1, le=100_000, description="Particle video: number of particles.")] = 4000
+    particle_lifetime: Annotated[int, Field(ge=1, le=10_000, description="Particle video: frames before a particle respawns elsewhere.")] = 90
+    particle_fade: Annotated[float, Field(ge=0, lt=1, description="Particle video: fraction of the previous frame kept each frame; higher gives longer trails.")] = 0.85
+    particle_substeps: Annotated[int, Field(ge=1, le=32, description="Particle video: integration steps per frame of flow.")] = 4
+    particle_seed: Annotated[int, Field(description="Particle video: seed for particle placement.")] = 0
+    particle_white: Annotated[bool, Field(description="Particle video: draw white instead of coloring by direction.")] = False
+    particle_height: Annotated[int, Field(ge=0, le=4320, description="Particle video: output height keeping the aspect ratio; 0 uses the source size.")] = 720
+    overwrite: Annotated[bool, Field(description="Replace output files that already exist.")] = False
+
+    @model_validator(mode="after")
+    def _valid_outputs(self) -> OpticalFlowRequest:
+        outputs = [o for o in (self.overlay_output, self.particles_output) if o is not None]
+        for output in outputs:
+            if not output.lower().endswith(".mp4"):
+                raise ValueError("Outputs must end in .mp4.")
+        if len({os.path.normpath(o) for o in outputs}) < len(outputs):
+            raise ValueError("overlay_output and particles_output must be different files.")
+        return self
+
+
 # --------------------------------------------------------------------------- media job views
 
 class MediaJobView(_Contract):
     '''A job together with its media-specific parameters and results.'''
 
     job: Annotated[JobView, Field(description="Generic lifecycle state.")]
-    kind: Annotated[str, Field(description="Short task name: reindex, thumbnails, cleanup, convert_mp4, move, move_item, delete_item, montage.")]
+    kind: Annotated[str, Field(description="Short task name: reindex, thumbnails, cleanup, convert_mp4, move, move_item, delete_item, montage, optical_flow.")]
     target: Annotated[str | None, Field(description="Target directory relative to the gallery root.")]
     params: Annotated[dict[str, JsonValue], Field(description="Parameters the job was submitted with.")]
     result: Annotated[dict[str, JsonValue] | None, Field(description="Handler-written result summary, once available.")]

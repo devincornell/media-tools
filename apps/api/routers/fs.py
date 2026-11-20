@@ -20,6 +20,9 @@ async def picker_roots(picker: PickerDep) -> list[PickerRoot]:
 
 
 @router.get("/dirs", responses=_ERRORS)
-async def picker_dirs(picker: PickerDep, scope: PickerScope = "gallery", path: str | None = None) -> PickerListing:
-    '''Subfolders of `path` (absolute; default: the first root of `scope`), read live from disk.'''
-    return await picker.list(scope, path)
+async def picker_dirs(
+    picker: PickerDep, scope: PickerScope = "gallery", path: str | None = None, videos: bool = False
+) -> PickerListing:
+    '''Subfolders of `path` (absolute; default: the first root of `scope`), read live from disk. With `videos`, also
+    the video files directly inside it.'''
+    return await picker.list(scope, path, videos)

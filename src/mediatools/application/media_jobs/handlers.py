@@ -56,6 +56,7 @@ from .types import (
     MONTAGE,
     MOVE,
     MOVE_ITEM,
+    OPTICAL_FLOW,
     REINDEX,
     THUMBNAILS,
 )
@@ -86,6 +87,7 @@ class MediaJobDeps:
     index: MediaIndexDB
     records: MediaJobCollection
     favorite_folders: PathFavoriteStore
+    flow_cache_path: Path
     locks: PathLocks = dataclasses.field(default_factory=PathLocks)
 
 
@@ -821,6 +823,9 @@ class DeleteItemHandler(_Base):
 
 
 def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
+    # Imported here because that module builds on this one.
+    from .optical_flow import OpticalFlowHandler
+
     return {
         REINDEX: ReindexHandler(deps),
         THUMBNAILS: ThumbnailsHandler(deps),
@@ -830,4 +835,5 @@ def build_handlers(deps: MediaJobDeps) -> dict[str, JobHandler]:
         MOVE_ITEM: MoveItemHandler(deps),
         DELETE_ITEM: DeleteItemHandler(deps),
         MONTAGE: MontageHandler(deps),
+        OPTICAL_FLOW: OpticalFlowHandler(deps),
     }

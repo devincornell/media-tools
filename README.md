@@ -90,6 +90,7 @@ Notebooks that download sample videos read the archive URL from the `TEST_ZIP_FI
 | `SITE_RUN_WORKER` | no | Run the job worker inside the server process (default `true`). |
 | `SITE_WORKER_CONCURRENCY` | no | Jobs one worker runs at once (default 4). |
 | `SITE_JOB_LEASE_SECONDS` | no | How long a job stays claimed without a heartbeat before another worker may resume it (default 60). |
+| `SITE_FLOW_CACHE_PATH` | no | Where optical flow jobs cache computed flow (default `~/.cache/mediatools/optical_flow`, the same folder the `scripts/optical_flow_video.py` default uses, so cached flow is shared). Created on first use. Needs about 1 MB per frame at the default 360 rows. |
 
 Run locally from the repo root:
 
@@ -137,6 +138,7 @@ Long-running maintenance runs as background jobs, tracked in MongoDB, viewable a
 | Cleanup | Finds empty, unprobable, or same-folder duplicate videos. **Dry run by default**; turn it off to delete, after which the folder is rescanned. |
 | Convert to MP4 | Converts other video formats to MP4 next to the originals, then rescans. |
 | Move + rescan | Moves a directory (from a `SITE_COPY_SOURCE_ROOTS` location) into the gallery in parallel, then rescans the destination. **The source folder is guaranteed to be gone afterwards**, or the job fails and says what is left. A file already at the destination with the same size is treated as the same file and just removed from the source; a file whose name clashes with a *different* file is kept under a numbered name (`clip (1).mp4`) rather than skipped. Symlinks and special files are moved as themselves, never followed (a relative link may then point elsewhere). Empty subfolders and the source folder itself are removed (for a symlinked source, the link and the folder behind it). The transfer is done by `mv` (a rename on the same filesystem) or, across filesystems, `cp -p --reflink=auto` to a temporary name, a size check, `mv` into place and `rm` of the source; commands run without a shell, so file names are never interpreted. If something cannot be moved (for example, a file sits where a destination folder must go, or the disk fills up), the job is retried and then fails, leaving only those entries. The server user must be able to delete files in every source folder; if it can't, the move is refused before anything is copied, with the `chown` command to fix it. A copy source root itself can't be a source, since removing it would stop the server from starting. |
+| Optical flow | Estimates dense optical flow for one video (a path inside the gallery root or a copy source root) and optionally renders an **overlay** video (flow color wheel and arrows over the source) and/or a **particle** video (particles drifting with the flow). Start it from the jobs page (choose **Optical flow** and pick a video from the gallery or a copy source root; output names are suggested next to the video, or under `optical_flow/` for videos outside the gallery), from **Optical flow...** in a gallery video's menu (opens the form with the video filled in), or with `POST /api/jobs/optical-flow`, which takes the flow settings (`algorithm`, `step`, `raft_*`, `cache_height`, `max_frames`) and the optional `overlay_output` / `particles_output` paths with their look settings. With no output it only fills the cache. Flow is cached per frame pair (see below), so a repeated or longer request only computes the missing pairs, and a retried or resumed job continues where it stopped. Estimation needs the `vision` extra on the worker (without it the job fails with `missing_dependency`; the Docker image does not include it) and runs one at a time per worker process, since RAFT on a shared GPU would run out of memory. Outputs are H.264 MP4 and are rescanned into the index. |
 
 Every path field on the jobs page has a **Browse…** button that opens a folder picker. It lists folders live from disk, but only inside the gallery root (for targets and destinations) or the copy source roots (for move sources), and marks folders the server can't write to. Symbolic links to folders are followed and shown with a link icon, even when they point outside those roots, so a symlink you place inside a copy source root makes its target movable. Links inside a move source are still skipped, never followed.
 
@@ -144,7 +146,7 @@ Jobs survive restarts: an interrupted job is resumed by the next worker once its
 
 Jobs run in parallel (`SITE_WORKER_CONCURRENCY`, default 4). Jobs that change the index or files (rescan, convert, move, and cleanup with deletes) wait for any other job in the same worker that touches an overlapping folder (the same folder, a parent, or a child). Thumbnails and dry-run cleanups only read, so they run alongside each other. Each job writes a live log (the per-directory output of a rescan, every file moved, and so on), shown under **Details** and available at `GET /v1/jobs/{id}/logs`. Logs are kept for 30 days.
 
-To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move,move-item,delete-item}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
+To run jobs outside the web server, start the server with `--no-worker` (or `SITE_RUN_WORKER=false`) and run `make worker` / `uv run --group api python -m apps.worker`. The standalone worker reads its settings from `SITE_*` / `.env` only. HTTP API: `POST /api/jobs/{reindex,thumbnails,cleanup,convert-mp4,move,move-item,delete-item,optical-flow}` returns `202` with a job ID; poll `GET /v1/jobs/{id}`; list with `GET /v1/jobs` or `GET /api/media-jobs`; cancel with `POST /v1/jobs/{id}/cancel`.
 
 The server has no authentication. Anyone who can reach it can start jobs, including deletes. Keep it on a trusted network.
 
@@ -282,6 +284,22 @@ for flow in estimate_video_flow("my_video.mp4", estimator):   # one FlowField pe
 ```
 
 `FlowField.vectors` is read-only, with channel 0 the horizontal and channel 1 the vertical displacement from frame 1 to frame 2. `RaftFlow` is memory-safe for ~8GB GPUs: RAFT's memory use grows with the square of the pixel count (all-pairs correlation volume), so it downscales frames to at most `max_height` rows, runs in fp16 on CUDA, then upscales the flow to the input resolution and rescales the vectors to match. Raise `max_height` for more detail if memory allows, or use `variant="large"` for accuracy. Running out of memory raises `DeviceMemoryError`; other errors derive from `OpticalFlowError`.
+
+For a whole video, `FlowVideo` estimates flow per frame pair, caches it on disk, and renders it as an overlay video and/or a particle video. The same code backs the app's [optical flow job](#jobs) and the command-line script `scripts/optical_flow_video.py`:
+
+```python
+from pathlib import Path
+from mediatools.vision import DEFAULT_CACHE_DIR, FlowSettings, FlowVideo, OverlayOptions, ParticleOptions
+
+settings = FlowSettings(algorithm="raft", raft_variant="large", raft_max_height=720, cache_height=720)
+flow = FlowVideo(Path("my_video.mp4"), settings, DEFAULT_CACHE_DIR, max_frames=1000)   # first 1000 frame pairs
+for _ in flow.compute(flow.missing()):       # yields after each newly cached pair; resumable
+    pass
+for frames_written in flow.render(OverlayOptions(Path("overlay.mp4")), ParticleOptions(Path("particles.mp4"))):
+    pass                                      # outputs are H.264 MP4 (needs ffmpeg)
+```
+
+The cache folder is named after the video and a hash of its path, size, modification time and the flow settings (`algorithm`, its parameters, `step`, `cache_height`), with one `.npy` file per frame pair. Extending `max_frames`, or shrinking it again, never recomputes a cached pair; changing a setting selects a different folder, and nothing is deleted automatically. Flow is stored downscaled to `cache_height` rows as float16 (about 1 MB per frame at 360 rows, 3.7 MB at 720); `FlowSettings.cache_height = 0` stores full resolution. `compute` and `render` are generators, so a caller can report progress or stop between frame pairs.
 
 ## Development
 

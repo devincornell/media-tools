@@ -282,7 +282,9 @@ def test_root_redirects(client: TestClient):
 def test_folder_picker_endpoints(client: TestClient, media_root: Path):
     assert client.get("/api/fs/roots").json() == [{"scope": "gallery", "path": str(media_root)}]
     listing = client.get("/api/fs/dirs", params={"scope": "gallery"}).json()
-    assert listing["rel"] == "." and [d["name"] for d in listing["dirs"]] == ["trip"]
+    assert listing["rel"] == "." and [d["name"] for d in listing["dirs"]] == ["trip"] and listing["videos"] == []
+    trip = client.get("/api/fs/dirs", params={"scope": "gallery", "path": str(media_root / "trip"), "videos": "true"}).json()
+    assert trip["videos"] and all(v["rel"].startswith("trip/") for v in trip["videos"])
     assert client.get("/api/fs/dirs", params={"scope": "gallery", "path": str(media_root.parent)}).status_code == 404
     assert client.get("/api/fs/dirs", params={"scope": "source"}).status_code == 422
 

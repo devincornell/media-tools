@@ -5,11 +5,18 @@ import dataclasses
 import os
 from pathlib import Path
 
-from ..contracts.picker import PickerDir, PickerListing, PickerRoot, PickerScope
+from ..contracts.picker import (
+    PickerDir,
+    PickerFile,
+    PickerListing,
+    PickerRoot,
+    PickerScope,
+)
 from .errors import InvalidJobRequestError, MediaFileNotFoundError, PathOutsideRootError
 from .media_jobs.fileops import user_name
 
 MAX_FILE_COUNT = 10_000
+VIDEO_SUFFIXES = frozenset({".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm", ".mts", ".m2ts", ".ts", ".wmv", ".flv", ".mpg", ".mpeg"})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -24,8 +31,8 @@ class FolderPicker:
             PickerRoot(scope="source", path=str(r)) for r in self.source_roots
         ]
 
-    async def list(self, scope: PickerScope, path: str | None = None) -> PickerListing:
-        return await asyncio.to_thread(self._list, scope, path)
+    async def list(self, scope: PickerScope, path: str | None = None, videos: bool = False) -> PickerListing:
+        return await asyncio.to_thread(self._list, scope, path, videos)
 
     def _scope_roots(self, scope: PickerScope) -> tuple[Path, ...]:
         roots = (self.gallery_root,) if scope == "gallery" else self.source_roots
@@ -33,7 +40,7 @@ class FolderPicker:
             raise InvalidJobRequestError("Move jobs are disabled: no copy source roots are configured.")
         return tuple(Path(os.path.normpath(r)) for r in roots)
 
-    def _list(self, scope: PickerScope, path: str | None) -> PickerListing:
+    def _list(self, scope: PickerScope, path: str | None, videos: bool = False) -> PickerListing:
         roots = self._scope_roots(scope)
         if path and not os.path.isabs(path):
             raise PathOutsideRootError(f"Path must be absolute: {path}")
@@ -48,6 +55,7 @@ class FolderPicker:
             raise MediaFileNotFoundError(f"Folder not found: {path}")
 
         dirs: list[PickerDir] = []
+        files: list[PickerFile] = []
         num_files = 0
         try:
             entries = list(os.scandir(target))
@@ -58,6 +66,9 @@ class FolderPicker:
                 dirs.append(self._describe(entry.name, target / entry.name, entry.is_symlink()))
             elif entry.is_file():
                 num_files += 1
+                if videos and os.path.splitext(entry.name)[1].lower() in VIDEO_SUFFIXES:
+                    file = target / entry.name
+                    files.append(PickerFile(name=entry.name, path=str(file), rel=self._rel(file), size=entry.stat().st_size))
         st = target.stat()
         return PickerListing(
             scope=scope,
@@ -69,6 +80,7 @@ class FolderPicker:
             owner=user_name(st.st_uid),
             num_files=num_files,
             dirs=sorted(dirs, key=lambda d: d.name.lower()),
+            videos=sorted(files, key=lambda f: f.name.lower()),
         )
 
     def _describe(self, name: str, path: Path, is_symlink: bool) -> PickerDir:

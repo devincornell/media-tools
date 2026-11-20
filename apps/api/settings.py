@@ -8,6 +8,8 @@ import pydantic_settings
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
+# Same default as the optical flow script, so cached flow is shared between the app and the command line.
+DEFAULT_FLOW_CACHE_PATH = Path("~/.cache/mediatools/optical_flow").expanduser()
 
 
 class Settings(pydantic_settings.BaseSettings):
@@ -23,6 +25,7 @@ class Settings(pydantic_settings.BaseSettings):
     site_run_worker: bool = True
     site_worker_concurrency: int = 4
     site_job_lease_seconds: float = 60.0
+    site_flow_cache_path: Path = DEFAULT_FLOW_CACHE_PATH
 
 
 @dataclasses.dataclass(frozen=True)
@@ -36,6 +39,7 @@ class ServerConfig:
     run_worker: bool = True
     worker_concurrency: int = 4
     job_lease_seconds: float = 60.0
+    flow_cache_path: Path = DEFAULT_FLOW_CACHE_PATH
 
     @classmethod
     def from_settings(cls, settings: Settings) -> typing.Self:
@@ -63,4 +67,6 @@ class ServerConfig:
             run_worker=settings.site_run_worker,
             worker_concurrency=max(1, settings.site_worker_concurrency),
             job_lease_seconds=settings.site_job_lease_seconds,
+            # Created on first use, so it need not exist yet.
+            flow_cache_path=settings.site_flow_cache_path.expanduser().resolve(),
         )

@@ -12,8 +12,8 @@ from pathlib import Path
 
 import cv2
 
+from mediatools.video.h264_writer import H264Writer
 from mediatools.vision import ObjectTracker, TrackedFrame, TrackId
-from video_writer import H264Writer
 
 Color = tuple[int, int, int]
 Point = tuple[int, int]

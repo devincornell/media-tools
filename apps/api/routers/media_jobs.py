@@ -18,6 +18,7 @@ from mediatools.contracts import (
     MontageRequest,
     MoveItemRequest,
     MoveRequest,
+    OpticalFlowRequest,
     ReindexRequest,
     ThumbnailsRequest,
 )
@@ -81,6 +82,12 @@ async def submit_delete_item(request: DeleteItemRequest, svc: MediaJobsDep) -> J
 @router.post("/api/jobs/montage", status_code=202, responses=_INVALID)
 async def submit_montage(request: MontageRequest, svc: MediaJobsDep) -> JobAccepted:
     '''Build a montage from random clips of videos whose creation_time falls in a date range.'''
+    return await _submit(svc, request)
+
+
+@router.post("/api/jobs/optical-flow", status_code=202, responses=_INVALID)
+async def submit_optical_flow(request: OpticalFlowRequest, svc: MediaJobsDep) -> JobAccepted:
+    '''Estimate cached dense optical flow for a video and optionally render an overlay and/or a particle video.'''
     return await _submit(svc, request)
 
 

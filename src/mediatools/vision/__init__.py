@@ -9,6 +9,8 @@ except ImportError as e:
     ) from e
 
 from .detect import Detection, detect_objects
+from .flow_cache import DEFAULT_CACHE_DIR, FlowCache, FlowSettings
+from .flow_video import FlowVideo, OverlayOptions, ParticleOptions
 from .optical_flow import estimate_video_flow
 from .optical_flow_domain import (
     DeviceMemoryError,
@@ -38,6 +40,7 @@ from .tracking_domain import (
 )
 
 __all__ = [
+    "DEFAULT_CACHE_DIR",
     "BoundingBox",
     "BoundingBoxDimensionError",
     "ClassId",
@@ -49,13 +52,18 @@ __all__ = [
     "DeviceUnavailableError",
     "DisFlow",
     "FarnebackFlow",
+    "FlowCache",
     "FlowField",
+    "FlowSettings",
     "FlowShapeError",
+    "FlowVideo",
     "FrameValidationError",
     "MissingTrackingIdError",
     "ObjectTracker",
     "OpticalFlowError",
     "OpticalFlowEstimator",
+    "OverlayOptions",
+    "ParticleOptions",
     "RaftFlow",
     "TrackId",
     "TrackedFrame",

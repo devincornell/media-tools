@@ -78,7 +78,7 @@
     <div class="page-head">
         <div>
             <h1>Jobs</h1>
-            <p class="page-sub">Rescans, thumbnails, cleanup, conversions, moves and montages run in the background.</p>
+            <p class="page-sub">Rescans, thumbnails, cleanup, conversions, moves, montages and optical flow run in the background.</p>
         </div>
         <a class="btn" id="backLink" href="/page/"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to gallery</a>
     </div>
@@ -94,6 +94,7 @@
                         <option value="convert_mp4">Convert to MP4</option>
                         <option value="move">Move into gallery + rescan</option>
                         <option value="montage">Create montage</option>
+                        <option value="optical_flow">Optical flow</option>
                     </select>
                 </label>
                 <label data-for="reindex thumbnails cleanup convert_mp4">Directory (relative to gallery root)
@@ -179,6 +180,87 @@
                     </div>
                 </details>
             </div>
+            <div class="montage" data-for="optical_flow">
+                <fieldset>
+                    <legend>Source video</legend>
+                    <div class="grid">
+                        <label class="wide">Video (absolute path)
+                            <input type="text" id="fVideo" placeholder="/path/inside/an/allowed/root/clip.mp4">
+                            <span class="field">
+                                <button type="button" class="small" data-pick="fVideoGallery">Choose from gallery&hellip;</button>
+                                <button type="button" class="small" data-pick="fVideoSource" id="fVideoSourceBtn">Choose from source roots&hellip;</button>
+                            </span>
+                        </label>
+                        <label>Max frame pairs <input type="number" id="fMaxFrames" min="1" placeholder="whole video"></label>
+                        <label>Frame step <input type="number" id="fStep" value="1" min="1" max="600"></label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Flow estimation</legend>
+                    <div class="grid">
+                        <label>Algorithm
+                            <select id="fAlgorithm">
+                                <option value="raft">RAFT (deep learning, GPU)</option>
+                                <option value="dis">DIS (fast, CPU)</option>
+                                <option value="farneback">Farneback (classical)</option>
+                            </select>
+                        </label>
+                        <label data-algo="raft">RAFT model
+                            <select id="fRaftVariant"><option value="small">small</option><option value="large">large</option></select>
+                        </label>
+                        <label data-algo="raft">RAFT max height (rows) <input type="number" id="fRaftHeight" value="360" min="16" max="2160"></label>
+                        <label data-algo="raft">RAFT refinement iterations <input type="number" id="fRaftUpdates" min="1" max="64" placeholder="model default"></label>
+                        <label data-algo="dis">DIS preset
+                            <select id="fDisPreset"><option>ultrafast</option><option>fast</option><option selected>medium</option></select>
+                        </label>
+                        <label>Cache height (rows, 0 = full) <input type="number" id="fCacheHeight" value="360" min="0" max="4320"></label>
+                        <div class="checks wide">
+                            <label class="check"><input type="checkbox" id="fRecompute"> Recompute cached flow</label>
+                        </div>
+                        <p class="muted wide" style="margin: 0; font-size: 13px">Flow is cached per frame pair and reused by later jobs with the same video and settings. Leave both outputs empty to only fill the cache.</p>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Outputs (relative to gallery root, .mp4)</legend>
+                    <div class="grid">
+                        <label class="wide">Overlay video (flow drawn over the source; empty to skip)
+                            <span class="field"><input type="text" id="fOverlay" placeholder="optical_flow/clip_overlay.mp4"><button type="button" data-pick="fOverlay">Browse&hellip;</button></span>
+                        </label>
+                        <label class="wide">Particle video (particles drifting with the flow; empty to skip)
+                            <span class="field"><input type="text" id="fParticles" placeholder="optical_flow/clip_particles.mp4"><button type="button" data-pick="fParticles">Browse&hellip;</button></span>
+                        </label>
+                        <div class="checks wide">
+                            <label class="check"><input type="checkbox" id="fOverwrite"> Overwrite existing outputs</label>
+                        </div>
+                    </div>
+                </fieldset>
+                <details>
+                    <summary>Overlay options</summary>
+                    <div class="grid">
+                        <label>Color opacity <input type="number" id="fAlpha" value="0.5" min="0" max="1" step="0.05"></label>
+                        <label>Full-brightness flow (px) <input type="number" id="fMaxFlow" min="0.01" step="any" placeholder="2% of width"></label>
+                        <label>Arrow spacing (px, 0 = none) <input type="number" id="fArrowEvery" value="48" min="0" max="512"></label>
+                        <label>Arrow length multiplier <input type="number" id="fArrowScale" value="3" min="0.1" max="50" step="any"></label>
+                        <div class="checks wide">
+                            <label class="check"><input type="checkbox" id="fSideBySide"> Original side by side</label>
+                        </div>
+                    </div>
+                </details>
+                <details>
+                    <summary>Particle options</summary>
+                    <div class="grid">
+                        <label>Particles <input type="number" id="fPCount" value="4000" min="1" max="100000"></label>
+                        <label>Lifetime (frames) <input type="number" id="fPLifetime" value="90" min="1" max="10000"></label>
+                        <label>Trail fade (0&ndash;0.99) <input type="number" id="fPFade" value="0.85" min="0" max="0.99" step="0.01"></label>
+                        <label>Substeps per frame <input type="number" id="fPSubsteps" value="4" min="1" max="32"></label>
+                        <label>Output height (0 = source) <input type="number" id="fPHeight" value="720" min="0" max="4320"></label>
+                        <label>Random seed <input type="number" id="fPSeed" value="0"></label>
+                        <div class="checks wide">
+                            <label class="check"><input type="checkbox" id="fPWhite"> White particles (no direction color)</label>
+                        </div>
+                    </div>
+                </details>
+            </div>
             <p id="moveDisabled" class="danger hidden" data-for="move">Move jobs are disabled: set SITE_COPY_SOURCE_ROOTS on the server.</p>
             <p id="workerOff" class="muted hidden">This server isn't running a job worker; jobs will wait for a separate worker process.</p>
             <div class="row" style="margin-top: 0.75rem">
@@ -204,7 +286,7 @@
                         <option value="">All</option>
                         <option value="reindex">Rescan</option><option value="thumbnails">Thumbnails</option>
                         <option value="cleanup">Cleanup</option><option value="convert_mp4">Convert</option>
-                        <option value="move">Move</option><option value="move_item">Move item</option><option value="delete_item">Delete item</option><option value="montage">Montage</option><option value="studio">Studio render</option>
+                        <option value="move">Move</option><option value="move_item">Move item</option><option value="delete_item">Delete item</option><option value="montage">Montage</option><option value="optical_flow">Optical flow</option><option value="studio">Studio render</option>
                     </select>
                 </label>
             </div>
@@ -221,8 +303,8 @@
 
 <script src="/static/picker.js"></script>
 <script>
-const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan', move_item: 'Move', delete_item: 'Delete', montage: 'Montage', studio: 'Studio render' };
-const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move', montage: 'montage' };
+const KIND_LABEL = { reindex: 'Rescan', thumbnails: 'Thumbnails', cleanup: 'Cleanup', convert_mp4: 'Convert', move: 'Move + rescan', move_item: 'Move', delete_item: 'Delete', montage: 'Montage', optical_flow: 'Optical flow', studio: 'Studio render' };
+const ENDPOINT = { reindex: 'reindex', thumbnails: 'thumbnails', cleanup: 'cleanup', convert_mp4: 'convert-mp4', move: 'move', montage: 'montage', optical_flow: 'optical-flow' };
 const ACTIVE = new Set(['queued', 'running']);
 const expanded = new Set();
 const $ = (id) => document.getElementById(id);
@@ -246,6 +328,7 @@ function errorText(body, fallback) {
 
 // ---------------------------------------------------------------- folder picker
 let copyRoots = [];
+let galleryRoot = null;
 const baseName = (p) => p.replace(/\/+$/, '').split('/').pop();
 
 function destFor(rel) {
@@ -253,7 +336,42 @@ function destFor(rel) {
     return [rel && rel !== '.' ? rel : '', name].filter(Boolean).join('/');
 }
 
+// Suggested outputs for a chosen video: next to it when it is in the gallery, else under optical_flow/.
+function suggestFlowOutputs(videoPath, rel) {
+    const name = baseName(videoPath);
+    const stem = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name;
+    const dir = rel != null ? rel.split('/').slice(0, -1).join('/') : 'optical_flow';
+    const out = (suffix) => [dir, `${stem}_${suffix}.mp4`].filter(Boolean).join('/');
+    $('fOverlay').value = out('overlay');
+    $('fParticles').value = out('particles');
+}
+
+function setFlowVideo(path, rel) {
+    const changed = $('fVideo').value.trim() !== path;
+    $('fVideo').value = path;
+    if (changed || (!$('fOverlay').value.trim() && !$('fParticles').value.trim())) suggestFlowOutputs(path, rel);
+}
+
 function openPicker(field) {
+    if (field === 'fVideoGallery' || field === 'fVideoSource') {
+        const current = $('fVideo').value.trim();
+        FolderPicker.open({
+            scope: field === 'fVideoGallery' ? 'gallery' : 'source', pickVideo: true, title: 'Choose a video',
+            start: current ? current.split('/').slice(0, -1).join('/') : null,
+            onChoose: (L, video) => setFlowVideo(video.path, video.rel),
+        });
+        return;
+    }
+    if (field === 'fOverlay' || field === 'fParticles') {
+        const parts = $(field).value.trim().split('/');
+        const file = /\.mp4$/i.test(parts[parts.length - 1]) ? parts.pop() : (field === 'fOverlay' ? 'flow.mp4' : 'particles.mp4');
+        FolderPicker.open({
+            scope: 'gallery', title: 'Choose where to save the video', startRel: parts.join('/'), allowNewFolder: true,
+            note: (L) => `will save as ${[L.rel && L.rel !== '.' ? L.rel : '', file].filter(Boolean).join('/')}`,
+            onChoose: (L) => { $(field).value = [L.rel && L.rel !== '.' ? L.rel : '', file].filter(Boolean).join('/'); },
+        });
+        return;
+    }
     if (field === 'mSourceExt' || field === 'mSourceGallery') {
         const scope = field === 'mSourceExt' ? 'source' : 'gallery';
         FolderPicker.open({
@@ -303,6 +421,9 @@ function updateForm() {
     document.querySelectorAll('[data-for]').forEach(n => n.classList.toggle('hidden', !n.dataset.for.split(' ').includes(kind)));
     $('dryRunWarning').classList.toggle('hidden', $('dryRun').checked);
     if (kind === 'move') $('moveDisabled').classList.toggle('hidden', copyRoots.length > 0);
+    const algo = $('fAlgorithm').value;
+    document.querySelectorAll('[data-algo]').forEach(n => n.classList.toggle('hidden', n.dataset.algo !== algo));
+    $('fVideoSourceBtn').classList.toggle('hidden', copyRoots.length === 0);
 }
 
 function buildRequest(kind) {
@@ -331,6 +452,25 @@ function buildRequest(kind) {
                 random_seed: Number($('mSeed').value), workers: Number($('mWorkers').value),
                 max_clips_per_video: optInt('mMaxPer'), max_total_clips: optInt('mMaxTotal'),
                 shuffle_clips: $('mShuffle').checked, use_cuda: $('mCuda').checked, overwrite: $('mOverwrite').checked,
+            };
+        }
+        case 'optical_flow': {
+            const opt = (id) => ($(id).value.trim() === '' ? null : Number($(id).value));
+            const text = (id) => $(id).value.trim() || null;
+            return {
+                video: $('fVideo').value.trim(), max_frames: opt('fMaxFrames'), step: Number($('fStep').value),
+                algorithm: $('fAlgorithm').value, cache_height: Number($('fCacheHeight').value),
+                dis_preset: $('fDisPreset').value, raft_variant: $('fRaftVariant').value,
+                raft_max_height: Number($('fRaftHeight').value), raft_flow_updates: opt('fRaftUpdates'),
+                recompute: $('fRecompute').checked,
+                overlay_output: text('fOverlay'), side_by_side: $('fSideBySide').checked,
+                alpha: Number($('fAlpha').value), max_flow: opt('fMaxFlow'),
+                arrow_every: Number($('fArrowEvery').value), arrow_scale: Number($('fArrowScale').value),
+                particles_output: text('fParticles'), particle_count: Number($('fPCount').value),
+                particle_lifetime: Number($('fPLifetime').value), particle_fade: Number($('fPFade').value),
+                particle_substeps: Number($('fPSubsteps').value), particle_height: Number($('fPHeight').value),
+                particle_seed: Number($('fPSeed').value), particle_white: $('fPWhite').checked,
+                overwrite: $('fOverwrite').checked,
             };
         }
     }
@@ -383,6 +523,11 @@ function summary(item) {
             }
             case 'convert_mp4': parts.push(`${r.converted} converted, ${r.skipped_existing} skipped of ${r.candidates}`); break;
             case 'montage': parts.push(`${r.videos_selected} of ${r.videos_found} videos${item.params.start || item.params.end ? ' in range' : ''}${r.output ? ` → ${r.output}` : ''}`); break;
+            case 'optical_flow': {
+                const outs = [item.params.overlay_output, item.params.particles_output].filter(Boolean);
+                parts.push(`${r.flows_computed} flows computed, ${r.flows_cached} cached of ${r.pairs} pairs${outs.length ? ` → ${outs.join(', ')}` : ''}`);
+                break;
+            }
             case 'move': {
                 const extra = [`${(r.renamed || []).length} renamed`];
                 if (r.links_moved) extra.push(`${r.links_moved} link(s)`);
@@ -497,7 +642,7 @@ function render(page) {
         const dryTag = item.kind === 'cleanup' && item.params.dry_run ? ' (dry run)' : '';
         tbody.append(el('tr', {},
             el('td', {}, (KIND_LABEL[item.kind] || item.kind) + dryTag),
-            el('td', { class: 'target' }, item.kind === 'move' ? `${item.params.source} → ${item.target}` : item.kind === 'move_item' ? `${item.params.path} → ${item.params.merge_into_dest ? `${item.params.dest} (merged)` : [item.params.dest, item.params.name || item.params.path.split('/').pop()].filter(p => p !== '.').join('/')}` : item.kind === 'delete_item' ? item.params.path : (item.target ?? '')),
+            el('td', { class: 'target' }, item.kind === 'optical_flow' ? item.params.video : item.kind === 'move' ? `${item.params.source} → ${item.target}` : item.kind === 'move_item' ? `${item.params.path} → ${item.params.merge_into_dest ? `${item.params.dest} (merged)` : [item.params.dest, item.params.name || item.params.path.split('/').pop()].filter(p => p !== '.').join('/')}` : item.kind === 'delete_item' ? item.params.path : (item.target ?? '')),
             el('td', {}, el('span', { class: `badge ${job.status}` }, statusText)),
             progressCell(job),
             el('td', {}, fmtTime(job.created_at)),
@@ -532,7 +677,8 @@ async function refresh() {
 }
 
 async function init() {
-    const path = new URLSearchParams(location.search).get('path');
+    const query = new URLSearchParams(location.search);
+    const path = query.get('path');
     if (path) {
         $('path').value = path;
         $('dest').value = path === '.' ? '' : path;
@@ -542,10 +688,12 @@ async function init() {
         const cfg = await (await fetch('/api/job-config')).json();
         copyRoots = cfg.copy_source_roots;
         $('workerOff').classList.toggle('hidden', cfg.worker_enabled);
+        galleryRoot = (await (await fetch('/api/fs/roots')).json()).find(r => r.scope === 'gallery')?.path ?? null;
     } catch (e) { /* config is optional for rendering */ }
     document.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => openPicker(b.dataset.pick)));
     $('kind').addEventListener('change', () => { $('workers').value = $('kind').value === 'move' ? 4 : 2; updateForm(); });
     $('dryRun').addEventListener('change', updateForm);
+    $('fAlgorithm').addEventListener('change', updateForm);
     $('mMode').addEventListener('change', () => {
         const byRatio = $('mMode').value === 'ratio';
         $('mTargetLabel').classList.toggle('hidden', byRatio);
@@ -555,6 +703,11 @@ async function init() {
     $('filterStatus').addEventListener('change', refresh);
     $('filterKind').addEventListener('change', refresh);
     $('workers').value = 2;
+    if ([...$('kind').options].some(o => o.value === query.get('kind'))) $('kind').value = query.get('kind');
+    // From the gallery's "Optical flow..." menu: the video path is relative to the gallery root.
+    const videoRel = query.get('video_rel');
+    if (videoRel && galleryRoot) setFlowVideo(`${galleryRoot.replace(/\/+$/, '')}/${videoRel}`, videoRel);
+    else if (query.get('video')) setFlowVideo(query.get('video'), null);
     updateForm();
     refresh();
 }

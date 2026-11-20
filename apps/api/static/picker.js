@@ -10,6 +10,8 @@
  *     allowNewFolder: true,             // show a "New folder" button (gallery scope); nothing is created here:
  *                                       // onChoose gets a listing with virtual: true for a folder the caller must create
  *     onChoose: (listing) => {},        // receives the /api/fs/dirs listing of the chosen folder (Enter also chooses)
+ *     pickVideo: true,                  // choose a video file instead: video files are listed under the folders,
+ *                                       // clicking one calls onChoose(listing, video) with an /api/fs/dirs `videos` entry
  *   });
  */
 (function () {
@@ -35,6 +37,7 @@
     .fp-row:nth-child(even) { background: #1b1b1b; }
     .fp-row:hover { background: #2a2a40; }
     .fp-row .fp-ico { color: #5aa9f6; width: 1.1rem; text-align: center; }
+    .fp-row.fp-file .fp-ico { color: #a3a3a3; }
     .fp-row .fp-nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fp-row .fp-meta { color: #a3a3a3; font-size: 0.78rem; white-space: nowrap; }
     .fp-row.fp-dot .fp-nm { color: #a3a3a3; }
@@ -67,7 +70,7 @@
             title: el('span', { class: 'fp-title' }),
             root: el('select', { onchange: () => go(d.root.value) }),
             filter: el('input', {
-                type: 'search', placeholder: 'Filter folders in this directory', 'aria-label': 'Filter folders',
+                type: 'search', 'aria-label': 'Filter',
                 autocomplete: 'off', spellcheck: 'false', oninput: () => state.listing && render(), onkeydown: filterKey,
             }),
             crumbs: el('div', { class: 'fp-crumbs' }),
@@ -77,7 +80,7 @@
                 el('i', { class: 'fas fa-arrow-up' }), ' Up'),
             newFolder: el('button', { type: 'button', title: 'Pick a new folder to create here', onclick: newFolder },
                 el('i', { class: 'fas fa-folder-plus' }), ' New folder'),
-            choose: el('button', { type: 'button', class: 'fp-primary', onclick: choose }, 'Choose this folder'),
+            choose: el('button', { type: 'button', class: 'fp-primary', onclick: () => choose(null) }, 'Choose this folder'),
         };
         d.modal = el('div', { class: 'fp-modal fp-hidden', role: 'dialog', 'aria-modal': 'true', onclick: (e) => { if (e.target === d.modal) close(); } },
             el('div', { class: 'fp-box' },
@@ -92,19 +95,19 @@
             // Buttons and the root selector keep Enter for their own action.
             else if (e.key === 'Enter' && !e.shiftKey && !e.repeat && !e.isComposing && !e.target.closest('button, select')) {
                 e.preventDefault();
-                choose();
+                choose(null);
             }
         });
         state.dom = d;
         return d;
     }
 
-    function visibleDirs() {
-        const term = state.dom.filter.value.trim().toLowerCase();
-        return state.listing.dirs.filter(x => x.name.toLowerCase().includes(term));
-    }
+    const matchesFilter = (x) => x.name.toLowerCase().includes(state.dom.filter.value.trim().toLowerCase());
+    const visibleDirs = () => state.listing.dirs.filter(matchesFilter);
+    const visibleVideos = () => (state.opts.pickVideo ? (state.listing.videos || []).filter(matchesFilter) : []);
 
-    // Shift+Enter opens the folder when the filter has narrowed the list to one (plain Enter chooses the current folder).
+    // Shift+Enter opens the folder when the filter has narrowed the list to one (plain Enter chooses the current folder,
+    // or in video mode the only video left by the filter).
     function filterKey(e) {
         if (e.key !== 'Enter' || !e.shiftKey || !state.listing) return;
         const matches = visibleDirs();
@@ -113,12 +116,17 @@
 
     function close() { state.dom?.modal.classList.add('fp-hidden'); }
 
-    function choose() {
+    function choose(video) {
         if (!state.listing || !state.opts) return;
+        if (state.opts.pickVideo && !video) {
+            const videos = visibleVideos();
+            if (videos.length !== 1) return;
+            video = videos[0];
+        }
         const cb = state.opts.onChoose;
         const listing = state.listing;
         close();
-        cb?.(listing);
+        cb?.(listing, video);
     }
 
     // Descends into a folder that doesn't exist yet; it is created by whatever uses the choice.
@@ -149,6 +157,13 @@
         render();
     }
 
+    function fmtSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+        return `${bytes.toFixed(i ? 1 : 0)} ${units[i]}`;
+    }
+
     async function loadRoots() {
         const res = await fetch('/api/fs/roots');
         return res.ok ? await res.json() : [];
@@ -158,6 +173,7 @@
         const d = build();
         const params = new URLSearchParams({ scope: state.opts.scope });
         if (path) params.set('path', path);
+        if (state.opts.pickVideo) params.set('videos', 'true');
         const res = await fetch(`/api/fs/dirs?${params}`);
         const data = await res.json().catch(() => null);
         if (!res.ok) {
@@ -195,16 +211,25 @@
            el('span', { class: 'fp-nm' }, x.name),
            el('span', { class: 'fp-meta' }, dirMeta(x)),
            x.has_subdirs ? el('i', { class: 'fas fa-chevron-right fp-meta' }) : null));
-        d.list.replaceChildren(...(rows.length ? rows
-            : [el('div', { class: 'fp-row fp-meta' }, L.virtual ? 'This new folder will be created when you choose it.'
-                : L.dirs.length ? 'No folders match the filter.'
-                : `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`)]));
+        for (const v of visibleVideos()) {
+            rows.push(el('div', { class: 'fp-row fp-file', title: v.path, onclick: () => choose(v) },
+                el('i', { class: 'fas fa-film fp-ico' }),
+                el('span', { class: 'fp-nm' }, v.name),
+                el('span', { class: 'fp-meta' }, fmtSize(v.size))));
+        }
+        const empty = o.pickVideo ? (L.dirs.length || (L.videos || []).length ? 'Nothing matches the filter.' : 'No subfolders or videos here')
+            : L.virtual ? 'This new folder will be created when you choose it.'
+            : L.dirs.length ? 'No folders match the filter.'
+            : `No subfolders \u00b7 ${L.num_files.toLocaleString()} files here`;
+        d.list.replaceChildren(...(rows.length ? rows : [el('div', { class: 'fp-row fp-meta' }, empty)]));
         d.up.disabled = !L.parent;
+        d.choose.classList.toggle('fp-hidden', !!o.pickVideo);
         d.newFolder.classList.toggle('fp-hidden', !(o.allowNewFolder && o.scope === 'gallery'));
         d.newFolder.disabled = !L.writable;
         const showPath = (o.display || (o.scope === 'source' ? 'path' : 'rel')) === 'path';
-        let note = `Selected: ${showPath ? L.path : (L.rel || '.')}${L.virtual ? ' (new folder)' : ''}`;
-        if (!L.writable) note += o.scope === 'source'
+        let note = o.pickVideo ? `${showPath ? L.path : (L.rel || '.')} \u00b7 click a video to choose it`
+            : `Selected: ${showPath ? L.path : (L.rel || '.')}${L.virtual ? ' (new folder)' : ''}`;
+        if (!L.writable && !o.pickVideo) note += o.scope === 'source'
             ? ` \u00b7 \u26a0 the server can't delete files here (owner: ${L.owner}); the move would be refused`
             : ` \u00b7 \u26a0 read-only for the server (owner: ${L.owner})`;
         const extra = o.note?.(L);
@@ -218,6 +243,7 @@
         if (!roots.length) { alert('No folders are available here. For move sources, set SITE_COPY_SOURCE_ROOTS on the server.'); return; }
         const d = build();
         d.title.textContent = state.opts.title;
+        d.filter.placeholder = state.opts.pickVideo ? 'Filter folders and videos in this directory' : 'Filter folders in this directory';
         d.root.replaceChildren(...roots.map(r => el('option', { value: r }, r)));
         d.root.classList.toggle('fp-hidden', roots.length < 2);
         d.modal.classList.remove('fp-hidden');
